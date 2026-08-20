@@ -49,11 +49,15 @@ def load_pembelian(file_or_path, sheet_name: str = SHEET_NAME) -> pd.DataFrame:
     for col in ["Kuantitas", "@Harga", "Total Harga"]:
         df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
 
-    # Normalisasi kategori barang -> hanya AKSESORIS yang dipertahankan
+    # Normalisasi kategori barang -> hanya kategori yang mengandung kata
+    # AKSESORIS yang dipertahankan (barang maupun jasa aksesoris, kalau ada
+    # variasi penulisan seperti "JASA AKSESORIS" di data mendatang). Kategori
+    # lain yang tidak menyebut aksesoris sama sekali (SPAREPART, HANDPHONE,
+    # JASA non-aksesoris, dll) tetap dikeluarkan.
     kat = df["Nama Kategori Barang"].astype(str).str.strip().str.upper()
     kat = kat.replace({"ACCESORIES": "AKSESORIS", "ACCESSORIES": "AKSESORIS"})
     df["KATEGORI_NORM"] = kat
-    df = df[df["KATEGORI_NORM"] == "AKSESORIS"].copy()
+    df = df[df["KATEGORI_NORM"].str.contains("AKSESORIS", na=False)].copy()
 
     # Normalisasi nama pemasok & nama barang (kunci pengelompokan)
     df["PEMASOK_NORM"] = df["Pemasok"].astype(str).str.strip().str.upper()
