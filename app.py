@@ -2,9 +2,10 @@ import streamlit as st
 import pandas as pd
 
 from logic import (
-    load_penjualan, apply_filters,
+    read_raw, finalize_data, apply_filters,
     top_cabang, top_produk, top_sales_retail,
     format_rupiah_id, format_percent_id, format_int_id,
+    MissingCabangColumn,
 )
 
 st.set_page_config(page_title="MFLASH — Top Performers", page_icon="🏆", layout="wide")
@@ -19,21 +20,25 @@ st.sidebar.header("Sumber data")
 
 DEFAULT_PATH = "penjualan.csv.gz"
 uploaded = st.sidebar.file_uploader(
-    "Unggah penjualan.csv.gz",
+    "Unggah penjualan.csv.gz — bisa data seluruh cabang, atau rincian satu cabang saja",
     type=["gz", "csv"],
-    help="Kalau file penjualan.csv.gz sudah ada di dalam repo, biarkan kosong — aplikasi akan memakainya otomatis.",
+    help=(
+        "Boleh berkas gabungan seluruh cabang (ada kolom CABANG), atau berkas "
+        "rincian satu cabang saja (tanpa kolom CABANG) — kalau tidak ada kolom "
+        "CABANG, Anda akan diminta mengisi nama cabangnya di bawah ini."
+    ),
 )
 
-df = None
+raw_df = None
 error_msg = None
 
 try:
     if uploaded is not None:
-        df = load_penjualan(uploaded)
+        raw_df = read_raw(uploaded)
     else:
         import os
         if os.path.exists(DEFAULT_PATH):
-            df = load_penjualan(DEFAULT_PATH)
+            raw_df = read_raw(DEFAULT_PATH)
 except Exception as e:
     error_msg = str(e)
 
@@ -41,12 +46,29 @@ if error_msg:
     st.error(f"Gagal membaca berkas: {error_msg}")
     st.stop()
 
-if df is None:
+if raw_df is None:
     st.info(
-        "Belum ada data. Unggah **penjualan.csv.gz** lewat panel di sebelah kiri, "
-        "atau taruh berkas tersebut di root repo (sejajar dengan app.py) sebelum deploy."
+        "Belum ada data. Unggah **penjualan.csv.gz** (atau berkas rincian satu "
+        "cabang) lewat panel di sebelah kiri, atau taruh berkas tersebut di root "
+        "repo (sejajar dengan app.py) sebelum deploy."
     )
     st.stop()
+
+# Kalau berkas tidak punya kolom CABANG (berkas rincian satu cabang), minta
+# nama cabangnya dulu sebelum data difinalisasi.
+df = None
+if "CABANG" in raw_df.columns:
+    df = finalize_data(raw_df)
+else:
+    st.sidebar.warning("Berkas ini tidak punya kolom CABANG — sepertinya rincian satu cabang saja.")
+    nama_cabang = st.sidebar.text_input(
+        "Nama cabang untuk berkas ini",
+        placeholder="contoh: MFLASH TELUK JAMBE",
+    )
+    if not nama_cabang:
+        st.info("Masukkan nama cabang di panel kiri untuk melanjutkan.")
+        st.stop()
+    df = finalize_data(raw_df, cabang_default=nama_cabang.strip())
 
 st.sidebar.success(f"Data termuat: {len(df):,}".replace(",", ".") + " baris")
 

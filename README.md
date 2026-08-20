@@ -25,6 +25,16 @@ requirements.txt  # dependensi untuk Streamlit Cloud
 3. Buka [share.streamlit.io](https://share.streamlit.io), hubungkan ke repo
    tersebut, pilih `app.py` sebagai entry point, lalu deploy.
 
+### Unggah data satu cabang saja
+
+Aplikasi juga menerima berkas rincian faktur untuk **satu cabang saja** (mis.
+hasil export per cabang dari sistem, yang biasanya tidak punya kolom
+`CABANG` sama sekali). Kalau kolom itu tidak ditemukan, aplikasi akan
+meminta Anda mengisi nama cabangnya lewat kotak input di panel kiri sebelum
+data diproses — bukan langsung gagal. Dalam mode ini, tabel Top 3 Cabang
+wajar hanya menampilkan satu baris karena datanya memang hanya dari satu
+cabang.
+
 ## Aturan data yang diterapkan
 
 - **Satu nota = kombinasi `CABANG` + `NO FAKTUR`**, bukan nomor faktur saja

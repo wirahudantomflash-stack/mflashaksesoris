@@ -16,16 +16,24 @@ from __future__ import annotations
 import pandas as pd
 import numpy as np
 
+# CABANG sengaja TIDAK wajib di sini — file rincian per cabang dari sistem
+# sumbernya sering tidak menyertakan kolom CABANG sama sekali (karena satu
+# file memang hanya berisi satu cabang). Ketiadaan kolom itu ditangani lewat
+# `finalize_data(..., cabang_default=...)`, bukan dianggap error baca berkas.
 REQUIRED_COLUMNS = [
-    "TGL FAKTUR", "NO FAKTUR", "CABANG", "KATEGORI BARANG", "NAMA BARANG",
+    "TGL FAKTUR", "NO FAKTUR", "KATEGORI BARANG", "NAMA BARANG",
     "HARGA BELI", "QTY", "@HARGA", "TOTAL HARGA", "NAMA CUSTOMER",
     "ID PELANGGAN", "KATEGORI PELANGGAN", "KATEGORI PENJUALAN",
     "NAMA TEKNISI (FINAL)", "YANG MENYERAHKAN/MENJUAL",
 ]
 
 
-def load_penjualan(file_or_path) -> pd.DataFrame:
-    """Baca penjualan.csv.gz (atau file csv/csv.gz apa pun dengan skema yang sama)."""
+class MissingCabangColumn(Exception):
+    """Berkas terbaca sukses tapi tidak punya kolom CABANG (file 1 cabang)."""
+
+
+def read_raw(file_or_path) -> pd.DataFrame:
+    """Baca csv/csv.gz apa adanya dan validasi kolom wajib (di luar CABANG)."""
     df = pd.read_csv(file_or_path, compression="infer", low_memory=False)
 
     missing = [c for c in REQUIRED_COLUMNS if c not in df.columns]
@@ -33,6 +41,29 @@ def load_penjualan(file_or_path) -> pd.DataFrame:
         raise ValueError(
             "Kolom berikut tidak ditemukan di berkas: " + ", ".join(missing)
         )
+    return df
+
+
+def finalize_data(df: pd.DataFrame, cabang_default: str | None = None) -> pd.DataFrame:
+    """Normalisasi tipe data, kunci nota, kategori, modal/laba.
+
+    Kalau kolom CABANG tidak ada di berkas:
+    - `cabang_default` diisi -> semua baris diberi nama cabang itu (kasus
+      berkas rincian satu cabang).
+    - `cabang_default` kosong -> lempar MissingCabangColumn supaya pemanggil
+      (aplikasi) bisa menanyakan nama cabangnya ke pengguna lebih dulu.
+    """
+    df = df.copy()
+
+    if "CABANG" not in df.columns:
+        if not cabang_default:
+            raise MissingCabangColumn(
+                "Berkas ini tidak memiliki kolom CABANG (kemungkinan berkas rincian "
+                "satu cabang). Masukkan nama cabangnya untuk melanjutkan."
+            )
+        df["CABANG"] = cabang_default
+    else:
+        df["CABANG"] = df["CABANG"].fillna(cabang_default or "TIDAK DIKETAHUI")
 
     # Tipe data
     df["TGL FAKTUR"] = pd.to_datetime(df["TGL FAKTUR"], errors="coerce", dayfirst=False)
@@ -55,6 +86,12 @@ def load_penjualan(file_or_path) -> pd.DataFrame:
     df["BULAN"] = df["TGL FAKTUR"].dt.month
 
     return df
+
+
+def load_penjualan(file_or_path, cabang_default: str | None = None) -> pd.DataFrame:
+    """Baca + finalisasi dalam satu langkah (dipakai kalau nama cabang sudah diketahui
+    di awal, atau kalau berkas sudah pasti punya kolom CABANG sendiri)."""
+    return finalize_data(read_raw(file_or_path), cabang_default=cabang_default)
 
 
 def apply_filters(df: pd.DataFrame, tahun=None, bulan=None, cabang=None) -> pd.DataFrame:
