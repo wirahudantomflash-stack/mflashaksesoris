@@ -1,73 +1,86 @@
-# MFLASH — Top Cabang / Top Produk / Top Sales Retail
+# MFLASH — Dashboard Cabang (Pembelian + Penjualan)
 
-Dashboard Streamlit ringan untuk tiga ranking:
+Satu aplikasi Streamlit dengan dua tab:
 
-- **Top 3 Cabang** (berdasarkan omzet, laba, atau jumlah nota)
-- **Top 10 Produk Terlaris** (berdasarkan qty terjual atau omzet)
-- **Top 5 Sales Retail** (berdasarkan omzet, laba, atau jumlah nota, khusus
-  transaksi berkategori retail)
+1. **📦 Dashboard Pembelian Cabang** — porsi pemasok aksesoris (terbesar ke
+   terkecil) + fokus target pembelian ke pemasok tertentu (default: LUNA,
+   Rp 2.000.000.000).
+2. **🧾 Dashboard Penjualan Cabang** — Top 3 Cabang, Top 10 Produk Terlaris,
+   Top 5 Sales Retail.
+
+Kedua tab berdiri sendiri-sendiri (data, filter, dan hasilnya terpisah) —
+digabung dalam satu aplikasi supaya tidak perlu buka dua tautan berbeda.
 
 ## Isi repo
 
 ```
-app.py            # aplikasi Streamlit
-logic.py          # semua logika olah data (bisa diuji terpisah dari UI)
-requirements.txt  # dependensi untuk Streamlit Cloud
+app.py               # aplikasi utama (2 tab)
+logic_pembelian.py    # logika olah data pembelian/pemasok
+logic_penjualan.py    # logika olah data penjualan/cabang
+requirements.txt      # dependensi untuk Streamlit Cloud
 ```
 
 ## Cara pakai di GitHub + Streamlit Cloud
 
-1. Buat repo baru di GitHub, unggah ketiga berkas di atas.
-2. **Opsional tapi disarankan:** unggah juga `penjualan.csv.gz` ke root repo
-   (sejajar dengan `app.py`). Kalau ada, aplikasi otomatis memuatnya tanpa
-   perlu upload manual setiap kali dibuka. Kalau tidak ada, aplikasi
-   menampilkan tombol unggah berkas di panel kiri.
-3. Buka [share.streamlit.io](https://share.streamlit.io), hubungkan ke repo
-   tersebut, pilih `app.py` sebagai entry point, lalu deploy.
+1. Buat repo baru, unggah keempat berkas di atas.
+2. **Opsional:** taruh berkas data langsung di root repo (sejajar `app.py`)
+   supaya termuat otomatis tanpa upload manual tiap buka aplikasi:
+   - `Purchase_Aksesoris_Regional.xlsx` (harus punya sheet **"DB Pembelian"**) untuk tab Pembelian.
+   - `penjualan.csv.gz` untuk tab Penjualan.
+   Kalau tidak ada, tersedia tombol unggah manual di panel kiri untuk masing-masing.
+3. Deploy lewat [share.streamlit.io](https://share.streamlit.io) dengan
+   `app.py` sebagai entry point.
 
-### Unggah data satu cabang saja
+## Panel kiri (sidebar)
 
-Aplikasi juga menerima berkas rincian faktur untuk **satu cabang saja** (mis.
-hasil export per cabang dari sistem, yang biasanya tidak punya kolom
-`CABANG` sama sekali). Kalau kolom itu tidak ditemukan, aplikasi akan
-meminta Anda mengisi nama cabangnya lewat kotak input di panel kiri sebelum
-data diproses — bukan langsung gagal. Dalam mode ini, tabel Top 3 Cabang
-wajar hanya menampilkan satu baris karena datanya memang hanya dari satu
-cabang.
+Sidebar dipakai bersama oleh kedua tab, berisi:
+- Unggah data pembelian
+- Unggah data penjualan
+- Pengaturan target pemasok (nama pemasok & nilai target, untuk tab Pembelian)
 
-## Aturan data yang diterapkan
+Filter tahun/bulan/cabang untuk tiap tab ada **di dalam tab masing-masing**
+(bukan di sidebar), supaya tidak tertukar antara filter pembelian dan
+penjualan saat berpindah tab.
 
-- **Satu nota = kombinasi `CABANG` + `NO FAKTUR`**, bukan nomor faktur saja
-  (nomor faktur berjalan sendiri-sendiri per cabang).
-- **`HARGA BELI` sudah berupa total per baris** — tidak dikalikan `QTY` lagi.
-  `MODAL = HARGA BELI`, `LABA = TOTAL HARGA − HARGA BELI`.
-- **Baris kembar tidak dibuang** — dihitung apa adanya.
-- Kategori **`AKSESORIS`** dan **`ACCESORIES`** digabung jadi satu kategori
-  di kolom "Kategori" pada tabel Top Produk.
-- Angka ditampilkan dengan format Indonesia (`68.838`, `10,3%`, `Rp 4.711.790.000`).
+## Aturan data — Tab Pembelian
 
-## Catatan tentang "Sales Retail"
+- Hanya kategori barang **AKSESORIS** (dua ejaan sumber, "AKSESORIS" dan
+  "Aksesoris", digabung).
+- Nama pemasok disatukan huruf besar/kecilnya ("LUNA"/"Luna" jadi satu).
+- Nilai pembelian dipakai langsung dari kolom `Total Harga` sumber.
+- Nama pemasok target & nilai target bisa diubah dari sidebar tanpa ubah kode.
+- Periode target mengikuti filter tahun/bulan yang dipilih di dalam tab.
+- Tabel "Sinyal Kemungkinan Bisa Dialihkan" bukan bukti pelanggaran aturan
+  wajib-beli-di-LUNA — hanya titik awal penelusuran (stok bisa saja sedang
+  kosong di pemasok target saat itu).
 
-Kolom **`YANG MENYERAHKAN/MENJUAL`** dipakai sebagai nama sales, dan
-transaksi dianggap "retail" berdasarkan kolom **`KATEGORI PENJUALAN`**.
-Karena nilai persis kolom itu di data Anda belum dikonfirmasi, aplikasi
-secara otomatis menebak kategori yang mengandung kata "RETAIL" — tapi Anda
-bisa mengoreksi pilihannya langsung lewat dropdown "Kategori penjualan yang
-dianggap retail" di dashboard, tanpa perlu mengubah kode.
+## Aturan data — Tab Penjualan
+
+- Satu nota = kombinasi `CABANG` + `NO FAKTUR` (bukan nomor faktur saja).
+- `HARGA BELI` sudah total per baris — tidak dikalikan `QTY` lagi.
+- Baris kembar tidak dibuang.
+- `AKSESORIS`/`ACCESORIES` digabung.
+- Boleh unggah data **gabungan seluruh cabang** (ada kolom `CABANG`), atau
+  **rincian satu cabang saja** (tanpa kolom `CABANG`) — kalau tidak ada,
+  aplikasi meminta nama cabangnya lewat kotak input di dalam tab.
+- Angka ditampilkan gaya Indonesia (`68.838`, `10,3%`, `Rp 4.711.790.000`).
 
 ## Pengujian
 
-Logika inti (`logic.py`) sudah diuji dengan data sintetis yang meniru skema
-asli, termasuk kasus tepi: filter yang membuat hasil kosong, faktur yang
-sama muncul di beberapa cabang, dan HARGA BELI yang tidak dikalikan ulang.
+Kedua modul logika (`logic_pembelian.py`, `logic_penjualan.py`) sudah diuji
+bersamaan (tanpa konflik nama) memakai data asli Anda:
+- Pembelian: 5.319 baris, 18 cabang, ~94 pemasok setelah difilter aksesoris.
+- Penjualan: 13.989 baris rincian satu cabang (MFLASH Teluk Jambe),
+  5.709 nota unik.
 
 **Catatan jujur:** lingkungan tempat saya membuat berkas ini tidak
-tersambung ke internet, sehingga saya tidak bisa memasang paket `streamlit`
-dan benar-benar menjalankan `streamlit run app.py` di sini. Yang sudah saya
-uji langsung adalah seluruh logika di `logic.py` (fungsi olah data), dan
-`app.py` hanya menyusun logika itu ke widget Streamlit standar (`columns`,
-`metric`, `radio`, `multiselect`, `dataframe`, `download_button`,
-`file_uploader`) — tidak ada fitur eksotis di dalamnya. Saya sarankan Anda
-menjalankannya sekali secara lokal (`streamlit run app.py`) sebelum atau
-sesudah deploy ke Streamlit Cloud, dan beri tahu saya kalau ada error —
-saya perbaiki dari sana.
+tersambung internet, sehingga saya tidak bisa memasang paket `streamlit`
+dan menjalankan `streamlit run app.py` langsung di sini. Yang sudah saya
+uji dan pastikan benar adalah seluruh fungsi olah data di kedua modul
+`logic_*.py`, memakai data Excel/CSV asli Anda. `app.py` sendiri hanya
+menyusun logika itu ke widget Streamlit standar (`tabs`, `sidebar`,
+`columns`, `metric`, `progress`, `bar_chart`, `dataframe`,
+`download_button`, `file_uploader`) — tidak ada fitur eksotis. Saya
+sarankan menjalankan sekali secara lokal (`streamlit run app.py`)
+sebelum/sesudah deploy, dan beri tahu saya kalau ada error — langsung
+saya perbaiki.
