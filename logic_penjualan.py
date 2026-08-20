@@ -33,8 +33,25 @@ class MissingCabangColumn(Exception):
 
 
 def read_raw(file_or_path) -> pd.DataFrame:
-    """Baca csv/csv.gz apa adanya dan validasi kolom wajib (di luar CABANG)."""
-    df = pd.read_csv(file_or_path, compression="infer", low_memory=False)
+    """Baca csv/csv.gz ATAU xlsx (sheet 'Rincian Faktur Penjualan') dan validasi
+    kolom wajib (di luar CABANG)."""
+    name = getattr(file_or_path, "name", str(file_or_path))
+    is_excel = str(name).lower().endswith((".xlsx", ".xls"))
+
+    if is_excel:
+        try:
+            df = pd.read_excel(file_or_path, sheet_name="Rincian Faktur Penjualan")
+        except ValueError:
+            # Sheet dengan nama lain / hanya satu sheet di berkas -> pakai yang pertama
+            df = pd.read_excel(file_or_path, sheet_name=0)
+    else:
+        df = pd.read_csv(file_or_path, compression="infer", low_memory=False)
+
+    # Normalisasi nama kolom cabang: sumber kadang menulis "Cabang", kadang
+    # "CABANG" — disamakan ke "CABANG" supaya terdeteksi konsisten di bawah.
+    rename_map = {c: "CABANG" for c in df.columns if str(c).strip().upper() == "CABANG"}
+    if rename_map:
+        df = df.rename(columns=rename_map)
 
     missing = [c for c in REQUIRED_COLUMNS if c not in df.columns]
     if missing:

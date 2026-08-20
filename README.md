@@ -26,8 +26,10 @@ requirements.txt      # dependensi untuk Streamlit Cloud
 2. **Opsional:** taruh berkas data langsung di root repo (sejajar `app.py`)
    supaya termuat otomatis tanpa upload manual tiap buka aplikasi:
    - `Purchase_Aksesoris_Regional.xlsx` (harus punya sheet **"DB Pembelian"**) untuk tab Pembelian.
-   - `penjualan.csv.gz` untuk tab Penjualan.
-   Kalau tidak ada, tersedia tombol unggah manual di panel kiri untuk masing-masing.
+   - `penjualan.csv.gz` untuk tab Penjualan — boleh CSV/gz, atau Excel
+     (`.xlsx`) dengan sheet **"Rincian Faktur Penjualan"**.
+   Kalau tidak ada, tersedia tombol unggah manual di panel kiri untuk masing-masing
+   (menerima `.csv`, `.gz`, `.xlsx`, `.xls`).
 3. Deploy lewat [share.streamlit.io](https://share.streamlit.io) dengan
    `app.py` sebagai entry point.
 
@@ -60,9 +62,11 @@ penjualan saat berpindah tab.
 - `HARGA BELI` sudah total per baris — tidak dikalikan `QTY` lagi.
 - Baris kembar tidak dibuang.
 - `AKSESORIS`/`ACCESORIES` digabung.
-- Boleh unggah data **gabungan seluruh cabang** (ada kolom `CABANG`), atau
-  **rincian satu cabang saja** (tanpa kolom `CABANG`) — kalau tidak ada,
+- Boleh unggah data **gabungan seluruh cabang** (ada kolom `Cabang`/`CABANG`),
+  atau **rincian satu cabang saja** (tanpa kolom cabang) — kalau tidak ada,
   aplikasi meminta nama cabangnya lewat kotak input di dalam tab.
+- Menerima format **CSV/gz** maupun **Excel** (`.xlsx`, sheet
+  "Rincian Faktur Penjualan").
 - Angka ditampilkan gaya Indonesia (`68.838`, `10,3%`, `Rp 4.711.790.000`).
 
 ## Pengujian
@@ -70,8 +74,10 @@ penjualan saat berpindah tab.
 Kedua modul logika (`logic_pembelian.py`, `logic_penjualan.py`) sudah diuji
 bersamaan (tanpa konflik nama) memakai data asli Anda:
 - Pembelian: 5.319 baris, 18 cabang, ~94 pemasok setelah difilter aksesoris.
-- Penjualan: 13.989 baris rincian satu cabang (MFLASH Teluk Jambe),
-  5.709 nota unik.
+- Penjualan (rincian satu cabang): 13.989 baris, 5.709 nota unik.
+- Penjualan (gabungan 17 cabang): 67.954 baris, 54.012 nota unik — kolom
+  cabang otomatis terdeteksi (baik ditulis "Cabang" maupun "CABANG"), tidak
+  perlu diminta nama cabang manual.
 
 **Catatan jujur:** lingkungan tempat saya membuat berkas ini tidak
 tersambung internet, sehingga saya tidak bisa memasang paket `streamlit`

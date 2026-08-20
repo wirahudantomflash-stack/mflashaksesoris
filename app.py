@@ -30,7 +30,7 @@ st.sidebar.divider()
 st.sidebar.header("🧾 Data Penjualan")
 st.sidebar.caption("Gabungan seluruh cabang, atau rincian satu cabang saja")
 upl_penjualan = st.sidebar.file_uploader(
-    "Unggah berkas penjualan", type=["gz", "csv"], key="upl_penjualan",
+    "Unggah berkas penjualan", type=["gz", "csv", "xlsx", "xls"], key="upl_penjualan",
 )
 
 st.sidebar.divider()
