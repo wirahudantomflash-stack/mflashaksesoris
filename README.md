@@ -5,12 +5,14 @@ Satu aplikasi Streamlit dengan dua tab:
 1. **📊 Dashboard Persediaan Aksesoris** — indikator stok dengan kode warna
    🔴🟡🟢 (berdasarkan jumlah unit stok aktual), dibagi dua bagian:
    - **Stok Persediaan — Nama Barang LUNA**: fokus brand yang wajib disetok
-     semua cabang.
+     semua cabang, dilengkapi **peta stok (heatmap) Cabang × Produk** untuk
+     pemantauan sekali-lihat.
    - **Stok Persediaan — Nama Barang Selain LUNA**: brand lain sebagai
      pembanding.
-   Tiap bagian punya ringkasan cabang & produk yang paling perlu segera
-   direstock, nilai persediaan per cabang, dan kotak analisa yang
-   membandingkan kondisi LUNA vs selain LUNA.
+   Tiap bagian punya kotak **"Cabang Paling Perlu Perhatian"** (5 cabang
+   dengan porsi Merah tertinggi, ditampilkan paling atas), tabel ringkasan
+   dengan gradasi warna otomatis, ringkasan produk, nilai persediaan per
+   cabang, dan kotak analisa yang membandingkan kondisi LUNA vs selain LUNA.
 2. **🧾 Dashboard Penjualan Aksesoris** — satu tab gabungan berisi dua bagian:
    - **Ringkasan Cabang, Produk & Sales**: ranking Seluruh Cabang, Semua
      Produk Aksesoris (terlaris & profit), dan Seluruh Sales.
@@ -93,6 +95,20 @@ masing-masing** (bukan di sidebar), supaya filter tidak tertukar.
 - Stok negatif pada sumber data (anomali sistem, biasanya transaksi keluar
   tercatat sebelum stok masuk disesuaikan) otomatis masuk kategori Merah,
   bukan disembunyikan atau di-clip jadi 0.
+- **Fitur pemantauan cepat** (supaya tidak perlu baca tabel panjang satu per
+  satu):
+  - **Kotak "Cabang Paling Perlu Perhatian"** — 5 cabang dengan porsi Merah
+    tertinggi, ditampilkan sebagai kartu merah mencolok di paling atas tiap
+    bagian.
+  - **Gradasi warna otomatis** pada kolom "Porsi Merah (%)" di tabel
+    ringkasan cabang & produk — makin pekat merahnya, makin kritis, tanpa
+    perlu membaca angka satu per satu.
+  - **Peta stok (heatmap) Cabang × Produk** — khusus bagian LUNA (87 produk,
+    masih kebaca dalam satu grid). Sel diwarnai mengikuti indikator
+    (🔴🟡🟢), sel abu-abu "-" berarti produk itu tidak tercatat sama sekali
+    di cabang tsb (bukan berarti stoknya 0 — beda makna, sengaja dibedakan
+    warnanya). Tidak dipasang di bagian "Selain LUNA" karena grid-nya akan
+    terlalu besar (12.634 produk) untuk kebaca.
 - Kotak Analisa & Tindak Lanjut membandingkan porsi Merah LUNA vs Selain
   LUNA secara eksplisit, di samping catatan per kelompok.
 - **Keterbatasan yang perlu diketahui:** indikator ini murni dari jumlah

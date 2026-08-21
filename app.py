@@ -111,7 +111,7 @@ except Exception as e:
 # ---------------------------------------------------------------------------
 # TAB 1 — Dashboard Persediaan Aksesoris (LUNA vs Selain LUNA)
 # ---------------------------------------------------------------------------
-def _render_kelompok_stok(dff_kelompok, label_kelompok, key_prefix, batas_produk_tampil=None):
+def _render_kelompok_stok(dff_kelompok, label_kelompok, key_prefix, batas_produk_tampil=None, tampilkan_heatmap=False):
     """Render indikator + ringkasan cabang/produk + detail + nilai persediaan
     untuk satu kelompok produk (LUNA atau selain LUNA). Mengembalikan tabel
     indikator supaya bisa dipakai lagi di bagian Analisa."""
@@ -131,17 +131,45 @@ def _render_kelompok_stok(dff_kelompok, label_kelompok, key_prefix, batas_produk
     c3.metric("🟡 Kuning", lp.format_int_id(n_kuning), lp.format_percent_id(n_kuning / total * 100 if total else 0))
     c4.metric("🟢 Hijau", lp.format_int_id(n_hijau), lp.format_percent_id(n_hijau / total * 100 if total else 0))
 
+    rc_awal = lp.ringkasan_indikator_cabang(ind)
+    prioritas = lp.cabang_prioritas(rc_awal, n=5)
+    if not prioritas.empty:
+        st.markdown("##### 🚨 Cabang Paling Perlu Perhatian")
+        badge_cols = st.columns(len(prioritas))
+        for col, (_, row) in zip(badge_cols, prioritas.iterrows()):
+            with col:
+                st.error(
+                    f"**{row['Cabang']}**\n\n"
+                    f"{lp.format_percent_id(row['Porsi Merah (%)'])} Merah\n\n"
+                    f"({int(row['Merah'])} dari {int(row['Jumlah SKU LUNA'])} SKU)"
+                )
+
     st.subheader("Ringkasan per Cabang")
-    st.caption("Diurutkan dari porsi Merah TERTINGGI — cabang paling perlu segera direstock ada di paling atas.")
+    st.caption(
+        "Diurutkan dari porsi Merah TERTINGGI — cabang paling perlu segera direstock ada di "
+        "paling atas. Warna latar kolom \"Porsi Merah (%)\" makin pekat = makin kritis."
+    )
     rc = lp.ringkasan_indikator_cabang(ind)
     st.bar_chart(rc.set_index("Cabang")[["Merah", "Kuning", "Hijau"]])
-    tampil_rc = rc.copy()
-    tampil_rc["Porsi Merah (%)"] = rc["Porsi Merah (%)"].map(lp.format_percent_id)
-    st.dataframe(tampil_rc, use_container_width=True, height=420)
+    styled_rc = lp.styler_gradasi_merah(rc).format({"Porsi Merah (%)": lp.format_percent_id})
+    st.dataframe(styled_rc, use_container_width=True, height=420)
     st.download_button(
         f"⬇️ Unduh CSV — Ringkasan Indikator per Cabang ({label_kelompok})", rc.to_csv(index=False).encode("utf-8-sig"),
         f"ringkasan_indikator_{key_prefix}_cabang.csv", "text/csv", key=f"{key_prefix}_dl_ringkasan_cabang",
     )
+
+    if tampilkan_heatmap:
+        st.subheader("🗺️ Peta Stok — Cabang × Produk")
+        st.caption(
+            "Sekali lihat langsung kelihatan pola di seluruh jaringan — warna sel mengikuti "
+            "indikator (🔴🟡🟢), angka di dalamnya menunjukkan jumlah stok. Sel abu-abu \"-\" "
+            "berarti produk itu tidak tercatat sama sekali di cabang tsb (bukan berarti stoknya 0)."
+        )
+        pivot_stok, pivot_ind = lp.pivot_heatmap_stok(ind)
+        if pivot_stok.empty:
+            st.info("Tidak ada data untuk peta stok pada filter ini.")
+        else:
+            st.dataframe(lp.styler_heatmap(pivot_stok, pivot_ind), use_container_width=True, height=520)
 
     rp_full = lp.ringkasan_indikator_produk(ind)
     if batas_produk_tampil is not None and len(rp_full) > batas_produk_tampil:
@@ -159,8 +187,7 @@ def _render_kelompok_stok(dff_kelompok, label_kelompok, key_prefix, batas_produk
         "Produk yang Merah di BANYAK cabang sekaligus kemungkinan masalah pasokan dari "
         "pemasok, bukan cuma masalah satu cabang — diurutkan dari porsi Merah tertinggi."
     )
-    tampil_rp = rp.copy()
-    tampil_rp["Porsi Merah (%)"] = rp["Porsi Merah (%)"].map(lp.format_percent_id)
+    tampil_rp = lp.styler_gradasi_merah(rp).format({"Porsi Merah (%)": lp.format_percent_id})
     st.dataframe(tampil_rp, use_container_width=True, height=380)
     st.download_button(
         f"⬇️ Unduh CSV — Ringkasan Indikator per Produk ({label_kelompok}, semua {lp.format_int_id(len(rp_full))} produk)",
@@ -283,7 +310,7 @@ def render_persediaan_tab():
         f"🟢 Hijau: stok ≥ {lp.format_int_id(batas_kuning + 1)} (ambang bisa diubah di panel kiri). "
         "Stok negatif (anomali sistem) otomatis masuk kategori Merah."
     )
-    ind_luna = _render_kelompok_stok(dff_luna, "LUNA", "luna")
+    ind_luna = _render_kelompok_stok(dff_luna, "LUNA", "luna", tampilkan_heatmap=True)
 
     st.divider()
 

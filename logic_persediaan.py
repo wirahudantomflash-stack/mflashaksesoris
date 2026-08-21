@@ -185,6 +185,71 @@ def nilai_persediaan_cabang(df: pd.DataFrame) -> pd.DataFrame:
 
 
 # ---------------------------------------------------------------------------
+# Pemantauan cepat: cabang prioritas & peta stok (heatmap)
+# ---------------------------------------------------------------------------
+
+def cabang_prioritas(ringkasan_cabang_df: pd.DataFrame, n: int = 5) -> pd.DataFrame:
+    """N cabang dengan porsi Merah tertinggi — dipakai untuk kotak "perlu
+    perhatian" di paling atas dashboard, supaya tidak perlu baca tabel penuh
+    untuk tahu cabang mana yang harus diprioritaskan duluan."""
+    if ringkasan_cabang_df.empty:
+        return ringkasan_cabang_df
+    # Ringkasan sudah terurut dari porsi Merah tertinggi (lihat ringkasan_indikator_cabang)
+    return ringkasan_cabang_df[ringkasan_cabang_df["Porsi Merah (%)"] > 0].head(n)
+
+
+def pivot_heatmap_stok(indikator_df: pd.DataFrame):
+    """Pivot dua tabel selebar (Nama Barang x Cabang): satu berisi jumlah
+    stok, satu berisi label indikator — dipakai untuk membuat peta warna
+    (heatmap) Cabang x Produk. Cocok untuk himpunan produk yang tidak
+    terlalu banyak (puluhan-ratusan) supaya tetap kebaca; untuk ribuan
+    produk (misal kelompok "selain LUNA"), heatmap ini tidak disarankan —
+    pakai ringkasan per produk dengan batas top-N sebagai gantinya.
+    """
+    if indikator_df.empty:
+        return pd.DataFrame(), pd.DataFrame()
+    pivot_stok = indikator_df.pivot_table(index="Nama Barang", columns="Cabang", values="Stok", aggfunc="sum")
+    pivot_ind = indikator_df.pivot_table(index="Nama Barang", columns="Cabang", values="Indikator", aggfunc="first")
+    # Urutkan baris dari yang paling banyak Merah-nya (paling perlu perhatian di atas)
+    urutan = (pivot_ind == MERAH).sum(axis=1).sort_values(ascending=False).index
+    pivot_stok = pivot_stok.loc[urutan]
+    pivot_ind = pivot_ind.loc[urutan]
+    return pivot_stok, pivot_ind
+
+
+_WARNA_INDIKATOR = {
+    MERAH: "background-color: #f5c6cb; color: #58151c;",
+    KUNING: "background-color: #ffe69c; color: #664d03;",
+    HIJAU: "background-color: #c3e6cb; color: #0f5132;",
+}
+_WARNA_KOSONG = "background-color: #f1f1f1; color: #adb5bd;"
+
+
+def styler_heatmap(pivot_stok: pd.DataFrame, pivot_ind: pd.DataFrame):
+    """Bungkus pivot_stok jadi pandas Styler dengan warna latar per sel
+    mengikuti pivot_ind (Merah/Kuning/Hijau), sel yang tidak tercatat di
+    cabang tsb diberi warna netral abu-abu (bukan Merah — supaya tidak
+    disalahartikan sebagai "kritis" padahal memang belum pernah dicatat)."""
+    try:
+        warna = pivot_ind.map(lambda v: _WARNA_INDIKATOR.get(v, _WARNA_KOSONG))
+    except AttributeError:
+        warna = pivot_ind.applymap(lambda v: _WARNA_INDIKATOR.get(v, _WARNA_KOSONG))
+    tampil = pivot_stok.copy()
+    for c in tampil.columns:
+        tampil[c] = tampil[c].apply(lambda x: "-" if pd.isna(x) else format_int_id(x))
+    return tampil.style.apply(lambda _: warna, axis=None)
+
+
+def styler_gradasi_merah(df: pd.DataFrame, kolom: str = "Porsi Merah (%)"):
+    """Beri gradasi warna latar merah pada satu kolom (mis. 'Porsi Merah (%)')
+    di sebuah tabel ringkasan, supaya baris paling kritis langsung menonjol
+    tanpa perlu membaca angkanya satu per satu."""
+    if df.empty or kolom not in df.columns:
+        return df.style
+    return df.style.background_gradient(subset=[kolom], cmap="Reds", vmin=0, vmax=100)
+
+
+# ---------------------------------------------------------------------------
 # Format angka gaya Indonesia
 # ---------------------------------------------------------------------------
 
