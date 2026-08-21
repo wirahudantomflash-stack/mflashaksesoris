@@ -324,69 +324,63 @@ def render_penjualan_tab():
     )
     st.divider()
 
-    st.header("Top 3 Cabang")
-    c1, c2 = st.columns([1, 3])
-    with c1:
-        metrik_cabang = st.radio("Urutkan berdasarkan", ["Omzet", "Laba", "Jumlah Nota"], key="jl_metrik_cabang")
-    tc = ljl.top_cabang(dff, metric=metrik_cabang, n=3)
-    with c2:
-        if tc.empty:
-            st.info("Tidak ada data cabang pada filter ini.")
-        else:
-            medali = ["🥇", "🥈", "🥉"]
-            cols = st.columns(len(tc))
-            for i, (col, (_, row)) in enumerate(zip(cols, tc.iterrows())):
-                with col:
-                    st.metric(f"{medali[i]} {row['CABANG']}", ljl.format_rupiah_id(row["Omzet"]), f"Laba {ljl.format_rupiah_id(row['Laba'])}")
-                    st.caption(f"Margin {ljl.format_percent_id(row['Margin (%)'])} · {ljl.format_int_id(row['Jumlah Nota'])} nota")
-    if not tc.empty:
+    st.header("Seluruh Cabang")
+    metrik_cabang = st.radio("Urutkan berdasarkan", ["Omzet", "Laba", "Jumlah Nota"], key="jl_metrik_cabang", horizontal=True)
+    tc = ljl.top_cabang(dff, metric=metrik_cabang, n=None)
+    if tc.empty:
+        st.info("Tidak ada data cabang pada filter ini.")
+    else:
+        st.bar_chart(tc.set_index("CABANG")[metrik_cabang])
         tampil = tc.copy()
         for col in ["Omzet", "Modal", "Laba"]:
             tampil[col] = tc[col].map(ljl.format_rupiah_id)
         tampil["Margin (%)"] = tc["Margin (%)"].map(ljl.format_percent_id)
         tampil["Jumlah Nota"] = tc["Jumlah Nota"].map(ljl.format_int_id)
-        st.dataframe(tampil, use_container_width=True)
-        st.download_button("⬇️ Unduh CSV — Top Cabang", tc.to_csv(index=True).encode("utf-8-sig"), "top_cabang.csv", "text/csv", key="jl_dl_cabang")
+        st.dataframe(tampil, use_container_width=True, height=460)
+        st.download_button("⬇️ Unduh CSV — Seluruh Cabang", tc.to_csv(index=True).encode("utf-8-sig"), "seluruh_cabang.csv", "text/csv", key="jl_dl_cabang")
 
     st.divider()
-    st.header("Top 10 Produk Terlaris")
+    st.header("Semua Produk Aksesoris")
+    st.caption("Difilter khusus kategori barang AKSESORIS (AKSESORIS/ACCESORIES digabung).")
     metrik_produk = st.radio("Urutkan berdasarkan", ["Qty Terjual", "Omzet"], key="jl_metrik_produk", horizontal=True)
-    tp = ljl.top_produk(dff, metric=metrik_produk, n=10)
+    tp = ljl.top_produk(dff, metric=metrik_produk, n=None, hanya_aksesoris=True)
     if tp.empty:
-        st.info("Tidak ada data produk pada filter ini.")
+        st.info("Tidak ada data produk aksesoris pada filter ini.")
     else:
+        st.caption(f"{len(tp):,}".replace(",", ".") + " produk aksesoris berbeda.")
         tampil = tp.copy()
         tampil["Qty Terjual"] = tp["Qty Terjual"].map(ljl.format_int_id)
         tampil["Omzet"] = tp["Omzet"].map(ljl.format_rupiah_id)
         tampil["Laba"] = tp["Laba"].map(ljl.format_rupiah_id)
-        st.dataframe(tampil, use_container_width=True)
-        st.download_button("⬇️ Unduh CSV — Top Produk", tp.to_csv(index=True).encode("utf-8-sig"), "top_produk.csv", "text/csv", key="jl_dl_produk")
+        st.dataframe(tampil, use_container_width=True, height=460)
+        st.download_button("⬇️ Unduh CSV — Semua Produk Aksesoris", tp.to_csv(index=True).encode("utf-8-sig"), "semua_produk_aksesoris.csv", "text/csv", key="jl_dl_produk")
 
     st.divider()
-    st.header("Top 5 Sales Retail")
+    st.header("Seluruh Sales")
     kategori_penjualan_opsi = sorted(dff["KATEGORI PENJUALAN"].dropna().unique().tolist())
-    default_retail = [k for k in kategori_penjualan_opsi if "RETAIL" in str(k).upper()] or kategori_penjualan_opsi
     c1, c2 = st.columns([2, 1])
     with c1:
-        sel_kategori_retail = st.multiselect(
-            "Kategori penjualan yang dianggap \"retail\"", kategori_penjualan_opsi, default=default_retail, key="jl_kategori_retail",
+        sel_kategori = st.multiselect(
+            "Filter kategori penjualan (kosongkan / pilih semua untuk seluruh sales)",
+            kategori_penjualan_opsi, default=kategori_penjualan_opsi, key="jl_kategori_sales",
         )
     with c2:
         metrik_sales = st.radio("Urutkan berdasarkan", ["Omzet", "Laba", "Jumlah Nota"], key="jl_metrik_sales")
-    if not sel_kategori_retail:
-        st.info("Pilih minimal satu kategori penjualan untuk dianggap sebagai retail.")
+    if not sel_kategori:
+        st.info("Pilih minimal satu kategori penjualan.")
     else:
-        ts = ljl.top_sales_retail(dff, sel_kategori_retail, metric=metrik_sales, n=5)
+        ts = ljl.ranking_sales(dff, metric=metrik_sales, n=None, kategori_penjualan=sel_kategori)
         if ts.empty:
-            st.info("Tidak ada transaksi retail pada filter ini.")
+            st.info("Tidak ada transaksi pada filter ini.")
         else:
+            st.caption(f"{len(ts):,}".replace(",", ".") + " sales berbeda.")
             tampil = ts.copy()
             tampil["Omzet"] = ts["Omzet"].map(ljl.format_rupiah_id)
             tampil["Laba"] = ts["Laba"].map(ljl.format_rupiah_id)
             tampil["Jumlah Nota"] = ts["Jumlah Nota"].map(ljl.format_int_id)
-            st.dataframe(tampil, use_container_width=True)
+            st.dataframe(tampil, use_container_width=True, height=460)
             st.download_button(
-                "⬇️ Unduh CSV — Top Sales Retail", ts.to_csv(index=True).encode("utf-8-sig"), "top_sales_retail.csv", "text/csv", key="jl_dl_sales",
+                "⬇️ Unduh CSV — Seluruh Sales", ts.to_csv(index=True).encode("utf-8-sig"), "seluruh_sales.csv", "text/csv", key="jl_dl_sales",
             )
 
     st.divider()

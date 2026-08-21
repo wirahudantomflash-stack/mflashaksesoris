@@ -5,8 +5,9 @@ Satu aplikasi Streamlit dengan tiga tab:
 1. **📦 Dashboard Pembelian Cabang** — porsi pemasok aksesoris (terbesar ke
    terkecil) + fokus target pembelian ke pemasok tertentu (default: LUNA,
    Rp 2.000.000.000).
-2. **🧾 Dashboard Penjualan Cabang** — Top 3 Cabang, Top 10 Produk Terlaris,
-   Top 5 Sales Retail (dari data penjualan umum, seluruh kategori barang).
+2. **🧾 Dashboard Penjualan Cabang** — ranking Seluruh Cabang, Semua Produk
+   Aksesoris (terlaris & profit), dan Seluruh Sales (dari data penjualan
+   umum, tidak dibatasi jumlah atau kategori tertentu).
 3. **💰 Dashboard Revenue Aksesoris** — revenue & tren bulanan, Top 10 produk
    aksesoris terlaris & profit, omzet seluruh cabang, dan analisa + proyeksi
    5–10 tahun (dari data penjualan khusus kategori AKSESORIS).

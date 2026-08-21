@@ -122,8 +122,9 @@ def apply_filters(df: pd.DataFrame, tahun=None, bulan=None, cabang=None) -> pd.D
     return out
 
 
-def top_cabang(df: pd.DataFrame, metric: str = "Omzet", n: int = 3) -> pd.DataFrame:
-    """Top N cabang berdasarkan omzet, laba, atau jumlah nota."""
+def top_cabang(df: pd.DataFrame, metric: str = "Omzet", n: int | None = 3) -> pd.DataFrame:
+    """Ranking cabang berdasarkan omzet, laba, atau jumlah nota.
+    n=None -> tampilkan SELURUH cabang (tidak dibatasi)."""
     if df.empty:
         return pd.DataFrame(columns=["CABANG", "Omzet", "Modal", "Laba", "Margin (%)", "Jumlah Nota"])
 
@@ -136,17 +137,25 @@ def top_cabang(df: pd.DataFrame, metric: str = "Omzet", n: int = 3) -> pd.DataFr
     g["Margin (%)"] = np.where(g["Omzet"] != 0, g["Laba"] / g["Omzet"] * 100, 0)
 
     sort_col = {"Omzet": "Omzet", "Laba": "Laba", "Jumlah Nota": "Jumlah Nota"}[metric]
-    g = g.sort_values(sort_col, ascending=False).head(n).reset_index(drop=True)
+    g = g.sort_values(sort_col, ascending=False).reset_index(drop=True)
+    if n is not None:
+        g = g.head(n)
     g.index = g.index + 1
     return g[["CABANG", "Omzet", "Modal", "Laba", "Margin (%)", "Jumlah Nota"]]
 
 
-def top_produk(df: pd.DataFrame, metric: str = "Omzet", n: int = 10) -> pd.DataFrame:
-    """Top N produk terlaris berdasarkan qty terjual atau omzet."""
-    if df.empty:
+def top_produk(df: pd.DataFrame, metric: str = "Omzet", n: int | None = 10, hanya_aksesoris: bool = False) -> pd.DataFrame:
+    """Ranking produk berdasarkan qty terjual atau omzet.
+    n=None -> tampilkan SEMUA produk (tidak dibatasi).
+    hanya_aksesoris=True -> filter ke KATEGORI BARANG NORM == "AKSESORIS" saja."""
+    d = df
+    if hanya_aksesoris:
+        d = d[d["KATEGORI BARANG NORM"] == "AKSESORIS"]
+
+    if d.empty:
         return pd.DataFrame(columns=["NAMA BARANG", "Kategori", "Qty Terjual", "Omzet", "Laba"])
 
-    g = df.groupby("NAMA BARANG", dropna=False).agg(
+    g = d.groupby("NAMA BARANG", dropna=False).agg(
         Kategori=("KATEGORI BARANG NORM", lambda s: s.mode().iat[0] if not s.mode().empty else ""),
         **{"Qty Terjual": ("QTY", "sum")},
         Omzet=("TOTAL HARGA", "sum"),
@@ -154,19 +163,24 @@ def top_produk(df: pd.DataFrame, metric: str = "Omzet", n: int = 10) -> pd.DataF
     ).reset_index()
 
     sort_col = {"Qty Terjual": "Qty Terjual", "Omzet": "Omzet"}[metric]
-    g = g.sort_values(sort_col, ascending=False).head(n).reset_index(drop=True)
+    g = g.sort_values(sort_col, ascending=False).reset_index(drop=True)
+    if n is not None:
+        g = g.head(n)
     g.index = g.index + 1
     return g[["NAMA BARANG", "Kategori", "Qty Terjual", "Omzet", "Laba"]]
 
 
-def top_sales_retail(
+def ranking_sales(
     df: pd.DataFrame,
-    retail_values: list[str],
     metric: str = "Omzet",
-    n: int = 5,
+    n: int | None = 5,
+    kategori_penjualan: list[str] | None = None,
 ) -> pd.DataFrame:
-    """Top N sales/penjual pada transaksi retail (KATEGORI PENJUALAN sesuai retail_values)."""
-    d = df[df["KATEGORI PENJUALAN"].isin(retail_values)]
+    """Ranking sales/penjual berdasarkan omzet, laba, atau jumlah nota.
+    n=None -> tampilkan SELURUH sales (tidak dibatasi).
+    kategori_penjualan=None -> semua kategori penjualan diikutsertakan (tidak
+    dibatasi ke retail saja)."""
+    d = df if not kategori_penjualan else df[df["KATEGORI PENJUALAN"].isin(kategori_penjualan)]
     if d.empty:
         return pd.DataFrame(columns=["Sales", "Omzet", "Laba", "Jumlah Nota"])
 
@@ -177,9 +191,16 @@ def top_sales_retail(
     ).reset_index().rename(columns={"YANG MENYERAHKAN/MENJUAL": "Sales"})
 
     sort_col = {"Omzet": "Omzet", "Laba": "Laba", "Jumlah Nota": "Jumlah Nota"}[metric]
-    g = g.sort_values(sort_col, ascending=False).head(n).reset_index(drop=True)
+    g = g.sort_values(sort_col, ascending=False).reset_index(drop=True)
+    if n is not None:
+        g = g.head(n)
     g.index = g.index + 1
     return g[["Sales", "Omzet", "Laba", "Jumlah Nota"]]
+
+
+# Alias lama dipertahankan supaya tidak memutus kode lain yang mungkin masih memanggilnya.
+def top_sales_retail(df, retail_values, metric="Omzet", n=5):
+    return ranking_sales(df, metric=metric, n=n, kategori_penjualan=retail_values)
 
 
 # ---------------------------------------------------------------------------
