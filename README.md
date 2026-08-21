@@ -1,24 +1,28 @@
-# MFLASH — Dashboard Cabang (Pembelian + Penjualan + Revenue Aksesoris)
+# MFLASH — Dashboard Cabang (Pembelian + Penjualan Aksesoris)
 
-Satu aplikasi Streamlit dengan tiga tab:
+Satu aplikasi Streamlit dengan dua tab:
 
 1. **📦 Dashboard Pembelian Cabang** — porsi pemasok aksesoris (terbesar ke
    terkecil) + fokus target pembelian ke pemasok tertentu (default: LUNA,
    Rp 2.000.000.000).
-2. **🧾 Dashboard Penjualan Cabang** — ranking Seluruh Cabang, Semua Produk
-   Aksesoris (terlaris & profit), dan Seluruh Sales (dari data penjualan
-   umum, tidak dibatasi jumlah atau kategori tertentu).
-3. **💰 Dashboard Revenue Aksesoris** — revenue & tren bulanan, Top 10 produk
-   aksesoris terlaris & profit, omzet seluruh cabang, dan analisa + proyeksi
-   5–10 tahun (dari data penjualan khusus kategori AKSESORIS).
+2. **🧾 Dashboard Penjualan Aksesoris** — satu tab gabungan berisi dua bagian:
+   - **Ringkasan Cabang, Produk & Sales**: ranking Seluruh Cabang, Semua
+     Produk Aksesoris (terlaris & profit), dan Seluruh Sales (dari data
+     penjualan umum).
+   - **Revenue, HPP & Katalog LUNA**: revenue & tren bulanan, Top 10 produk
+     aksesoris terlaris & profit, omzet + HPP seluruh cabang, katalog
+     referensi harga LUNA & potensi profit, serta analisa + proyeksi
+     5–10 tahun (dari data penjualan khusus kategori AKSESORIS).
 
-Ketiga tab berdiri sendiri-sendiri (data, filter, dan hasilnya terpisah) —
-digabung dalam satu aplikasi supaya tidak perlu buka beberapa tautan berbeda.
+Kedua bagian dalam tab Penjualan Aksesoris memakai berkas data yang bisa
+sama atau berbeda (masing-masing punya tombol unggah sendiri di panel kiri)
+— digabung tampilannya dalam satu tab karena sama-sama berbicara soal
+penjualan aksesoris, meski sumber datanya independen.
 
 ## Isi repo
 
 ```
-app.py               # aplikasi utama (3 tab)
+app.py               # aplikasi utama (2 tab)
 logic_pembelian.py    # logika olah data pembelian/pemasok
 logic_penjualan.py    # logika olah data penjualan/cabang (umum)
 logic_aksesoris.py     # logika olah data revenue penjualan aksesoris
@@ -31,10 +35,10 @@ requirements.txt      # dependensi untuk Streamlit Cloud
 2. **Opsional:** taruh berkas data langsung di root repo (sejajar `app.py`)
    supaya termuat otomatis tanpa upload manual tiap buka aplikasi:
    - `Purchase_Aksesoris_Regional.xlsx` (harus punya sheet **"DB Pembelian"**) untuk tab Pembelian.
-   - `penjualan.csv.gz` untuk tab Penjualan — boleh CSV/gz, atau Excel
-     (`.xlsx`) dengan sheet **"Rincian Faktur Penjualan"**.
-   - `Penjualan_Aksesoris_Regional_MFlash.csv` untuk tab Revenue Aksesoris —
-     boleh CSV, atau Excel (`.xlsx`) dengan sheet **"Rincian Faktur Penjualan"**.
+   - `penjualan.csv.gz` untuk bagian "Ringkasan Cabang, Produk & Sales" —
+     boleh CSV/gz, atau Excel (`.xlsx`) dengan sheet **"Rincian Faktur Penjualan"**.
+   - `Penjualan_Aksesoris_Regional_MFlash.csv` untuk bagian "Revenue, HPP &
+     Katalog LUNA" — boleh CSV, atau Excel (`.xlsx`) dengan sheet yang sama.
    Kalau tidak ada, tersedia tombol unggah manual di panel kiri untuk masing-masing
    (menerima `.csv`, `.gz`, `.xlsx`, `.xls`).
 3. Deploy lewat [share.streamlit.io](https://share.streamlit.io) dengan
@@ -42,14 +46,14 @@ requirements.txt      # dependensi untuk Streamlit Cloud
 
 ## Panel kiri (sidebar)
 
-Sidebar dipakai bersama oleh ketiga tab, berisi:
+Sidebar dipakai bersama oleh kedua tab, berisi:
 - Unggah data pembelian
-- Unggah data penjualan (umum)
-- Unggah data penjualan aksesoris
+- Unggah data penjualan (umum) — untuk bagian pertama tab Penjualan Aksesoris
+- Unggah data penjualan aksesoris — untuk bagian kedua tab Penjualan Aksesoris
 - Pengaturan target pemasok (nama pemasok & nilai target, untuk tab Pembelian)
 
-Filter tahun/bulan/cabang untuk tiap tab ada **di dalam tab masing-masing**
-(bukan di sidebar), supaya filter antar tab tidak tertukar saat berpindah.
+Filter tahun/bulan/cabang untuk tiap bagian ada **di dalam bagian
+masing-masing** (bukan di sidebar), supaya filter tidak tertukar.
 
 ## Aturan data — Tab Pembelian
 

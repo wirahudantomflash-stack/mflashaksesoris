@@ -292,6 +292,7 @@ def render_penjualan_tab():
     if df is None:
         return
 
+    st.markdown("## 🧾 Ringkasan Cabang, Produk & Sales")
     st.subheader("Filter — Data Penjualan")
     tahun_opsi = sorted([int(t) for t in df["TAHUN"].dropna().unique()])
     bulan_opsi = sorted([int(b) for b in df["BULAN"].dropna().unique()])
@@ -743,15 +744,23 @@ def render_aksesoris_tab():
 # ---------------------------------------------------------------------------
 # Tab layout
 # ---------------------------------------------------------------------------
-tab_pembelian, tab_penjualan, tab_aksesoris = st.tabs([
-    "📦 Dashboard Pembelian Cabang", "🧾 Dashboard Penjualan Cabang", "💰 Dashboard Revenue Aksesoris",
+tab_pembelian, tab_penjualan_aksesoris = st.tabs([
+    "📦 Dashboard Pembelian Cabang", "🧾 Dashboard Penjualan Aksesoris",
 ])
 
 with tab_pembelian:
     render_pembelian_tab()
 
-with tab_penjualan:
+with tab_penjualan_aksesoris:
     render_penjualan_tab()
 
-with tab_aksesoris:
+    st.divider()
+    st.divider()
+    st.markdown("## 💰 Revenue, HPP & Katalog LUNA")
+    st.caption(
+        "Bagian di bawah ini memakai berkas data penjualan aksesoris khusus "
+        "(unggah terpisah di panel kiri) untuk analisa revenue, HPP, katalog LUNA, "
+        "dan proyeksi 5–10 tahun."
+    )
+
     render_aksesoris_tab()
