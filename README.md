@@ -63,9 +63,14 @@ Sidebar dipakai bersama oleh kedua tab, berisi:
 - Unggah data persediaan — untuk tab Persediaan Aksesoris
 - Unggah data penjualan — dipakai untuk **kedua bagian** di tab Penjualan
   Aksesoris (Ringkasan Cabang/Produk/Sales, maupun Revenue/HPP/Katalog LUNA)
-- **Ambang indikator stok LUNA** — dua kotak angka untuk mengatur batas
-  Merah dan batas Kuning (default: Merah ≤ 2 unit, Kuning 3–7 unit, Hijau
-  ≥ 8 unit — bisa diubah tanpa ubah kode)
+
+> **Catatan:** kontrol ambang indikator stok (batas Merah/Kuning) dan angka
+> "Jumlah SKU" **sementara disembunyikan** dari sidebar & tampilan dashboard
+> atas permintaan — supaya fokus murni ke kontrol stok menipis tanpa
+> distraksi angka tambahan. Ambang tetap dipakai di belakang layar dengan
+> nilai default (Merah ≤ 2 unit, Kuning 3–7 unit, Hijau ≥ 8 unit), diatur
+> lewat variabel `batas_merah`/`batas_kuning` di awal `app.py` kalau perlu
+> diubah. Beri tahu saya kapan saja kalau kontrolnya mau dimunculkan lagi.
 
 Filter tahun/bulan/cabang untuk tiap bagian ada **di dalam bagian
 masing-masing** (bukan di sidebar), supaya filter tidak tertukar.

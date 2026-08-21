@@ -40,12 +40,11 @@ upl_penjualan = st.sidebar.file_uploader(
 )
 
 st.sidebar.divider()
-st.sidebar.header("🚦 Ambang Indikator Stok LUNA")
-st.sidebar.caption("Berdasarkan jumlah unit stok aktual (bukan persentase).")
-batas_merah = st.sidebar.number_input("Batas Merah (stok ≤ ini)", min_value=0, value=2, step=1, key="batas_merah")
-batas_kuning = st.sidebar.number_input("Batas Kuning (stok ≤ ini, di atas Merah)", min_value=0, value=7, step=1, key="batas_kuning")
-if batas_merah >= batas_kuning:
-    st.sidebar.warning("Batas Merah harus lebih kecil dari batas Kuning.")
+# NOTE: kontrol ambang indikator (Merah/Kuning) sementara disembunyikan dari
+# sidebar atas permintaan — dipakai default tetap di kode saja (2 / 7),
+# supaya fokus dashboard murni ke kontrol stok menipis tanpa perlu
+# pengaturan tambahan. Bisa dimunculkan lagi kapan saja kalau dibutuhkan.
+batas_merah, batas_kuning = 2, 7
 
 # ---------------------------------------------------------------------------
 # Muat data
@@ -125,11 +124,10 @@ def _render_kelompok_stok(dff_kelompok, label_kelompok, key_prefix, batas_produk
     n_merah = (ind["Indikator"] == lp.MERAH).sum()
     n_kuning = (ind["Indikator"] == lp.KUNING).sum()
     n_hijau = (ind["Indikator"] == lp.HIJAU).sum()
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Total SKU × Cabang", lp.format_int_id(total))
-    c2.metric("🔴 Merah", lp.format_int_id(n_merah), lp.format_percent_id(n_merah / total * 100 if total else 0))
-    c3.metric("🟡 Kuning", lp.format_int_id(n_kuning), lp.format_percent_id(n_kuning / total * 100 if total else 0))
-    c4.metric("🟢 Hijau", lp.format_int_id(n_hijau), lp.format_percent_id(n_hijau / total * 100 if total else 0))
+    c1, c2, c3 = st.columns(3)
+    c1.metric("🔴 Merah", lp.format_int_id(n_merah), lp.format_percent_id(n_merah / total * 100 if total else 0))
+    c2.metric("🟡 Kuning", lp.format_int_id(n_kuning), lp.format_percent_id(n_kuning / total * 100 if total else 0))
+    c3.metric("🟢 Hijau", lp.format_int_id(n_hijau), lp.format_percent_id(n_hijau / total * 100 if total else 0))
 
     rc_awal = lp.ringkasan_indikator_cabang(ind)
     prioritas = lp.cabang_prioritas(rc_awal, n=5)
@@ -141,7 +139,7 @@ def _render_kelompok_stok(dff_kelompok, label_kelompok, key_prefix, batas_produk
                 st.error(
                     f"**{row['Cabang']}**\n\n"
                     f"{lp.format_percent_id(row['Porsi Merah (%)'])} Merah\n\n"
-                    f"({int(row['Merah'])} dari {int(row['Jumlah SKU LUNA'])} SKU)"
+                    f"({int(row['Merah'])} item)"
                 )
 
     st.subheader("Ringkasan per Cabang")
@@ -151,7 +149,8 @@ def _render_kelompok_stok(dff_kelompok, label_kelompok, key_prefix, batas_produk
     )
     rc = lp.ringkasan_indikator_cabang(ind)
     st.bar_chart(rc.set_index("Cabang")[["Merah", "Kuning", "Hijau"]])
-    styled_rc = lp.styler_gradasi_merah(rc).format({"Porsi Merah (%)": lp.format_percent_id})
+    rc_tampil = rc.drop(columns=["Jumlah SKU LUNA"])
+    styled_rc = lp.styler_gradasi_merah(rc_tampil).format({"Porsi Merah (%)": lp.format_percent_id})
     st.dataframe(styled_rc, use_container_width=True, height=420)
     st.download_button(
         f"⬇️ Unduh CSV — Ringkasan Indikator per Cabang ({label_kelompok})", rc.to_csv(index=False).encode("utf-8-sig"),
@@ -224,10 +223,9 @@ def _render_kelompok_stok(dff_kelompok, label_kelompok, key_prefix, batas_produk
         st.info("Tidak ada data pada filter ini.")
     else:
         st.bar_chart(nv.set_index("Cabang")["Nilai Persediaan"])
-        tampil_nv = nv.copy()
-        tampil_nv["Total Qty"] = nv["Total Qty"].map(lp.format_int_id)
-        tampil_nv["Jumlah SKU"] = nv["Jumlah SKU"].map(lp.format_int_id)
-        tampil_nv["Nilai Persediaan"] = nv["Nilai Persediaan"].map(lp.format_rupiah_id)
+        tampil_nv = nv.drop(columns=["Jumlah SKU"]).copy()
+        tampil_nv["Total Qty"] = tampil_nv["Total Qty"].map(lp.format_int_id)
+        tampil_nv["Nilai Persediaan"] = tampil_nv["Nilai Persediaan"].map(lp.format_rupiah_id)
         st.dataframe(tampil_nv, use_container_width=True, height=420)
         st.download_button(
             f"⬇️ Unduh CSV — Nilai Persediaan {label_kelompok} per Cabang", nv.to_csv(index=False).encode("utf-8-sig"),
@@ -247,8 +245,8 @@ def _catatan_kelompok(ind, label_kelompok):
         prioritas = rc2.iloc[0]
         catatan.append(
             f"[{label_kelompok}] Cabang **{prioritas['Cabang']}** paling perlu segera direstock — "
-            f"{lp.format_percent_id(prioritas['Porsi Merah (%)'])} dari SKU-nya berstatus "
-            f"🔴 Merah ({int(prioritas['Merah'])} dari {int(prioritas['Jumlah SKU LUNA'])} SKU)."
+            f"{lp.format_percent_id(prioritas['Porsi Merah (%)'])} dari item yang dipantau berstatus "
+            f"🔴 Merah ({int(prioritas['Merah'])} item)."
         )
         aman = rc2.sort_values("Porsi Merah (%)").iloc[0]
         catatan.append(
@@ -276,10 +274,6 @@ def render_persediaan_tab():
         )
         return
 
-    if batas_merah >= batas_kuning:
-        st.error("Batas Merah harus lebih kecil dari batas Kuning — perbaiki dulu di panel kiri.")
-        return
-
     st.subheader("Filter — Data Persediaan")
     cabang_opsi = sorted(df_persediaan["Cabang"].dropna().unique().tolist())
     sel_cabang = st.multiselect("Cabang", cabang_opsi, default=cabang_opsi, key="pd_cabang")
@@ -304,10 +298,8 @@ def render_persediaan_tab():
     # -----------------------------------------------------------------
     st.header("🔵 1. Stok Persediaan — Nama Barang LUNA")
     st.caption(
-        f"Nama barang mengandung kata \"LUNA\". Indikator dari jumlah stok aktual — "
-        f"🔴 Merah: stok ≤ {lp.format_int_id(batas_merah)} · "
-        f"🟡 Kuning: stok {lp.format_int_id(batas_merah + 1)}–{lp.format_int_id(batas_kuning)} · "
-        f"🟢 Hijau: stok ≥ {lp.format_int_id(batas_kuning + 1)} (ambang bisa diubah di panel kiri). "
+        "Nama barang mengandung kata \"LUNA\". Indikator dari jumlah stok aktual — "
+        "🔴 Merah = kritis/habis, 🟡 Kuning = menipis, 🟢 Hijau = aman. "
         "Stok negatif (anomali sistem) otomatis masuk kategori Merah."
     )
     ind_luna = _render_kelompok_stok(dff_luna, "LUNA", "luna", tampilkan_heatmap=True)
