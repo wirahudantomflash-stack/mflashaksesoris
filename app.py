@@ -4,6 +4,7 @@ import pandas as pd
 
 import logic_pembelian as lp
 import logic_penjualan as ljl
+import logic_aksesoris as la
 
 st.set_page_config(page_title="MFLASH — Dashboard Cabang", page_icon="🏬", layout="wide")
 
@@ -31,6 +32,14 @@ st.sidebar.header("🧾 Data Penjualan")
 st.sidebar.caption("Gabungan seluruh cabang, atau rincian satu cabang saja")
 upl_penjualan = st.sidebar.file_uploader(
     "Unggah berkas penjualan", type=["gz", "csv", "xlsx", "xls"], key="upl_penjualan",
+)
+
+st.sidebar.divider()
+
+st.sidebar.header("💰 Data Penjualan Aksesoris")
+st.sidebar.caption("Sheet \"Rincian Faktur Penjualan\" (khusus aksesoris) — Excel atau CSV sepadan")
+upl_aksesoris = st.sidebar.file_uploader(
+    "Unggah berkas penjualan aksesoris", type=["xlsx", "xls", "csv"], key="upl_aksesoris",
 )
 
 st.sidebar.divider()
@@ -71,6 +80,16 @@ if raw_penjualan is not None:
         df_penjualan = ljl.finalize_data(raw_penjualan)
     else:
         need_cabang_name = True
+
+DEFAULT_AKSESORIS_PATH = "Penjualan_Aksesoris_Regional_MFlash.csv"
+df_aksesoris, err_aksesoris = None, None
+try:
+    if upl_aksesoris is not None:
+        df_aksesoris = la.load_aksesoris(upl_aksesoris)
+    elif os.path.exists(DEFAULT_AKSESORIS_PATH):
+        df_aksesoris = la.load_aksesoris(DEFAULT_AKSESORIS_PATH)
+except Exception as e:
+    err_aksesoris = str(e)
 
 
 # ---------------------------------------------------------------------------
@@ -379,12 +398,265 @@ def render_penjualan_tab():
 
 
 # ---------------------------------------------------------------------------
+# TAB 3 — Dashboard Revenue Penjualan Aksesoris
+# ---------------------------------------------------------------------------
+def render_aksesoris_tab():
+    if err_aksesoris:
+        st.error(f"Gagal membaca berkas penjualan aksesoris: {err_aksesoris}")
+        return
+    if df_aksesoris is None:
+        st.info(
+            "Belum ada data. Unggah berkas Excel/CSV **Penjualan Aksesoris Regional** "
+            "(sheet **Rincian Faktur Penjualan**) lewat panel kiri, atau taruh berkasnya "
+            "di root repo sebelum deploy."
+        )
+        return
+
+    df = df_aksesoris
+
+    st.subheader("Filter — Data Penjualan Aksesoris")
+    tahun_opsi = sorted([int(t) for t in df["TAHUN"].dropna().unique()])
+    bulan_opsi = sorted([int(b) for b in df["BULAN"].dropna().unique()])
+    cabang_opsi = sorted(df["CABANG"].dropna().unique().tolist())
+    segmen_opsi = sorted(df["SEGMEN"].dropna().unique().tolist())
+
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        sel_tahun = st.multiselect("Tahun", tahun_opsi, default=tahun_opsi, key="ak_tahun")
+    with c2:
+        sel_bulan = st.multiselect(
+            "Bulan", bulan_opsi, default=bulan_opsi, format_func=lambda b: BULAN_NAMA.get(b, str(b)), key="ak_bulan",
+        )
+    with c3:
+        sel_cabang = st.multiselect("Cabang", cabang_opsi, default=cabang_opsi, key="ak_cabang")
+    with c4:
+        sel_segmen = st.multiselect("Segmen", segmen_opsi, default=segmen_opsi, key="ak_segmen")
+
+    dff = la.apply_filters(
+        df,
+        tahun=sel_tahun if sel_tahun else None,
+        bulan=sel_bulan if sel_bulan else None,
+        cabang=sel_cabang if sel_cabang else None,
+        segmen=sel_segmen if sel_segmen else None,
+    )
+
+    if dff.empty:
+        st.warning("Tidak ada data untuk kombinasi filter ini. Coba longgarkan pilihan di atas.")
+        return
+
+    st.caption(
+        f"Menampilkan {len(dff):,}".replace(",", ".") + " baris · "
+        f"{dff['NOTA_ID'].nunique():,}".replace(",", ".") + " nota unik (cabang + no faktur)"
+    )
+    st.divider()
+
+    # -----------------------------------------------------------------
+    # 1. Dashboard Revenue
+    # -----------------------------------------------------------------
+    st.header("💰 Revenue Penjualan Aksesoris")
+
+    rs = la.revenue_summary(dff)
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Omzet", la.format_rupiah_id(rs["omzet"]))
+    c2.metric("Laba", la.format_rupiah_id(rs["laba"]))
+    c3.metric("Margin", la.format_percent_id(rs["margin"]))
+    c4.metric("Rata-rata / Nota", la.format_rupiah_id(rs["rata_per_nota"]))
+    st.caption(
+        f"{la.format_int_id(rs['jumlah_nota'])} nota · {la.format_int_id(rs['jumlah_item'])} item terjual "
+        f"· modal {la.format_rupiah_id(rs['modal'])}"
+    )
+
+    trend = la.revenue_trend_bulanan(dff)
+    if not trend.empty:
+        st.subheader("Tren Omzet & Laba Bulanan")
+        st.caption(
+            "Bulan berjalan yang belum lengkap tetap ditampilkan di grafik, tapi tidak "
+            "dipakai sebagai dasar rata-rata pada bagian Proyeksi di bawah."
+        )
+        st.bar_chart(trend.set_index("Periode")[["Omzet", "Laba"]])
+        tampil_trend = trend.copy()
+        for col in ["Omzet", "Modal", "Laba"]:
+            tampil_trend[col] = trend[col].map(la.format_rupiah_id)
+        tampil_trend["Margin (%)"] = trend["Margin (%)"].map(la.format_percent_id)
+        tampil_trend["Qty Terjual"] = trend["Qty Terjual"].map(la.format_int_id)
+        tampil_trend["Jumlah Nota"] = trend["Jumlah Nota"].map(la.format_int_id)
+        st.dataframe(tampil_trend, use_container_width=True)
+        st.download_button(
+            "⬇️ Unduh CSV — Tren Bulanan", trend.to_csv(index=False).encode("utf-8-sig"),
+            "tren_revenue_aksesoris.csv", "text/csv", key="ak_dl_trend",
+        )
+
+    seg = la.revenue_per_segmen(dff)
+    if not seg.empty:
+        st.subheader("Omzet per Segmen Transaksi")
+        st.caption("Service = dari transaksi Service HP/Laptop dll · Penjualan Unit = HP/Laptop baru & second.")
+        st.bar_chart(seg.set_index("Segmen")["Omzet"])
+        tampil_seg = seg.copy()
+        tampil_seg["Omzet"] = seg["Omzet"].map(la.format_rupiah_id)
+        tampil_seg["Laba"] = seg["Laba"].map(la.format_rupiah_id)
+        tampil_seg["Margin (%)"] = seg["Margin (%)"].map(la.format_percent_id)
+        tampil_seg["Jumlah Nota"] = seg["Jumlah Nota"].map(la.format_int_id)
+        tampil_seg["Porsi Omzet (%)"] = seg["Porsi Omzet (%)"].map(la.format_percent_id)
+        st.dataframe(tampil_seg, use_container_width=True)
+
+    st.divider()
+
+    # -----------------------------------------------------------------
+    # 2. Top 10 Produk Terlaris & Profit
+    # -----------------------------------------------------------------
+    st.header("🏆 Top 10 Produk Aksesoris Terlaris & Profit")
+    metrik_produk = st.radio(
+        "Urutkan berdasarkan", ["Qty Terjual", "Omzet", "Laba"], key="ak_metrik_produk", horizontal=True,
+    )
+    tp = la.top_produk(dff, metric=metrik_produk, n=10)
+    if tp.empty:
+        st.info("Tidak ada data produk pada filter ini.")
+    else:
+        tampil_tp = tp.copy()
+        tampil_tp["Qty Terjual"] = tp["Qty Terjual"].map(la.format_int_id)
+        tampil_tp["Omzet"] = tp["Omzet"].map(la.format_rupiah_id)
+        tampil_tp["Modal"] = tp["Modal"].map(la.format_rupiah_id)
+        tampil_tp["Laba"] = tp["Laba"].map(la.format_rupiah_id)
+        tampil_tp["Margin (%)"] = tp["Margin (%)"].map(la.format_percent_id)
+        st.dataframe(tampil_tp, use_container_width=True)
+        st.download_button(
+            "⬇️ Unduh CSV — Top 10 Produk", tp.to_csv(index=True).encode("utf-8-sig"),
+            "top_produk_aksesoris.csv", "text/csv", key="ak_dl_produk",
+        )
+
+    st.divider()
+
+    # -----------------------------------------------------------------
+    # 3. Dashboard Omzet All Cabang
+    # -----------------------------------------------------------------
+    st.header("🏬 Omzet Seluruh Cabang")
+    oc = la.omzet_cabang(dff)
+    if oc.empty:
+        st.info("Tidak ada data cabang pada filter ini.")
+    else:
+        st.bar_chart(oc.set_index("Cabang")["Omzet"])
+        tampil_oc = oc.copy()
+        tampil_oc["Omzet"] = oc["Omzet"].map(la.format_rupiah_id)
+        tampil_oc["Modal"] = oc["Modal"].map(la.format_rupiah_id)
+        tampil_oc["Laba"] = oc["Laba"].map(la.format_rupiah_id)
+        tampil_oc["Margin (%)"] = oc["Margin (%)"].map(la.format_percent_id)
+        tampil_oc["Jumlah Nota"] = oc["Jumlah Nota"].map(la.format_int_id)
+        tampil_oc["Rata-rata / Nota"] = oc["Rata-rata / Nota"].map(la.format_rupiah_id)
+        st.dataframe(tampil_oc, use_container_width=True, height=460)
+        st.download_button(
+            "⬇️ Unduh CSV — Omzet per Cabang", oc.to_csv(index=True).encode("utf-8-sig"),
+            "omzet_cabang.csv", "text/csv", key="ak_dl_cabang",
+        )
+
+    st.divider()
+
+    # -----------------------------------------------------------------
+    # 4. Analisa & Proyeksi 5-10 Tahun
+    # -----------------------------------------------------------------
+    st.header("📈 Analisa Penjualan & Proyeksi 5–10 Tahun")
+
+    rr = la.hitung_run_rate(dff)
+    if rr["jumlah_bulan"] == 0:
+        st.info("Data tidak cukup untuk membuat proyeksi (butuh minimal satu bulan penuh).")
+    else:
+        st.caption(
+            f"Proyeksi dihitung dari rata-rata omzet **{rr['jumlah_bulan']} bulan penuh** "
+            f"({la.format_rupiah_id(rr['omzet_bulanan'])}/bulan, margin {la.format_percent_id(rr['margin'])})."
+            + (f" Bulan **{rr['bulan_tidak_lengkap']}** dikeluarkan dari rata-rata karena datanya belum lengkap."
+               if rr["bulan_tidak_lengkap"] else "")
+        )
+        st.warning(
+            "⚠️ Data historis yang tersedia baru mencakup kurang dari 1 tahun (Jan–Ags 2026). "
+            "Proyeksi 5–10 tahun di bawah ini adalah **ekstrapolasi kasar** dari 3 skenario "
+            "pertumbuhan tahunan, bukan model statistik yang memperhitungkan musiman atau siklus "
+            "ekonomi — gunakan sebagai ilustrasi arah, bukan angka pasti untuk perencanaan keuangan."
+        )
+
+        proj = la.proyeksi_tahunan(rr["omzet_bulanan"])
+        pivot = proj.pivot(index="Tahun ke-", columns="Skenario", values="Proyeksi Omzet Tahunan")
+        st.subheader("Proyeksi Omzet Tahunan per Skenario")
+        st.line_chart(pivot)
+        tampil_proj = pivot.copy()
+        for c in tampil_proj.columns:
+            tampil_proj[c] = tampil_proj[c].map(la.format_rupiah_id)
+        st.dataframe(tampil_proj, use_container_width=True)
+        st.download_button(
+            "⬇️ Unduh CSV — Proyeksi", proj.to_csv(index=False).encode("utf-8-sig"),
+            "proyeksi_omzet_aksesoris.csv", "text/csv", key="ak_dl_proyeksi",
+        )
+
+    st.subheader("📌 Analisa & Rekomendasi")
+    catatan = []
+
+    if not seg.empty:
+        seg_top = seg.iloc[0]
+        catatan.append(
+            f"Segmen **{seg_top['Segmen']}** menyumbang porsi omzet terbesar "
+            f"({la.format_percent_id(seg_top['Porsi Omzet (%)'])}) dengan margin "
+            f"{la.format_percent_id(seg_top['Margin (%)'])}. Ini sejalan dengan program **Bundling "
+            "Aksesoris NexLink & LUNA** yang menambahkan aksesoris otomatis ke setiap transaksi "
+            "Service — perluas cakupan tier bundling (mengikuti Surat Edaran SE/001/IN-MF/IV/2026) "
+            "bisa jadi pengungkit utama pertumbuhan 5-10 tahun ke depan."
+        )
+        service_row = seg[seg["Segmen"] == "Service"]
+        if not service_row.empty and service_row.iloc[0]["Margin (%)"] > seg["Margin (%)"].mean():
+            catatan.append(
+                "Margin dari segmen Service secara konsisten lebih tinggi dibanding rata-rata — "
+                "menambah jumlah cabang atau memperluas tier bundling pada layanan Service berpotensi "
+                "menaikkan profitabilitas lebih cepat dibanding menambah unit baru."
+            )
+
+    if not oc.empty:
+        oc_sorted_asc = oc.sort_values("Omzet")
+        terendah = oc_sorted_asc.iloc[0]
+        tertinggi = oc.iloc[0]
+        catatan.append(
+            f"Cabang **{terendah['Cabang']}** memiliki omzet terendah "
+            f"({la.format_rupiah_id(terendah['Omzet'])}) dibanding cabang tertinggi "
+            f"**{tertinggi['Cabang']}** ({la.format_rupiah_id(tertinggi['Omzet'])}) — perlu ditelusuri "
+            "apakah ini soal lokasi/traffic, kelengkapan stok aksesoris, atau kurangnya penawaran "
+            "bundling oleh frontliner di cabang tersebut."
+        )
+        margin_rendah = oc.sort_values("Margin (%)").iloc[0]
+        if margin_rendah["Margin (%)"] < oc["Margin (%)"].mean() - 10:
+            catatan.append(
+                f"Cabang **{margin_rendah['Cabang']}** punya margin jauh di bawah rata-rata "
+                f"({la.format_percent_id(margin_rendah['Margin (%)'])}) — cek harga modal aksesorisnya, "
+                "kemungkinan sering membeli dari pemasok non-LUNA dengan modal lebih mahal "
+                "(lihat tab Dashboard Pembelian Cabang untuk detail kepatuhan ke pemasok target)."
+            )
+
+    if not tp.empty:
+        produk_top = tp.iloc[0]
+        catatan.append(
+            f"Produk **{produk_top['NAMA BARANG']}** adalah yang paling laris — pastikan stoknya "
+            "selalu tersedia di semua cabang, terutama untuk mendukung tier bundling di Surat Edaran."
+        )
+
+    catatan.append(
+        "Untuk pertumbuhan 5–10 tahun ke depan, tiga pengungkit paling realistis dari data ini: "
+        "(1) **menaikkan attach rate bundling** di transaksi Service (segmen dengan margin tertinggi), "
+        "(2) **menyamakan performa cabang lemah** dengan cabang terbaik lewat pelatihan/SOP penawaran "
+        "aksesoris, dan (3) **konsolidasi pembelian ke pemasok bermodal rendah** (seperti target LUNA) "
+        "untuk menaikkan margin tanpa menaikkan harga jual ke customer."
+    )
+
+    for c in catatan:
+        st.markdown("- " + c)
+
+
+# ---------------------------------------------------------------------------
 # Tab layout
 # ---------------------------------------------------------------------------
-tab_pembelian, tab_penjualan = st.tabs(["📦 Dashboard Pembelian Cabang", "🧾 Dashboard Penjualan Cabang"])
+tab_pembelian, tab_penjualan, tab_aksesoris = st.tabs([
+    "📦 Dashboard Pembelian Cabang", "🧾 Dashboard Penjualan Cabang", "💰 Dashboard Revenue Aksesoris",
+])
 
 with tab_pembelian:
     render_pembelian_tab()
 
 with tab_penjualan:
     render_penjualan_tab()
+
+with tab_aksesoris:
+    render_aksesoris_tab()
