@@ -258,6 +258,174 @@ def proyeksi_tahunan(omzet_bulanan: float, tahun_list=(1, 3, 5, 10), skenario=No
 
 
 # ---------------------------------------------------------------------------
+# 5. Katalog referensi harga LUNA & potensi profit
+# ---------------------------------------------------------------------------
+# Diketik ulang dari pricelist resmi LUNA (NEW_PL_05_JULI_LUNA_2026.pdf).
+# Kolom: kategori, kode_produk, deskripsi_singkat, harga_dealer, harga_srp
+# (SRP = Suggested Retail Price / saran harga jual ke konsumen).
+_LUNA_ACCESSORIES_RAW = [
+    ("Adapter", "AJ-4PJ JAR", "Adapter Jar (12pc) QC 2.4A Micro USB", 186500, 266450),
+    ("Adapter", "AJ-5O TRAY", "Adapter Tray (15pc) Fast Charging 25W Type-C", 804000, 950000),
+    ("Adapter", "AJ5Y-T", "Adapter Box (20pc) Dual Port 2.4A USB-A", 350000, 590000),
+    ("Adapter", "AJ5G-J", "Adapter Jar (15pc) QC 1.5A Micro USB", 195000, 278500),
+    ("Adapter", "AJ5S", "Adapter GAN 35W PD Single Port Type C", 89000, 129500),
+    ("Adapter", "AJ-5F", "Adapter 30W PD Single Port USB-C", 66000, 94000),
+    ("Adapter", "AJ-5E", "Adapter 25W PD Single Port USB-C", 63000, 90000),
+    ("Adapter", "AJ-4Y", "Adapter 20W QC3.0 Micro USB", 39000, 55500),
+    ("Adapter", "AJ-5A", "Adapter Fast Charging QC3.0 Micro USB", 35000, 50000),
+    ("Adapter", "AJ-4A", "Adapter 20W QC3.0 Type C", 59000, 84000),
+    ("Adapter", "AJ-5K", "Adapter+Cable Dual Port GAN 45W Retractable", 165000, 235500),
+    ("Adapter", "AJ5W-CC KIT", "Adapter+Cable GAN 45W + Kabel C to C 5A", 116000, 181000),
+    ("Adapter", "AJ5S-CC", "Adapter+Cable GAN 35W + Kabel Type-C 60W", 99000, 145000),
+    ("Adapter", "AJ5T-CC", "Adapter+Cable GAN 30W + Kabel Type-C 60W", 90000, 131000),
+    ("Adapter", "AJ5U-CC", "Adapter+Cable GAN 25W + Kabel Type-C 60W", 83000, 121000),
+    ("Adapter", "AJ4C-CL", "Adapter+Cable PD 20W + Kabel PD 27W", 71500, 106000),
+    ("Adapter", "AJ-4C C TO C", "Adapter+Cable QC3.0+20W + Kabel Type C", 65000, 84500),
+    ("Adapter", "AJ4Y-AC (KIT)", "Adapter+Cable USB-A 20W + Kabel Type C 3A", 51000, 88500),
+    ("Adapter", "AJ5A-AC (KIT)", "Adapter+Cable USB-A 18W + Kabel Type C 3A", 43500, 62000),
+    ("Adapter", "AJ-3D", "Adapter+Cable 1 port 1.5A + Kabel Micro", 19000, 27000),
+    ("Adapter", "AJ5H-AC", "Adapter+Cable Dual Port 2.4A + Kabel C to C", 32800, 57500),
+    ("Adapter", "AJ-4E", "Adapter 45W QC3.0 Type C", 99000, 141500),
+    ("Adapter", "A196", "Adapter PD-65W 2 Port USB QC3.0 + Type C", 200000, 285500),
+    ("Adapter", "DJ-3A", "Car Charger (15pc) 2 Port 2.4A Fast Charging", 250000, 430000),
+    ("Adapter", "DJ-5A RETRACTABLE", "Car Charger 120W Retractable 4in1", 125000, 178500),
+    ("Adapter", "DJ-5B RETRACTABLE", "Car Charger 120W Voltage Display 4in1", 109000, 155500),
+    ("Adapter", "R1B1", "Car Adapter Turbo Charger PD20W+QC3.0", 37000, 53000),
+    ("Adapter", "DR-4R", "Car Charger 2 Port QC3.0 25W+PD30W", 78000, 111500),
+    ("Adapter", "R1B2Q", "Car Charger 2 Port QC3.0 + Indikator", 41000, 58500),
+    ("Adapter", "DJ-3B", "Car Charger 2.4A + Kabel 100cm", 32000, 45500),
+    ("Cable", "CJ-5CJ TYPE C JAR", "Charging Cable Jar (15pc) Type C 2.4A 120cm", 91500, 130500),
+    ("Cable", "CJ-5CJ Micro", "Charging Cable Jar (15pc) Micro 2.4A 120cm", 78000, 111500),
+    ("Cable", "CB-2AEJ Micro JAR", "Data Cable Jar (15pc) Micro Flat 3.0A 100cm", 121500, 173500),
+    ("Cable", "CB-2AEJ Type C JAR", "Data Cable Jar (15pc) Type C Flat 3.0A 100cm", 135000, 193000),
+    ("Cable", "CB-2AEJ Lightning JAR", "Data Cable Jar (15pc) Lightning Flat 3.0A 100cm", 199500, 285000),
+    ("Cable", "CJ-4J C TO C", "Cable Jar (15pc) Type C to C PD 40W 120cm", 192000, 320000),
+    ("Cable", "CJ-4G TYPE C JAR", "Charging Cable Jar (20pc) Type C 5A 100cm", 280000, 400000),
+    ("Cable", "CJ-4FC JAR", "Charging Cable Jar (20pc) Type C up to 45W", 140000, 200000),
+    ("Cable", "CJ-4FL JAR", "Charging Cable Jar (20pc) Lightning up to 45W", 164000, 234000),
+    ("Cable", "CB-2E Micro Tray", "Data Cable Tray (21pc) Micro Braided 2.4A", 330000, 471500),
+    ("Cable", "CB-2E Lightning Tray", "Data Cable Tray (21pc) Lightning Braided 2.4A", 405300, 579000),
+    ("Cable", "CJ5Q-JCC", "Charging Cable Jar (20pc) Braided 60W", 320000, 457000),
+    ("Cable", "CJ5H-JAM", "Charging Cable Jar (20pc) Micro 2A 100cm", 94000, 157000),
+    ("Cable", "CJ-4P TYPE C WITH DATA", "Charging Cable Box (24pc) Type C Data 3.0A", 201600, 336000),
+    ("Cable", "CJ5L-KCL", "Charging Cable Box (15pc) Lightning PD 27W", 354000, 505500),
+    ("Cable", "CB-2A7M", "Charging Cable Pastel USB 2.4A 100cm", 21000, 29000),
+    ("Cable", "CB-2A7C", "Charging Cable Pastel Type C 2.4A 100cm", 24000, 35000),
+    ("Cable", "CB-2A7L", "Charging Cable Pastel Lightning 2.4A 100cm", 25000, 37000),
+    ("Cable", "CJ-5R", "Charging Cable Type C Braided PD 60W 100cm", 22000, 31500),
+    ("Cable", "CJ-5A", "Data Cable Fast Charging 40W 100cm", 21000, 30000),
+    ("Cable", "CR-4S", "Data Cable Type C PD 18W 100cm", 15000, 21500),
+    ("Cable", "CJ-4G C To C (2 Meter)", "Charging Cable Type C PD 65W 2 Meter", 35000, 50000),
+    ("Cable", "CJ-4XC", "Charging Cable Aluminium PD 66W 120cm", 45000, 75000),
+    ("Cable", "CJ-5B Magnetic C to C", "Charging Cable Magnetic PD 65W 100cm", 45000, 64000),
+    ("Cable", "CB-2A9 (1m)", "Cable 3 in 1 Nylon 2A 100cm", 30000, 43000),
+    ("Cable", "CB-2A9 (1,2m)", "Cable 3 in 1 Nylon 2A 120cm", 33000, 47000),
+    ("Earphone", "TWS TJ-4P EXODUS", "Premium TWS ANC + Display", 236000, 337000),
+    ("Earphone", "OWS TJ-4Q SPORT", "Open Wearable Stereo BT 5.3", 193000, 275000),
+    ("Earphone", "TWS TJ-4F PEGASSUS", "TWS In-Ear BT 5.3", 94000, 134000),
+    ("Earphone", "ER5A-J", "Wired Earphone Jar (15pc) Hi-Res 120cm", 195000, 289000),
+    ("Earphone", "ER5B", "Balanced Performance Earphone", 19000, 27000),
+    ("Earphone", "EJ5A-K", "Wired Earphone Kaleng (20pc) Semi In-Ear", 260000, 372000),
+    ("Earphone", "NECKBAND V1 RIVER", "Bluetooth Headset Neckband V5.0", 38000, 54000),
+    ("Earphone", "NECKBAND L2 FOREST", "Sport Neckband BT V5.0 300 Jam", 94000, 122200),
+    ("Earphone", "NEXUS HJ-4H", "Headphone Wireless BT 5.0", 160000, 228500),
+    ("Earphone", "ZENITH HJ-4K", "Headphone Wireless BT 5.3", 140000, 200000),
+    ("Earphone", "BHETRIX HJ-4K", "Headphone Wireless BT 5.0", 120000, 171500),
+    ("Earphone", "EJ-4V", "Earphone In-Ear Jack 3.5mm 120cm", 19500, 28000),
+    ("Earphone", "EJ-4W", "Earphone Semi In-Ear Jack 3.5mm 100cm", 45000, 53000),
+    ("Earphone", "EJ-4X", "Earphone In-Ear Jack 3.5mm 120cm", 35000, 46000),
+    ("Earphone", "EJ-4R", "Earphone Comfort Eartips Jack 3.5mm 100cm", 42000, 59000),
+    ("Speaker", "S4-2AS", "Hera Speaker Bluetooth IPX4", 95000, 135500),
+    ("Speaker", "S4-2AR", "Artemis Speaker Bluetooth IPX5", 145000, 207000),
+    ("Powerbank", "PJ-4D", "Powerbank 10.000mAh PD 25W", 187500, 270000),
+    ("Others", "CJ5J-PCC", "Cable Cross Body Type C PD 60W", 37800, 54000),
+    ("Others", "CJ5J-PCL", "Cable Cross Body Lightning PD 27W", 39000, 55500),
+    ("Others", "G1-2AI", "Car Holder Rotate Metal-Plastic", 29000, 41500),
+    ("Others", "G1-2A8", "Car Holder Rotate Metal-Plastic Modern", 35000, 50000),
+    ("Others", "R1A1", "Car Holder All Cars Compatible", 51000, 73000),
+    ("Others", "GJ-4I", "Phone Holder Adjustable 360", 45000, 64000),
+    ("Others", "RNPH 1001", "Phone Holder Compact", 41400, 59000),
+    ("Others", "OR5D", "Mobile Phone Holder Helmet Motor", 49000, 70000),
+    ("Others", "GJ-4H", "Selfie Stick Bluetooth Remote 100m", 98000, 140000),
+    ("Others", "GJ-4C", "Mousepad Gaming RGB 1.8M", 85000, 105000),
+    ("Others", "WIFI REPEATER GJ-4N", "Wifi Repeater 100-300m", 150000, 235000),
+]
+
+# Katalog bahan & mesin cutting screen protector — HANYA ada harga dealer per
+# box (bukan per pcs), TIDAK ada SRP resmi karena harga jual ke konsumen
+# ditentukan sendiri oleh tiap cabang per potongan (dipotong sesuai model HP
+# dengan mesin cutting). Tidak dipakai untuk hitung margin potensial —
+# disediakan sebagai referensi harga modal saja.
+_LUNA_MATERIAL_RAW = [
+    ("Alasca Cutting Machine S310 White - A2", 4500000, None),
+    ("Alasca Ruby Material Matte", 900000, 50),
+    ("Alasca Ruby Material Anti Blue", 900000, 50),
+    ("Alasca Ruby Material Clear", 900000, 50),
+    ("Alasca Sapphire Material Anti Blue", 725000, 50),
+    ("Alasca Sapphire Material Clear", 725000, 50),
+    ("Alasca Sapphire Material Matte", 725000, 50),
+    ("Alasca Emerald Material Clear", 400036, 50),
+    ("Alasca Emerald Material Clear (20pc)", 160000, 20),
+    ("Alasca Emerald Material Matte", 400036, 50),
+    ("Alasca Emerald Material Anti Blue", 400036, 50),
+    ("Alasca Sapphire Material Anti Blue (20pc)", 290000, 20),
+    ("Alasca Sapphire Material Matte (20pc)", 290000, 20),
+    ("Alaska Ruby Material Anti Spy (10pc)", 447000, 10),
+    ("Alaska Ruby Material Tablet 10\" Clear (10pc)", 490000, 10),
+    ("Alaska Skin Material Back Cover", 950000, 50),
+    ("Vermont Ruby Material Anti Spy (10pc)", 447000, 10),
+    ("Vermont Ruby Material Tablet 10\" Clear (10pc)", 490000, 10),
+    ("Vermont Ruby Material Anti Blue", 900000, 50),
+    ("Vermont Ruby Material Clear", 900000, 50),
+    ("Vermont Ruby Material Matte", 900000, 50),
+    ("Vermont Sapphire Material Anti Blue", 725000, 50),
+    ("Vermont Sapphire Material Clear", 725000, 50),
+    ("Vermont Sapphire Material Matte", 725000, 50),
+    ("Vermont Emerald Material Clear", 400036, 50),
+    ("Vermont Material Back Cover", 950000, 50),
+    ("Cutting Machine Material Blader", 75000, None),
+    ("Non Slip Mat Cutting Green", 49000, None),
+]
+
+
+def katalog_luna_aksesoris() -> pd.DataFrame:
+    """Katalog resmi LUNA (produk aksesoris dengan SRP), lengkap dengan
+    potensi profit & margin per unit kalau dijual sesuai SRP dan dibeli
+    sesuai harga dealer."""
+    df = pd.DataFrame(_LUNA_ACCESSORIES_RAW, columns=["Kategori", "Kode", "Deskripsi", "Dealer", "SRP"])
+    df["Potensi Profit"] = df["SRP"] - df["Dealer"]
+    df["Potensi Margin (%)"] = np.where(df["SRP"] != 0, df["Potensi Profit"] / df["SRP"] * 100, 0)
+    return df
+
+
+def katalog_luna_material() -> pd.DataFrame:
+    """Katalog bahan/mesin cutting LUNA — harga dealer per box saja (tidak
+    ada SRP resmi), plus estimasi harga modal per pcs kalau jumlah isi box
+    diketahui."""
+    df = pd.DataFrame(_LUNA_MATERIAL_RAW, columns=["Nama Barang", "Dealer (per box)", "Isi per Box"])
+    df["Estimasi Modal per Pcs"] = np.where(
+        df["Isi per Box"].notna() & (df["Isi per Box"] > 0),
+        df["Dealer (per box)"] / df["Isi per Box"],
+        np.nan,
+    )
+    return df
+
+
+def ringkasan_margin_katalog(katalog: pd.DataFrame) -> pd.DataFrame:
+    """Ringkasan rata-rata margin potensial per kategori dari katalog LUNA."""
+    cols = ["Kategori", "Jumlah Produk", "Rata-rata Dealer", "Rata-rata SRP", "Rata-rata Margin (%)"]
+    if katalog.empty:
+        return pd.DataFrame(columns=cols)
+    g = katalog.groupby("Kategori").agg(
+        **{"Jumlah Produk": ("Kode", "count")},
+        **{"Rata-rata Dealer": ("Dealer", "mean")},
+        **{"Rata-rata SRP": ("SRP", "mean")},
+        **{"Rata-rata Margin (%)": ("Potensi Margin (%)", "mean")},
+    ).reset_index()
+    return g.sort_values("Rata-rata Margin (%)", ascending=False).reset_index(drop=True)[cols]
+
+
+# ---------------------------------------------------------------------------
 # Format angka gaya Indonesia
 # ---------------------------------------------------------------------------
 

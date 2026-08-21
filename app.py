@@ -545,6 +545,78 @@ def render_aksesoris_tab():
     st.divider()
 
     # -----------------------------------------------------------------
+    # 3b. Katalog Referensi Harga LUNA & Potensi Profit
+    # -----------------------------------------------------------------
+    st.header("🧾 Katalog Referensi Harga LUNA & Potensi Profit")
+    st.caption(
+        "Pricelist resmi LUNA (harga dealer & saran harga jual ke konsumen/SRP) — "
+        "sebagai gambaran potensi profit per produk yang bisa didapat cabang, "
+        "terlepas dari harga aktual di lapangan."
+    )
+
+    katalog = la.katalog_luna_aksesoris()
+    kategori_katalog_opsi = sorted(katalog["Kategori"].unique().tolist())
+    sel_kategori_katalog = st.multiselect(
+        "Filter kategori katalog", kategori_katalog_opsi, default=kategori_katalog_opsi, key="ak_kategori_katalog",
+    )
+    katalog_f = katalog[katalog["Kategori"].isin(sel_kategori_katalog)] if sel_kategori_katalog else katalog.iloc[0:0]
+
+    if katalog_f.empty:
+        st.info("Pilih minimal satu kategori untuk menampilkan katalog.")
+    else:
+        margin_rata2_katalog = katalog_f["Potensi Margin (%)"].mean()
+        margin_aktual = rs["margin"]
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Rata-rata Margin Potensial (katalog LUNA)", la.format_percent_id(margin_rata2_katalog))
+        c2.metric("Margin Aktual Tercapai (data penjualan)", la.format_percent_id(margin_aktual))
+        selisih = margin_aktual - margin_rata2_katalog
+        c3.metric("Selisih", f"{'+' if selisih >= 0 else ''}{la.format_decimal_id(selisih)} poin")
+        st.caption(
+            "Margin aktual bisa lebih tinggi dari margin katalog murni kalau cabang "
+            "menjual sesuai skema **Up Harga Bundling** dari Surat Edaran "
+            "SE/001/IN-MF/IV/2026 (nilai tambahan tetap per tier, bukan mengikuti SRP "
+            "per produk) — atau bisa lebih rendah kalau harga jual di lapangan belum "
+            "mengikuti SRP resmi. Bandingkan sebagai bahan evaluasi, bukan kesimpulan pasti."
+        )
+
+        ring = la.ringkasan_margin_katalog(katalog_f)
+        st.subheader("Rata-rata Margin Potensial per Kategori")
+        st.bar_chart(ring.set_index("Kategori")["Rata-rata Margin (%)"])
+        tampil_ring = ring.copy()
+        tampil_ring["Rata-rata Dealer"] = ring["Rata-rata Dealer"].map(la.format_rupiah_id)
+        tampil_ring["Rata-rata SRP"] = ring["Rata-rata SRP"].map(la.format_rupiah_id)
+        tampil_ring["Rata-rata Margin (%)"] = ring["Rata-rata Margin (%)"].map(la.format_percent_id)
+        st.dataframe(tampil_ring, use_container_width=True)
+
+        with st.expander(f"Lihat detail katalog ({len(katalog_f)} produk)"):
+            tampil_katalog = katalog_f.copy()
+            tampil_katalog["Dealer"] = katalog_f["Dealer"].map(la.format_rupiah_id)
+            tampil_katalog["SRP"] = katalog_f["SRP"].map(la.format_rupiah_id)
+            tampil_katalog["Potensi Profit"] = katalog_f["Potensi Profit"].map(la.format_rupiah_id)
+            tampil_katalog["Potensi Margin (%)"] = katalog_f["Potensi Margin (%)"].map(la.format_percent_id)
+            st.dataframe(tampil_katalog, use_container_width=True, height=400)
+            st.download_button(
+                "⬇️ Unduh CSV — Katalog LUNA (Aksesoris)", katalog_f.to_csv(index=False).encode("utf-8-sig"),
+                "katalog_luna_aksesoris.csv", "text/csv", key="ak_dl_katalog",
+            )
+
+        with st.expander("Lihat katalog bahan & mesin cutting (harga dealer saja, tanpa SRP)"):
+            st.caption(
+                "Produk ini (material tempered glass/hydrogel & mesin cutting) tidak "
+                "punya SRP resmi karena harga jual ke konsumen ditentukan sendiri oleh "
+                "tiap cabang per potongan sesuai model HP."
+            )
+            mat = la.katalog_luna_material()
+            tampil_mat = mat.copy()
+            tampil_mat["Dealer (per box)"] = mat["Dealer (per box)"].map(la.format_rupiah_id)
+            tampil_mat["Estimasi Modal per Pcs"] = mat["Estimasi Modal per Pcs"].apply(
+                lambda x: la.format_rupiah_id(x) if pd.notna(x) else "-"
+            )
+            st.dataframe(tampil_mat, use_container_width=True, height=320)
+
+    st.divider()
+
+    # -----------------------------------------------------------------
     # 4. Analisa & Proyeksi 5-10 Tahun
     # -----------------------------------------------------------------
     st.header("📈 Analisa Penjualan & Proyeksi 5–10 Tahun")
@@ -626,6 +698,23 @@ def render_aksesoris_tab():
             f"Produk **{produk_top['NAMA BARANG']}** adalah yang paling laris — pastikan stoknya "
             "selalu tersedia di semua cabang, terutama untuk mendukung tier bundling di Surat Edaran."
         )
+
+    if not katalog_f.empty:
+        margin_katalog_final = katalog_f["Potensi Margin (%)"].mean()
+        if rs["margin"] < margin_katalog_final:
+            catatan.append(
+                f"Margin aktual saat ini ({la.format_percent_id(rs['margin'])}) masih di bawah rata-rata "
+                f"margin potensial dari katalog resmi LUNA ({la.format_percent_id(margin_katalog_final)}) — "
+                "cek apakah harga jual ke konsumen di cabang sudah mengikuti SRP resmi, atau modal "
+                "pembelian aksesoris masih sering dari pemasok non-LUNA yang lebih mahal."
+            )
+        else:
+            catatan.append(
+                f"Margin aktual saat ini ({la.format_percent_id(rs['margin'])}) sudah di atas rata-rata "
+                f"margin potensial murni dari katalog LUNA ({la.format_percent_id(margin_katalog_final)}) — "
+                "kemungkinan besar berkat skema Up Harga Bundling di Surat Edaran. Pertahankan dan "
+                "pastikan seluruh cabang konsisten menerapkannya."
+            )
 
     catatan.append(
         "Untuk pertumbuhan 5–10 tahun ke depan, tiga pengungkit paling realistis dari data ini: "

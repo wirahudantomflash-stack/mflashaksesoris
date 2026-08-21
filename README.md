@@ -93,6 +93,16 @@ Filter tahun/bulan/cabang untuk tiap tab ada **di dalam tab masing-masing**
   **Ini estimasi kasar**, bukan model statistik penuh, karena data historis
   yang tersedia baru mencakup kurang dari 1 tahun — dashboard menampilkan
   peringatan ini secara eksplisit ke pengguna.
+- **Katalog Referensi Harga LUNA**: pricelist resmi LUNA (85 produk aksesoris
+  dengan harga dealer & SRP, dari `NEW_PL_05_JULI_LUNA_2026.pdf`) ditanam
+  langsung di `logic_aksesoris.py` sebagai tabel referensi, dipakai untuk
+  menghitung **potensi profit per produk** kalau dijual sesuai SRP resmi.
+  Margin potensial ini (~30,6% rata-rata) dibandingkan dengan margin AKTUAL
+  yang tercapai di data penjualan sebagai bahan evaluasi — bukan diklaim
+  sebagai angka yang identik, karena keduanya diukur dari basis berbeda
+  (katalog vs skema Up Harga Bundling di Surat Edaran). Katalog bahan/mesin
+  cutting (28 item, tanpa SRP resmi) ditampilkan terpisah sebagai referensi
+  harga modal saja.
 - Kotak analisa menautkan temuan ke konteks lain yang sudah ada (program
   Bundling Aksesoris NexLink & LUNA dari Surat Edaran SE/001/IN-MF/IV/2026,
   serta target pemasok LUNA di tab Pembelian) supaya rekomendasinya konkret,
