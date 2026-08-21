@@ -184,16 +184,17 @@ def top_produk(df: pd.DataFrame, metric: str = "Qty Terjual", n: int = 10) -> pd
 # ---------------------------------------------------------------------------
 
 def omzet_cabang(df: pd.DataFrame) -> pd.DataFrame:
-    cols = ["Cabang", "Omzet", "Modal", "Laba", "Margin (%)", "Jumlah Nota", "Rata-rata / Nota"]
+    cols = ["Cabang", "Omzet", "HPP", "Laba", "Margin (%)", "HPP terhadap Omzet (%)", "Jumlah Nota", "Rata-rata / Nota"]
     if df.empty:
         return pd.DataFrame(columns=cols)
     g = df.groupby("CABANG").agg(
         Omzet=("TOTAL HARGA", "sum"),
-        Modal=("MODAL", "sum"),
+        HPP=("MODAL", "sum"),
         Laba=("LABA", "sum"),
         **{"Jumlah Nota": ("NOTA_ID", "nunique")},
     ).reset_index().rename(columns={"CABANG": "Cabang"})
     g["Margin (%)"] = np.where(g["Omzet"] != 0, g["Laba"] / g["Omzet"] * 100, 0)
+    g["HPP terhadap Omzet (%)"] = np.where(g["Omzet"] != 0, g["HPP"] / g["Omzet"] * 100, 0)
     g["Rata-rata / Nota"] = np.where(g["Jumlah Nota"] != 0, g["Omzet"] / g["Jumlah Nota"], 0)
     g = g.sort_values("Omzet", ascending=False).reset_index(drop=True)
     g.index = g.index + 1

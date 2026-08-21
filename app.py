@@ -450,14 +450,15 @@ def render_aksesoris_tab():
     st.header("💰 Revenue Penjualan Aksesoris")
 
     rs = la.revenue_summary(dff)
-    c1, c2, c3, c4 = st.columns(4)
+    c1, c2, c3, c4, c5 = st.columns(5)
     c1.metric("Omzet", la.format_rupiah_id(rs["omzet"]))
-    c2.metric("Laba", la.format_rupiah_id(rs["laba"]))
-    c3.metric("Margin", la.format_percent_id(rs["margin"]))
-    c4.metric("Rata-rata / Nota", la.format_rupiah_id(rs["rata_per_nota"]))
+    c2.metric("HPP (Harga Beli)", la.format_rupiah_id(rs["modal"]))
+    c3.metric("Laba", la.format_rupiah_id(rs["laba"]))
+    c4.metric("Margin", la.format_percent_id(rs["margin"]))
+    c5.metric("Rata-rata / Nota", la.format_rupiah_id(rs["rata_per_nota"]))
     st.caption(
-        f"{la.format_int_id(rs['jumlah_nota'])} nota · {la.format_int_id(rs['jumlah_item'])} item terjual "
-        f"· modal {la.format_rupiah_id(rs['modal'])}"
+        f"{la.format_int_id(rs['jumlah_nota'])} nota · {la.format_int_id(rs['jumlah_item'])} item terjual · "
+        f"HPP = total HARGA BELI per baris (sudah nilai total, tidak dikalikan QTY lagi)"
     )
 
     trend = la.revenue_trend_bulanan(dff)
@@ -523,23 +524,34 @@ def render_aksesoris_tab():
     # -----------------------------------------------------------------
     # 3. Dashboard Omzet All Cabang
     # -----------------------------------------------------------------
-    st.header("🏬 Omzet Seluruh Cabang")
+    st.header("🏬 Omzet & HPP Seluruh Cabang")
+    st.caption(
+        "HPP (Harga Pokok Penjualan) = total HARGA BELI dari seluruh item aksesoris yang "
+        "terjual di cabang tersebut — dipakai untuk melihat beban modal per cabang, "
+        "bukan cuma omzet dan laba."
+    )
     oc = la.omzet_cabang(dff)
     if oc.empty:
         st.info("Tidak ada data cabang pada filter ini.")
     else:
-        st.bar_chart(oc.set_index("Cabang")["Omzet"])
+        tab_chart1, tab_chart2 = st.tabs(["Omzet vs HPP per Cabang", "HPP terhadap Omzet (%)"])
+        with tab_chart1:
+            st.bar_chart(oc.set_index("Cabang")[["Omzet", "HPP"]])
+        with tab_chart2:
+            st.bar_chart(oc.set_index("Cabang")["HPP terhadap Omzet (%)"])
+
         tampil_oc = oc.copy()
         tampil_oc["Omzet"] = oc["Omzet"].map(la.format_rupiah_id)
-        tampil_oc["Modal"] = oc["Modal"].map(la.format_rupiah_id)
+        tampil_oc["HPP"] = oc["HPP"].map(la.format_rupiah_id)
         tampil_oc["Laba"] = oc["Laba"].map(la.format_rupiah_id)
         tampil_oc["Margin (%)"] = oc["Margin (%)"].map(la.format_percent_id)
+        tampil_oc["HPP terhadap Omzet (%)"] = oc["HPP terhadap Omzet (%)"].map(la.format_percent_id)
         tampil_oc["Jumlah Nota"] = oc["Jumlah Nota"].map(la.format_int_id)
         tampil_oc["Rata-rata / Nota"] = oc["Rata-rata / Nota"].map(la.format_rupiah_id)
         st.dataframe(tampil_oc, use_container_width=True, height=460)
         st.download_button(
-            "⬇️ Unduh CSV — Omzet per Cabang", oc.to_csv(index=True).encode("utf-8-sig"),
-            "omzet_cabang.csv", "text/csv", key="ak_dl_cabang",
+            "⬇️ Unduh CSV — Omzet & HPP per Cabang", oc.to_csv(index=True).encode("utf-8-sig"),
+            "omzet_hpp_cabang.csv", "text/csv", key="ak_dl_cabang",
         )
 
     st.divider()
