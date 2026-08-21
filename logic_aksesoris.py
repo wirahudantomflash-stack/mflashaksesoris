@@ -31,8 +31,13 @@ BULAN_NAMA = {
 }
 
 
-def load_aksesoris(file_or_path, sheet_name: str = SHEET_NAME) -> pd.DataFrame:
-    """Baca berkas Excel (sheet Rincian Faktur Penjualan) atau CSV sepadan."""
+class MissingCabangColumn(Exception):
+    """Berkas terbaca sukses tapi tidak punya kolom CABANG (file 1 cabang)."""
+
+
+def read_raw(file_or_path, sheet_name: str = SHEET_NAME) -> pd.DataFrame:
+    """Baca berkas Excel (sheet Rincian Faktur Penjualan) atau CSV sepadan.
+    CABANG TIDAK wajib di sini — ditangani lewat `finalize_data`."""
     name = getattr(file_or_path, "name", str(file_or_path))
     is_excel = str(name).lower().endswith((".xlsx", ".xls"))
 
@@ -55,13 +60,34 @@ def load_aksesoris(file_or_path, sheet_name: str = SHEET_NAME) -> pd.DataFrame:
     if rename_map:
         df = df.rename(columns=rename_map)
 
-    missing = [c for c in REQUIRED_COLUMNS if c not in df.columns and c != "Cabang"]
-    if "CABANG" not in df.columns:
-        missing.append("CABANG")
+    required_minus_cabang = [c for c in REQUIRED_COLUMNS if c != "Cabang"]
+    missing = [c for c in required_minus_cabang if c not in df.columns]
     if missing:
         raise ValueError("Kolom berikut tidak ditemukan di berkas: " + ", ".join(missing))
+    return df
 
+
+def finalize_data(df: pd.DataFrame, cabang_default: str | None = None) -> pd.DataFrame:
+    """Normalisasi tipe data, kunci nota, kategori, modal/laba, segmen.
+
+    Kalau kolom CABANG tidak ada di berkas:
+    - `cabang_default` diisi -> semua baris diberi nama cabang itu (kasus
+      berkas rincian satu cabang).
+    - `cabang_default` kosong -> lempar MissingCabangColumn supaya pemanggil
+      (aplikasi) bisa menanyakan nama cabangnya ke pengguna lebih dulu.
+    """
     df = df.copy()
+
+    if "CABANG" not in df.columns:
+        if not cabang_default:
+            raise MissingCabangColumn(
+                "Berkas ini tidak memiliki kolom CABANG (kemungkinan berkas rincian "
+                "satu cabang). Masukkan nama cabangnya untuk melanjutkan."
+            )
+        df["CABANG"] = cabang_default
+    else:
+        df["CABANG"] = df["CABANG"].fillna(cabang_default or "TIDAK DIKETAHUI")
+
     df["TGL FAKTUR"] = pd.to_datetime(df["TGL FAKTUR"], errors="coerce")
     for col in ["HARGA BELI", "QTY", "@HARGA", "TOTAL HARGA"]:
         df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
@@ -91,6 +117,12 @@ def load_aksesoris(file_or_path, sheet_name: str = SHEET_NAME) -> pd.DataFrame:
     df["SEGMEN"] = kp.apply(segmen)
 
     return df
+
+
+def load_aksesoris(file_or_path, sheet_name: str = SHEET_NAME, cabang_default: str | None = None) -> pd.DataFrame:
+    """Baca + finalisasi dalam satu langkah (dipakai kalau berkas sudah pasti
+    punya kolom CABANG sendiri, atau nama cabang default sudah diketahui)."""
+    return finalize_data(read_raw(file_or_path, sheet_name), cabang_default=cabang_default)
 
 
 def apply_filters(df: pd.DataFrame, tahun=None, bulan=None, cabang=None, segmen=None) -> pd.DataFrame:

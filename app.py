@@ -1,8 +1,9 @@
 import os
+import io
 import streamlit as st
 import pandas as pd
 
-import logic_stok as ls
+import logic_persediaan as lp
 import logic_penjualan as ljl
 import logic_aksesoris as la
 
@@ -20,55 +21,68 @@ BULAN_NAMA = {
 # Sidebar — sumber data untuk KEDUA dashboard, supaya bisa dimuat sekali dan
 # tab tinggal berpindah tanpa perlu unggah ulang.
 # ---------------------------------------------------------------------------
-st.sidebar.header("📊 Data Persediaan/Stok")
+st.sidebar.header("📊 Data Persediaan Aksesoris")
 st.sidebar.caption("Sheet \"Daftar Barang dan Jasa\" — Excel atau CSV sepadan")
-upl_stok = st.sidebar.file_uploader(
-    "Unggah berkas persediaan", type=["xlsx", "xls", "csv"], key="upl_stok",
+upl_persediaan = st.sidebar.file_uploader(
+    "Unggah berkas persediaan", type=["xlsx", "xls", "csv"], key="upl_persediaan",
 )
 
 st.sidebar.divider()
 
 st.sidebar.header("🧾 Data Penjualan")
-st.sidebar.caption("Gabungan seluruh cabang, atau rincian satu cabang saja")
+st.sidebar.caption(
+    "Gabungan seluruh cabang, atau rincian satu cabang saja — dipakai untuk "
+    "SELURUH bagian di tab Penjualan Aksesoris (Ringkasan Cabang/Produk/Sales "
+    "maupun Revenue, HPP & Katalog LUNA)."
+)
 upl_penjualan = st.sidebar.file_uploader(
     "Unggah berkas penjualan", type=["gz", "csv", "xlsx", "xls"], key="upl_penjualan",
 )
 
 st.sidebar.divider()
-
-st.sidebar.header("💰 Data Penjualan Aksesoris")
-st.sidebar.caption("Sheet \"Rincian Faktur Penjualan\" (khusus aksesoris) — Excel atau CSV sepadan")
-upl_aksesoris = st.sidebar.file_uploader(
-    "Unggah berkas penjualan aksesoris", type=["xlsx", "xls", "csv"], key="upl_aksesoris",
-)
-
-st.sidebar.divider()
-st.sidebar.header("🚦 Ambang Status Stok LUNA")
-ambang_merah = st.sidebar.slider("Batas Merah (di bawah ini)", 0, 100, 20, key="ambang_merah")
-ambang_hijau = st.sidebar.slider("Batas Hijau (di atas/sama dengan ini)", 0, 100, 90, key="ambang_hijau")
-if ambang_merah >= ambang_hijau:
-    st.sidebar.warning("Batas Merah harus lebih kecil dari batas Hijau.")
+st.sidebar.header("🚦 Ambang Indikator Stok LUNA")
+st.sidebar.caption("Berdasarkan jumlah unit stok aktual (bukan persentase).")
+batas_merah = st.sidebar.number_input("Batas Merah (stok ≤ ini)", min_value=0, value=2, step=1, key="batas_merah")
+batas_kuning = st.sidebar.number_input("Batas Kuning (stok ≤ ini, di atas Merah)", min_value=0, value=7, step=1, key="batas_kuning")
+if batas_merah >= batas_kuning:
+    st.sidebar.warning("Batas Merah harus lebih kecil dari batas Kuning.")
 
 # ---------------------------------------------------------------------------
-# Muat data (dua sumber independen)
+# Muat data
 # ---------------------------------------------------------------------------
-DEFAULT_STOK_PATH = "Persediaan_Aksesoris_Regional.xlsx"
+DEFAULT_PERSEDIAAN_PATH = "Persediaan_Aksesoris_Regional.xlsx"
 DEFAULT_PENJUALAN_PATH = "penjualan.csv.gz"
 
-df_stok, err_stok = None, None
+df_persediaan, err_persediaan = None, None
 try:
-    if upl_stok is not None:
-        df_stok = ls.load_persediaan(upl_stok)
-    elif os.path.exists(DEFAULT_STOK_PATH):
-        df_stok = ls.load_persediaan(DEFAULT_STOK_PATH)
+    if upl_persediaan is not None:
+        df_persediaan = lp.load_persediaan(upl_persediaan)
+    elif os.path.exists(DEFAULT_PERSEDIAAN_PATH):
+        df_persediaan = lp.load_persediaan(DEFAULT_PERSEDIAAN_PATH)
 except Exception as e:
-    err_stok = str(e)
+    err_persediaan = str(e)
 
+
+def _dua_salinan(uploaded_file):
+    """Bikin dua salinan independen dari satu berkas unggahan, supaya bisa
+    dibaca dua kali (oleh dua parser berbeda) tanpa isu posisi baca habis."""
+    if uploaded_file is None:
+        return None, None
+    data = uploaded_file.getvalue()
+    b1, b2 = io.BytesIO(data), io.BytesIO(data)
+    b1.name = uploaded_file.name
+    b2.name = uploaded_file.name
+    return b1, b2
+
+
+buf_penjualan_1, buf_penjualan_2 = _dua_salinan(upl_penjualan)
+
+# --- Sumber untuk bagian "Ringkasan Cabang, Produk & Sales" ---
 df_penjualan, err_penjualan, need_cabang_name = None, None, False
 raw_penjualan = None
 try:
-    if upl_penjualan is not None:
-        raw_penjualan = ljl.read_raw(upl_penjualan)
+    if buf_penjualan_1 is not None:
+        raw_penjualan = ljl.read_raw(buf_penjualan_1)
     elif os.path.exists(DEFAULT_PENJUALAN_PATH):
         raw_penjualan = ljl.read_raw(DEFAULT_PENJUALAN_PATH)
 except Exception as e:
@@ -80,13 +94,13 @@ if raw_penjualan is not None:
     else:
         need_cabang_name = True
 
-DEFAULT_AKSESORIS_PATH = "Penjualan_Aksesoris_Regional_MFlash.csv"
-df_aksesoris, err_aksesoris = None, None
+# --- Sumber untuk bagian "Revenue, HPP & Katalog LUNA" — berkas yang SAMA ---
+raw_aksesoris, err_aksesoris = None, None
 try:
-    if upl_aksesoris is not None:
-        df_aksesoris = la.load_aksesoris(upl_aksesoris)
-    elif os.path.exists(DEFAULT_AKSESORIS_PATH):
-        df_aksesoris = la.load_aksesoris(DEFAULT_AKSESORIS_PATH)
+    if buf_penjualan_2 is not None:
+        raw_aksesoris = la.read_raw(buf_penjualan_2)
+    elif os.path.exists(DEFAULT_PENJUALAN_PATH):
+        raw_aksesoris = la.read_raw(DEFAULT_PENJUALAN_PATH)
 except Exception as e:
     err_aksesoris = str(e)
 
@@ -94,11 +108,14 @@ except Exception as e:
 # ---------------------------------------------------------------------------
 # TAB 1 — Dashboard Stok Semua Cabang (fokus buffer stok LUNA)
 # ---------------------------------------------------------------------------
-def render_stok_tab():
-    if err_stok:
-        st.error(f"Gagal membaca berkas persediaan: {err_stok}")
+# ---------------------------------------------------------------------------
+# TAB 1 — Dashboard Persediaan Aksesoris (fokus indikator stok LUNA)
+# ---------------------------------------------------------------------------
+def render_persediaan_tab():
+    if err_persediaan:
+        st.error(f"Gagal membaca berkas persediaan: {err_persediaan}")
         return
-    if df_stok is None:
+    if df_persediaan is None:
         st.info(
             "Belum ada data. Unggah berkas Excel/CSV **Persediaan Aksesoris Regional** "
             "(sheet **Daftar Barang dan Jasa**) lewat panel kiri, atau taruh berkasnya "
@@ -106,109 +123,124 @@ def render_stok_tab():
         )
         return
 
-    if ambang_merah >= ambang_hijau:
-        st.error("Batas Merah harus lebih kecil dari batas Hijau — perbaiki dulu di panel kiri.")
+    if batas_merah >= batas_kuning:
+        st.error("Batas Merah harus lebih kecil dari batas Kuning — perbaiki dulu di panel kiri.")
         return
 
     st.subheader("Filter — Data Persediaan")
-    cabang_opsi = sorted(df_stok["Cabang"].dropna().unique().tolist())
-    sel_cabang = st.multiselect("Cabang", cabang_opsi, default=cabang_opsi, key="st_cabang")
+    cabang_opsi = sorted(df_persediaan["Cabang"].dropna().unique().tolist())
+    sel_cabang = st.multiselect("Cabang", cabang_opsi, default=cabang_opsi, key="pd_cabang")
 
-    dff = ls.apply_filters(df_stok, cabang=sel_cabang if sel_cabang else None, hanya_aksesoris=True)
+    dff = lp.apply_filters(df_persediaan, cabang=sel_cabang if sel_cabang else None, hanya_aksesoris=True, hanya_luna=True)
 
     if dff.empty:
         st.warning("Tidak ada data untuk kombinasi filter ini. Coba longgarkan pilihan cabang di atas.")
         return
 
-    st.caption(f"Menampilkan {len(dff):,}".replace(",", ".") + " baris persediaan kategori aksesoris.")
+    st.caption(
+        f"Menampilkan {len(dff):,}".replace(",", ".") + " baris persediaan aksesoris berlabel **LUNA** "
+        "(nama barang mengandung kata \"LUNA\")."
+    )
     st.divider()
 
     # -----------------------------------------------------------------
-    # Status buffer stok LUNA
+    # Indikator stok LUNA
     # -----------------------------------------------------------------
-    st.header("🚦 Status Buffer Stok LUNA")
+    st.header("🚦 Indikator Stok LUNA")
     st.caption(
-        "Semua cabang wajib menyetok LUNA. Status dihitung dari stok cabang dibanding "
-        "**stok tertinggi yang pernah tercatat di cabang manapun** untuk produk yang sama "
-        "(karena sumber data tidak punya kolom target stok resmi) — "
-        f"🔴 Merah: di bawah {ambang_merah}% · 🟡 Kuning: {ambang_merah}%–{ambang_hijau}% · "
-        f"🟢 Hijau: {ambang_hijau}% ke atas."
+        f"Dihitung dari jumlah stok aktual per SKU per cabang — "
+        f"🔴 Merah: stok ≤ {lp.format_int_id(batas_merah)} · "
+        f"🟡 Kuning: stok {lp.format_int_id(batas_merah + 1)}–{lp.format_int_id(batas_kuning)} · "
+        f"🟢 Hijau: stok ≥ {lp.format_int_id(batas_kuning + 1)}. "
+        "Ambang bisa diubah lewat panel kiri."
     )
     st.caption(
-        "Catatan: produk yang cuma tercatat di satu cabang otomatis 100% (Hijau) karena "
-        "tidak ada pembanding cabang lain — bukan berarti stoknya benar-benar aman. "
-        "Stok negatif pada sumber data (anomali sistem) diperlakukan sebagai 0."
+        "Stok negatif pada sumber data (anomali sistem — biasanya transaksi keluar tercatat "
+        "sebelum stok masuk disesuaikan) otomatis masuk kategori Merah."
     )
 
-    status = ls.status_stok_luna(dff, ambang_merah=ambang_merah, ambang_hijau=ambang_hijau)
+    ind = lp.indikator_stok_luna(dff, batas_merah=batas_merah, batas_kuning=batas_kuning)
 
-    if status.empty:
+    if ind.empty:
         st.info("Tidak ditemukan produk LUNA (nama mengandung \"LUNA\") pada filter ini.")
     else:
+        total = len(ind)
+        n_merah = (ind["Indikator"] == lp.MERAH).sum()
+        n_kuning = (ind["Indikator"] == lp.KUNING).sum()
+        n_hijau = (ind["Indikator"] == lp.HIJAU).sum()
         c1, c2, c3, c4 = st.columns(4)
-        total = len(status)
-        n_merah = (status["Status"] == "🔴 Merah").sum()
-        n_kuning = (status["Status"] == "🟡 Kuning").sum()
-        n_hijau = (status["Status"] == "🟢 Hijau").sum()
-        c1.metric("Total Produk × Cabang", ls.format_int_id(total))
-        c2.metric("🔴 Merah", ls.format_int_id(n_merah), f"{ls.format_percent_id(n_merah/total*100 if total else 0)}")
-        c3.metric("🟡 Kuning", ls.format_int_id(n_kuning), f"{ls.format_percent_id(n_kuning/total*100 if total else 0)}")
-        c4.metric("🟢 Hijau", ls.format_int_id(n_hijau), f"{ls.format_percent_id(n_hijau/total*100 if total else 0)}")
+        c1.metric("Total SKU × Cabang", lp.format_int_id(total))
+        c2.metric("🔴 Merah", lp.format_int_id(n_merah), lp.format_percent_id(n_merah / total * 100 if total else 0))
+        c3.metric("🟡 Kuning", lp.format_int_id(n_kuning), lp.format_percent_id(n_kuning / total * 100 if total else 0))
+        c4.metric("🟢 Hijau", lp.format_int_id(n_hijau), lp.format_percent_id(n_hijau / total * 100 if total else 0))
 
         st.subheader("Ringkasan per Cabang")
-        st.caption("Diurutkan dari porsi Merah TERTINGGI — cabang paling perlu segera dibuffer ada di paling atas.")
-        ring = ls.ringkasan_status_cabang(status)
-        st.bar_chart(ring.set_index("Cabang")[["Merah", "Kuning", "Hijau"]])
-        tampil_ring = ring.copy()
-        tampil_ring["Porsi Merah (%)"] = ring["Porsi Merah (%)"].map(ls.format_percent_id)
-        st.dataframe(tampil_ring, use_container_width=True, height=420)
+        st.caption("Diurutkan dari porsi Merah TERTINGGI — cabang paling perlu segera direstock ada di paling atas.")
+        rc = lp.ringkasan_indikator_cabang(ind)
+        st.bar_chart(rc.set_index("Cabang")[["Merah", "Kuning", "Hijau"]])
+        tampil_rc = rc.copy()
+        tampil_rc["Porsi Merah (%)"] = rc["Porsi Merah (%)"].map(lp.format_percent_id)
+        st.dataframe(tampil_rc, use_container_width=True, height=420)
         st.download_button(
-            "⬇️ Unduh CSV — Ringkasan Status per Cabang", ring.to_csv(index=False).encode("utf-8-sig"),
-            "ringkasan_status_stok_luna.csv", "text/csv", key="st_dl_ringkasan",
+            "⬇️ Unduh CSV — Ringkasan Indikator per Cabang", rc.to_csv(index=False).encode("utf-8-sig"),
+            "ringkasan_indikator_stok_luna_cabang.csv", "text/csv", key="pd_dl_ringkasan_cabang",
         )
 
-        st.subheader("Detail per Produk × Cabang")
-        filter_status = st.multiselect(
-            "Filter status", ["🔴 Merah", "🟡 Kuning", "🟢 Hijau"],
-            default=["🔴 Merah", "🟡 Kuning", "🟢 Hijau"], key="st_filter_status",
+        st.subheader("Ringkasan per Produk")
+        st.caption(
+            "Produk yang Merah di BANYAK cabang sekaligus kemungkinan masalah pasokan dari "
+            "pemasok, bukan cuma masalah satu cabang — diurutkan dari porsi Merah tertinggi."
         )
-        cari_produk = st.text_input("Cari nama produk", key="st_cari_produk")
+        rp = lp.ringkasan_indikator_produk(ind)
+        tampil_rp = rp.copy()
+        tampil_rp["Porsi Merah (%)"] = rp["Porsi Merah (%)"].map(lp.format_percent_id)
+        st.dataframe(tampil_rp, use_container_width=True, height=380)
+        st.download_button(
+            "⬇️ Unduh CSV — Ringkasan Indikator per Produk", rp.to_csv(index=False).encode("utf-8-sig"),
+            "ringkasan_indikator_stok_luna_produk.csv", "text/csv", key="pd_dl_ringkasan_produk",
+        )
 
-        detail = status[status["Status"].isin(filter_status)] if filter_status else status.iloc[0:0]
+        st.subheader("Detail per SKU × Cabang")
+        filter_indikator = st.multiselect(
+            "Filter indikator", [lp.MERAH, lp.KUNING, lp.HIJAU],
+            default=[lp.MERAH, lp.KUNING, lp.HIJAU], key="pd_filter_indikator",
+        )
+        cari_produk = st.text_input("Cari nama produk", key="pd_cari_produk")
+
+        detail = ind[ind["Indikator"].isin(filter_indikator)] if filter_indikator else ind.iloc[0:0]
         if cari_produk:
             detail = detail[detail["Nama Barang"].str.upper().str.contains(cari_produk.upper(), na=False)]
 
         if detail.empty:
-            st.info("Tidak ada produk yang cocok dengan filter status/pencarian ini.")
+            st.info("Tidak ada produk yang cocok dengan filter indikator/pencarian ini.")
         else:
             tampil_detail = detail.copy()
-            tampil_detail["Persen Stok (%)"] = detail["Persen Stok (%)"].map(ls.format_percent_id)
+            tampil_detail["Nilai Stok"] = detail["Nilai Stok"].map(lp.format_rupiah_id)
             st.dataframe(tampil_detail, use_container_width=True, height=420)
             st.download_button(
-                "⬇️ Unduh CSV — Detail Status Stok LUNA", detail.to_csv(index=False).encode("utf-8-sig"),
-                "detail_status_stok_luna.csv", "text/csv", key="st_dl_detail",
+                "⬇️ Unduh CSV — Detail Indikator Stok LUNA", detail.to_csv(index=False).encode("utf-8-sig"),
+                "detail_indikator_stok_luna.csv", "text/csv", key="pd_dl_detail",
             )
 
     st.divider()
 
     # -----------------------------------------------------------------
-    # Nilai persediaan per cabang (konteks tambahan, semua brand)
+    # Nilai persediaan LUNA per cabang
     # -----------------------------------------------------------------
-    st.header("💼 Nilai Persediaan Aksesoris per Cabang")
-    st.caption("Konteks tambahan di luar fokus LUNA — seluruh brand aksesoris yang tercatat di persediaan.")
-    nilai = ls.nilai_stok_cabang(dff)
-    if nilai.empty:
+    st.header("💼 Nilai Persediaan LUNA per Cabang")
+    nv = lp.nilai_persediaan_cabang(dff)
+    if nv.empty:
         st.info("Tidak ada data pada filter ini.")
     else:
-        st.bar_chart(nilai.set_index("Cabang")["Nilai Persediaan"])
-        tampil_nilai = nilai.copy()
-        tampil_nilai["Total Qty"] = nilai["Total Qty"].map(ls.format_int_id)
-        tampil_nilai["Jumlah SKU"] = nilai["Jumlah SKU"].map(ls.format_int_id)
-        tampil_nilai["Nilai Persediaan"] = nilai["Nilai Persediaan"].map(ls.format_rupiah_id)
-        st.dataframe(tampil_nilai, use_container_width=True, height=420)
+        st.bar_chart(nv.set_index("Cabang")["Nilai Persediaan"])
+        tampil_nv = nv.copy()
+        tampil_nv["Total Qty"] = nv["Total Qty"].map(lp.format_int_id)
+        tampil_nv["Jumlah SKU"] = nv["Jumlah SKU"].map(lp.format_int_id)
+        tampil_nv["Nilai Persediaan"] = nv["Nilai Persediaan"].map(lp.format_rupiah_id)
+        st.dataframe(tampil_nv, use_container_width=True, height=420)
         st.download_button(
-            "⬇️ Unduh CSV — Nilai Persediaan per Cabang", nilai.to_csv(index=False).encode("utf-8-sig"),
-            "nilai_persediaan_cabang.csv", "text/csv", key="st_dl_nilai",
+            "⬇️ Unduh CSV — Nilai Persediaan LUNA per Cabang", nv.to_csv(index=False).encode("utf-8-sig"),
+            "nilai_persediaan_luna_cabang.csv", "text/csv", key="pd_dl_nilai",
         )
 
     st.divider()
@@ -218,26 +250,35 @@ def render_stok_tab():
     # -----------------------------------------------------------------
     st.header("📌 Analisa & Tindak Lanjut")
     catatan = []
-    if not status.empty:
-        ring2 = ls.ringkasan_status_cabang(status)
-        if not ring2.empty:
-            prioritas = ring2.iloc[0]
+    if not ind.empty:
+        rc2 = lp.ringkasan_indikator_cabang(ind)
+        if not rc2.empty:
+            prioritas = rc2.iloc[0]
             catatan.append(
-                f"Cabang **{prioritas['Cabang']}** paling perlu segera dibuffer — "
-                f"{ls.format_percent_id(prioritas['Porsi Merah (%)'])} dari produk LUNA-nya berstatus "
-                f"🔴 Merah ({int(prioritas['Merah'])} dari {int(prioritas['Jumlah Produk LUNA'])} produk)."
+                f"Cabang **{prioritas['Cabang']}** paling perlu segera direstock LUNA — "
+                f"{lp.format_percent_id(prioritas['Porsi Merah (%)'])} dari SKU LUNA-nya berstatus "
+                f"🔴 Merah ({int(prioritas['Merah'])} dari {int(prioritas['Jumlah SKU LUNA'])} SKU)."
             )
-            aman = ring2.sort_values("Porsi Merah (%)").iloc[0]
+            aman = rc2.sort_values("Porsi Merah (%)").iloc[0]
             catatan.append(
                 f"Cabang **{aman['Cabang']}** paling aman stok LUNA-nya — hanya "
-                f"{ls.format_percent_id(aman['Porsi Merah (%)'])} produk berstatus Merah."
+                f"{lp.format_percent_id(aman['Porsi Merah (%)'])} SKU berstatus Merah."
             )
-        n_merah_total = (status["Status"] == "🔴 Merah").sum()
+        rp2 = lp.ringkasan_indikator_produk(ind)
+        if not rp2.empty:
+            produk_kritis = rp2.iloc[0]
+            if produk_kritis["Porsi Merah (%)"] >= 50:
+                catatan.append(
+                    f"Produk **{produk_kritis['Nama Barang']}** berstatus Merah di "
+                    f"{int(produk_kritis['Merah'])} dari {int(produk_kritis['Jumlah Cabang Tercatat'])} cabang "
+                    f"({lp.format_percent_id(produk_kritis['Porsi Merah (%)'])}) — kemungkinan masalah pasokan "
+                    "dari pemasok LUNA, bukan cuma masalah satu cabang. Cek ketersediaan ke pemasok."
+                )
+        n_merah_total = (ind["Indikator"] == lp.MERAH).sum()
         if n_merah_total > 0:
             catatan.append(
-                f"Total ada **{ls.format_int_id(n_merah_total)}** kombinasi produk×cabang berstatus "
-                "🔴 Merah di seluruh jaringan — prioritaskan pengiriman ulang/pembelian ke pemasok LUNA "
-                "untuk item-item ini dulu (lihat tab Dashboard Penjualan Aksesoris untuk data pembelian historis)."
+                f"Total ada **{lp.format_int_id(n_merah_total)}** kombinasi SKU×cabang berstatus 🔴 Merah "
+                "di seluruh jaringan — prioritaskan pembelian ulang ke pemasok LUNA untuk item-item ini."
             )
     else:
         catatan.append("Tidak ada data produk LUNA untuk dianalisa pada filter saat ini.")
@@ -271,6 +312,7 @@ def render_penjualan_tab():
             st.info("Masukkan nama cabang di atas untuk melanjutkan.")
             return
         df = ljl.finalize_data(raw_penjualan, cabang_default=nama_cabang.strip())
+        st.session_state["nama_cabang_bersama"] = nama_cabang.strip()
 
     if df is None:
         return
@@ -380,17 +422,32 @@ def render_penjualan_tab():
 # ---------------------------------------------------------------------------
 def render_aksesoris_tab():
     if err_aksesoris:
-        st.error(f"Gagal membaca berkas penjualan aksesoris: {err_aksesoris}")
+        st.error(f"Gagal membaca berkas penjualan: {err_aksesoris}")
         return
-    if df_aksesoris is None:
+    if raw_aksesoris is None:
         st.info(
-            "Belum ada data. Unggah berkas Excel/CSV **Penjualan Aksesoris Regional** "
-            "(sheet **Rincian Faktur Penjualan**) lewat panel kiri, atau taruh berkasnya "
-            "di root repo sebelum deploy."
+            "Belum ada data. Unggah berkas penjualan (Excel/CSV) lewat panel kiri di "
+            "bagian \"🧾 Data Penjualan\" — berkas yang sama dipakai untuk bagian ini juga."
         )
         return
 
-    df = df_aksesoris
+    df = None
+    if "CABANG" in raw_aksesoris.columns:
+        df = la.finalize_data(raw_aksesoris)
+    else:
+        nama_bersama = st.session_state.get("nama_cabang_bersama")
+        if nama_bersama:
+            df = la.finalize_data(raw_aksesoris, cabang_default=nama_bersama)
+        else:
+            st.info(
+                "Berkas ini tidak punya kolom Cabang (rincian satu cabang saja). "
+                "Masukkan nama cabangnya dulu di bagian **\"🧾 Ringkasan Cabang, Produk & Sales\"** "
+                "di atas — nama itu akan dipakai juga di bagian ini."
+            )
+            return
+
+    if df is None:
+        return
 
     st.subheader("Filter — Data Penjualan Aksesoris")
     tahun_opsi = sorted([int(t) for t in df["TAHUN"].dropna().unique()])
@@ -685,7 +742,7 @@ def render_aksesoris_tab():
                 f"Cabang **{margin_rendah['Cabang']}** punya margin jauh di bawah rata-rata "
                 f"({la.format_percent_id(margin_rendah['Margin (%)'])}) — cek harga modal aksesorisnya, "
                 "kemungkinan sering membeli dari pemasok non-LUNA dengan modal lebih mahal "
-                "(lihat tab Dashboard Pembelian Cabang untuk detail kepatuhan ke pemasok target)."
+                "(lihat tab Dashboard Persediaan Aksesoris untuk cek ketersediaan stok LUNA di cabang ini)."
             )
 
     if not tp.empty:
@@ -727,12 +784,12 @@ def render_aksesoris_tab():
 # ---------------------------------------------------------------------------
 # Tab layout
 # ---------------------------------------------------------------------------
-tab_stok, tab_penjualan_aksesoris = st.tabs([
-    "📊 Dashboard Stok Semua Cabang", "🧾 Dashboard Penjualan Aksesoris",
+tab_persediaan, tab_penjualan_aksesoris = st.tabs([
+    "📊 Dashboard Persediaan Aksesoris", "🧾 Dashboard Penjualan Aksesoris",
 ])
 
-with tab_stok:
-    render_stok_tab()
+with tab_persediaan:
+    render_persediaan_tab()
 
 with tab_penjualan_aksesoris:
     render_penjualan_tab()

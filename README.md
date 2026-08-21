@@ -1,29 +1,29 @@
-# MFLASH — Dashboard Cabang (Stok LUNA + Penjualan Aksesoris)
+# MFLASH — Dashboard Cabang (Persediaan Aksesoris LUNA + Penjualan Aksesoris)
 
 Satu aplikasi Streamlit dengan dua tab:
 
-1. **📊 Dashboard Stok Semua Cabang** — status buffer stok LUNA per cabang
-   dengan kode warna 🔴🟡🟢, ringkasan cabang yang paling perlu segera
-   dibuffer, dan nilai persediaan aksesoris per cabang.
+1. **📊 Dashboard Persediaan Aksesoris** — indikator stok produk **LUNA** per
+   cabang dengan kode warna 🔴🟡🟢 (berdasarkan jumlah unit stok aktual),
+   ringkasan cabang & produk yang paling perlu segera direstock, dan nilai
+   persediaan LUNA per cabang.
 2. **🧾 Dashboard Penjualan Aksesoris** — satu tab gabungan berisi dua bagian:
    - **Ringkasan Cabang, Produk & Sales**: ranking Seluruh Cabang, Semua
-     Produk Aksesoris (terlaris & profit), dan Seluruh Sales (dari data
-     penjualan umum).
+     Produk Aksesoris (terlaris & profit), dan Seluruh Sales.
    - **Revenue, HPP & Katalog LUNA**: revenue & tren bulanan, Top 10 produk
      aksesoris terlaris & profit, omzet + HPP seluruh cabang, katalog
      referensi harga LUNA & potensi profit, serta analisa + proyeksi
-     5–10 tahun (dari data penjualan khusus kategori AKSESORIS).
+     5–10 tahun.
 
-Kedua bagian dalam tab Penjualan Aksesoris memakai berkas data yang bisa
-sama atau berbeda (masing-masing punya tombol unggah sendiri di panel kiri)
-— digabung tampilannya dalam satu tab karena sama-sama berbicara soal
-penjualan aksesoris, meski sumber datanya independen.
+Kedua bagian dalam tab Penjualan Aksesoris memakai **satu berkas data
+penjualan yang sama** (satu tombol unggah saja di panel kiri) — dibaca dua
+kali secara independen oleh dua modul olah data yang berbeda, jadi tidak
+perlu unggah berkas terpisah untuk tiap bagian.
 
 ## Isi repo
 
 ```
 app.py               # aplikasi utama (2 tab)
-logic_stok.py          # logika status buffer stok LUNA per cabang
+logic_persediaan.py    # logika indikator stok LUNA per cabang
 logic_penjualan.py    # logika olah data penjualan/cabang (umum)
 logic_aksesoris.py     # logika olah data revenue penjualan aksesoris
 logic_pembelian.py     # TIDAK dipakai app.py lagi — lihat catatan di bawah
@@ -32,8 +32,9 @@ requirements.txt      # dependensi untuk Streamlit Cloud
 
 > **Catatan:** `logic_pembelian.py` (dashboard porsi pemasok yang lama)
 > sudah tidak lagi dipanggil dari `app.py` sejak tab Pembelian diganti
-> menjadi tab Stok. Berkasnya tetap disertakan kalau-kalau Anda masih butuh
-> logikanya nanti — boleh dihapus dari repo kalau memang tidak dipakai.
+> menjadi tab Persediaan Aksesoris. Berkasnya tetap disertakan kalau-kalau
+> Anda masih butuh logikanya nanti — boleh dihapus dari repo kalau memang
+> tidak dipakai.
 
 ## Cara pakai di GitHub + Streamlit Cloud
 
@@ -41,11 +42,9 @@ requirements.txt      # dependensi untuk Streamlit Cloud
 2. **Opsional:** taruh berkas data langsung di root repo (sejajar `app.py`)
    supaya termuat otomatis tanpa upload manual tiap buka aplikasi:
    - `Persediaan_Aksesoris_Regional.xlsx` (harus punya sheet
-     **"Daftar Barang dan Jasa"**) untuk tab Stok.
-   - `penjualan.csv.gz` untuk bagian "Ringkasan Cabang, Produk & Sales" —
+     **"Daftar Barang dan Jasa"**) untuk tab Persediaan Aksesoris.
+   - `penjualan.csv.gz` untuk **kedua bagian** di tab Penjualan Aksesoris —
      boleh CSV/gz, atau Excel (`.xlsx`) dengan sheet **"Rincian Faktur Penjualan"**.
-   - `Penjualan_Aksesoris_Regional_MFlash.csv` untuk bagian "Revenue, HPP &
-     Katalog LUNA" — boleh CSV, atau Excel (`.xlsx`) dengan sheet yang sama.
    Kalau tidak ada, tersedia tombol unggah manual di panel kiri untuk masing-masing
    (menerima `.csv`, `.gz`, `.xlsx`, `.xls`).
 3. Deploy lewat [share.streamlit.io](https://share.streamlit.io) dengan
@@ -54,36 +53,45 @@ requirements.txt      # dependensi untuk Streamlit Cloud
 ## Panel kiri (sidebar)
 
 Sidebar dipakai bersama oleh kedua tab, berisi:
-- Unggah data persediaan/stok — untuk tab Stok
-- Unggah data penjualan (umum) — untuk bagian pertama tab Penjualan Aksesoris
-- Unggah data penjualan aksesoris — untuk bagian kedua tab Penjualan Aksesoris
-- **Ambang status stok LUNA** — dua slider untuk mengatur batas Merah dan
-  batas Hijau (default 20% dan 90%, bisa diubah tanpa ubah kode)
+- Unggah data persediaan — untuk tab Persediaan Aksesoris
+- Unggah data penjualan — dipakai untuk **kedua bagian** di tab Penjualan
+  Aksesoris (Ringkasan Cabang/Produk/Sales, maupun Revenue/HPP/Katalog LUNA)
+- **Ambang indikator stok LUNA** — dua kotak angka untuk mengatur batas
+  Merah dan batas Kuning (default: Merah ≤ 2 unit, Kuning 3–7 unit, Hijau
+  ≥ 8 unit — bisa diubah tanpa ubah kode)
 
 Filter tahun/bulan/cabang untuk tiap bagian ada **di dalam bagian
 masing-masing** (bukan di sidebar), supaya filter tidak tertukar.
 
-## Aturan data — Tab Stok Semua Cabang
+## Aturan data — Tab Persediaan Aksesoris
 
 - Barang LUNA diidentifikasi dari **nama barang yang mengandung kata
-  "LUNA"** (sumber data tidak punya kolom Pemasok terpisah untuk stok).
+  "LUNA"** (sumber data tidak punya kolom Pemasok/Brand terpisah untuk stok).
 - Data difilter ke kategori barang **AKSESORIS** (dua ejaan digabung),
   sesuai kolom `Kategori Barang`.
-- **Basis persentase stok**: karena sumber data tidak punya kolom target
-  stok/par-level resmi, persentase dihitung dari **stok tertinggi yang
-  pernah tercatat di cabang manapun** untuk produk yang sama (bukan target
-  resmi dari manajemen). Produk yang cuma tercatat di satu cabang otomatis
-  100% (Hijau) karena tidak ada pembanding — ditampilkan apa adanya di
-  dashboard, bukan disembunyikan.
-- **Status warna** (ambang bisa diubah di sidebar): 🔴 Merah di bawah 20%,
-  🟡 Kuning 20%–90%, 🟢 Hijau 90% ke atas.
+- **Indikator dari jumlah stok aktual** (`Kts (Semua Gdng)`), bukan
+  persentase relatif terhadap cabang lain — supaya konsisten dan tidak
+  bergantung pada produk pembanding. Ambang batas default diturunkan dari
+  sebaran stok LUNA riil (median 3, kuartil-3 ≈10):
+  - 🔴 **Merah**: stok ≤ 2 (kritis, termasuk 0 dan anomali negatif)
+  - 🟡 **Kuning**: stok 3–7 (menipis, perlu diawasi)
+  - 🟢 **Hijau**: stok ≥ 8 (aman)
+  Ambang ini **bisa diubah dari sidebar** kalau standar operasional MFLASH
+  berbeda dari saran ini.
 - Stok negatif pada sumber data (anomali sistem, biasanya transaksi keluar
-  tercatat sebelum stok masuk) diperlakukan sebagai 0, bukan dibiarkan
-  menghasilkan persentase negatif.
+  tercatat sebelum stok masuk disesuaikan) otomatis masuk kategori Merah,
+  bukan disembunyikan atau di-clip jadi 0.
+- **Keterbatasan yang perlu diketahui:** indikator ini murni dari jumlah
+  unit fisik, BUKAN "hari persediaan" (days of supply) — karena nama produk
+  di data stok vs data penjualan cuma cocok persis sekitar 45% (variasi
+  penulisan), sehingga menghitung kecepatan jual per produk per cabang
+  belum bisa diandalkan sebagai basis utama. Kalau penamaan produk di kedua
+  sumber data dirapikan/distandardisasi di masa depan, pendekatan berbasis
+  kecepatan jual bisa jadi peningkatan berikutnya.
 - Kode Barang **tidak** dipakai sebagai kunci pembanding antar cabang
   karena penomorannya independen per cabang (kode yang sama bisa merujuk
   ke produk berbeda di cabang lain) — nama barang yang dipakai sebagai
-  kunci, setelah dirapikan (strip + uppercase).
+  kunci pengelompokan, setelah dirapikan (strip + uppercase).
 
 ## Aturan data — Tab Penjualan Aksesoris (bagian Ringkasan)
 
@@ -100,6 +108,13 @@ masing-masing** (bukan di sidebar), supaya filter tidak tertukar.
 
 ## Aturan data — Tab Penjualan Aksesoris (bagian Revenue, HPP & Katalog LUNA)
 
+- Memakai **berkas yang sama** dengan bagian Ringkasan di atasnya — dibaca
+  ulang secara independen (bukan berbagi objek berkas yang sama, supaya
+  tidak ada masalah posisi baca habis pada salah satu bagian).
+- Kalau berkas yang diunggah adalah **rincian satu cabang saja** (tanpa
+  kolom Cabang), Anda cukup mengisi nama cabangnya **sekali** di bagian
+  "Ringkasan Cabang, Produk & Sales" — nama itu otomatis dipakai juga di
+  bagian Revenue ini, tidak perlu diisi dua kali.
 - Sama seperti bagian Ringkasan: nota = `CABANG` + `NO FAKTUR`, `HARGA BELI`
   sudah total per baris, baris kembar tidak dibuang.
 - Kolom "Unnamed" dari sumber Excel (baik yang kosong maupun yang cuma
@@ -132,10 +147,12 @@ masing-masing** (bukan di sidebar), supaya filter tidak tertukar.
 ## Pengujian
 
 Modul-modul logika sudah diuji memakai data asli Anda:
-- **Stok** (`logic_stok.py`): 23.124 baris persediaan, 18 cabang, 358 baris
-  produk LUNA (332 kode barang unik, 86 nama produk unik) — status buffer
-  menghasilkan 127 kombinasi produk×cabang Merah, 132 Kuning, 76 Hijau;
-  termasuk penanganan stok negatif dan kasus tepi filter cabang kosong.
+- **Persediaan** (`logic_persediaan.py`): 23.124 baris persediaan, 18 cabang,
+  358 baris item LUNA (87 nama produk unik) — indikator menghasilkan
+  134 kombinasi SKU×cabang Merah, 78 Kuning, 123 Hijau (dari total 335,
+  karena sebagian baris terduplikasi kode barangnya dalam satu cabang dan
+  digabung); termasuk penanganan stok negatif dan kasus tepi filter cabang
+  kosong.
 - **Penjualan** (rincian satu cabang): 13.989 baris, 5.709 nota unik.
 - **Penjualan** (gabungan 17 cabang): 67.954 baris, 54.012 nota unik.
 - **Revenue Aksesoris** (gabungan 18 cabang): 72.776 baris, 58.550 nota
@@ -148,7 +165,7 @@ dan menjalankan `streamlit run app.py` langsung di sini. Yang sudah saya
 uji dan pastikan benar adalah seluruh fungsi olah data di modul
 `logic_*.py`, memakai data Excel/CSV asli Anda. `app.py` sendiri hanya
 menyusun logika itu ke widget Streamlit standar (`tabs`, `sidebar`,
-`columns`, `metric`, `slider`, `bar_chart`, `dataframe`,
+`columns`, `metric`, `number_input`, `bar_chart`, `dataframe`,
 `download_button`, `file_uploader`) — tidak ada fitur eksotis. Saya
 sarankan menjalankan sekali secara lokal (`streamlit run app.py`)
 sebelum/sesudah deploy, dan beri tahu saya kalau ada error — langsung
