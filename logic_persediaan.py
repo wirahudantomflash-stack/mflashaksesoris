@@ -82,12 +82,16 @@ def load_persediaan(file_or_path, sheet_name: str = SHEET_NAME) -> pd.DataFrame:
     return df
 
 
-def apply_filters(df: pd.DataFrame, cabang=None, hanya_aksesoris: bool = True, hanya_luna: bool = True) -> pd.DataFrame:
+def apply_filters(df: pd.DataFrame, cabang=None, hanya_aksesoris: bool = True, filter_luna: bool | None = True) -> pd.DataFrame:
+    """filter_luna: True -> hanya nama barang mengandung LUNA,
+    False -> hanya SELAIN LUNA, None -> tidak difilter berdasarkan brand."""
     out = df
     if hanya_aksesoris:
         out = out[out["KATEGORI_NORM"] == "AKSESORIS"]
-    if hanya_luna:
+    if filter_luna is True:
         out = out[out["ADALAH_LUNA"]]
+    elif filter_luna is False:
+        out = out[~out["ADALAH_LUNA"]]
     if cabang:
         out = out[out["Cabang"].isin(cabang)]
     return out
@@ -102,7 +106,9 @@ def klasifikasi_stok(qty: float, batas_merah: float = 2, batas_kuning: float = 7
 
 
 def indikator_stok_luna(df: pd.DataFrame, batas_merah: float = 2, batas_kuning: float = 7) -> pd.DataFrame:
-    """Indikator stok per (Cabang, Nama Barang) untuk item LUNA.
+    """Indikator stok per (Cabang, Kode Barang, Nama Barang) — fungsi ini generik,
+    bisa dipakai untuk himpunan produk manapun yang sudah difilter sebelumnya
+    (LUNA maupun selain LUNA), bukan cuma untuk LUNA meski nama fungsinya begitu.
 
     Kolom hasil: Cabang, Kode Barang, Nama Barang, Stok, Nilai Stok, Indikator.
     """

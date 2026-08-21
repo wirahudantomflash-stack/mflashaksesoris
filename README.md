@@ -2,10 +2,15 @@
 
 Satu aplikasi Streamlit dengan dua tab:
 
-1. **📊 Dashboard Persediaan Aksesoris** — indikator stok produk **LUNA** per
-   cabang dengan kode warna 🔴🟡🟢 (berdasarkan jumlah unit stok aktual),
-   ringkasan cabang & produk yang paling perlu segera direstock, dan nilai
-   persediaan LUNA per cabang.
+1. **📊 Dashboard Persediaan Aksesoris** — indikator stok dengan kode warna
+   🔴🟡🟢 (berdasarkan jumlah unit stok aktual), dibagi dua bagian:
+   - **Stok Persediaan — Nama Barang LUNA**: fokus brand yang wajib disetok
+     semua cabang.
+   - **Stok Persediaan — Nama Barang Selain LUNA**: brand lain sebagai
+     pembanding.
+   Tiap bagian punya ringkasan cabang & produk yang paling perlu segera
+   direstock, nilai persediaan per cabang, dan kotak analisa yang
+   membandingkan kondisi LUNA vs selain LUNA.
 2. **🧾 Dashboard Penjualan Aksesoris** — satu tab gabungan berisi dua bagian:
    - **Ringkasan Cabang, Produk & Sales**: ranking Seluruh Cabang, Semua
      Produk Aksesoris (terlaris & profit), dan Seluruh Sales.
@@ -66,13 +71,20 @@ masing-masing** (bukan di sidebar), supaya filter tidak tertukar.
 ## Aturan data — Tab Persediaan Aksesoris
 
 - Barang LUNA diidentifikasi dari **nama barang yang mengandung kata
-  "LUNA"** (sumber data tidak punya kolom Pemasok/Brand terpisah untuk stok).
+  "LUNA"** (sumber data tidak punya kolom Pemasok/Brand terpisah untuk stok);
+  sisanya masuk kelompok "Selain LUNA".
 - Data difilter ke kategori barang **AKSESORIS** (dua ejaan digabung),
-  sesuai kolom `Kategori Barang`.
+  sesuai kolom `Kategori Barang` — berlaku untuk kedua kelompok.
+- **Kelompok "Selain LUNA" jauh lebih besar** (≈22.700 baris, ≈12.600 nama
+  produk unik, vs LUNA ≈360 baris/≈90 nama produk) — supaya tabel di layar
+  tetap ringan, ringkasan per produk kelompok ini dibatasi tampilan (default
+  30, bisa diperbesar lewat slider di dashboard), tapi **tombol unduh CSV
+  selalu berisi semua produk**, tidak dipotong.
 - **Indikator dari jumlah stok aktual** (`Kts (Semua Gdng)`), bukan
   persentase relatif terhadap cabang lain — supaya konsisten dan tidak
   bergantung pada produk pembanding. Ambang batas default diturunkan dari
-  sebaran stok LUNA riil (median 3, kuartil-3 ≈10):
+  sebaran stok LUNA riil (median 3, kuartil-3 ≈10), dan dipakai sama untuk
+  kedua kelompok supaya bisa dibandingkan apel-ke-apel:
   - 🔴 **Merah**: stok ≤ 2 (kritis, termasuk 0 dan anomali negatif)
   - 🟡 **Kuning**: stok 3–7 (menipis, perlu diawasi)
   - 🟢 **Hijau**: stok ≥ 8 (aman)
@@ -81,6 +93,8 @@ masing-masing** (bukan di sidebar), supaya filter tidak tertukar.
 - Stok negatif pada sumber data (anomali sistem, biasanya transaksi keluar
   tercatat sebelum stok masuk disesuaikan) otomatis masuk kategori Merah,
   bukan disembunyikan atau di-clip jadi 0.
+- Kotak Analisa & Tindak Lanjut membandingkan porsi Merah LUNA vs Selain
+  LUNA secara eksplisit, di samping catatan per kelompok.
 - **Keterbatasan yang perlu diketahui:** indikator ini murni dari jumlah
   unit fisik, BUKAN "hari persediaan" (days of supply) — karena nama produk
   di data stok vs data penjualan cuma cocok persis sekitar 45% (variasi
@@ -147,12 +161,14 @@ masing-masing** (bukan di sidebar), supaya filter tidak tertukar.
 ## Pengujian
 
 Modul-modul logika sudah diuji memakai data asli Anda:
-- **Persediaan** (`logic_persediaan.py`): 23.124 baris persediaan, 18 cabang,
-  358 baris item LUNA (87 nama produk unik) — indikator menghasilkan
-  134 kombinasi SKU×cabang Merah, 78 Kuning, 123 Hijau (dari total 335,
-  karena sebagian baris terduplikasi kode barangnya dalam satu cabang dan
-  digabung); termasuk penanganan stok negatif dan kasus tepi filter cabang
-  kosong.
+- **Persediaan** (`logic_persediaan.py`): 23.124 baris persediaan, 18 cabang.
+  - Kelompok **LUNA**: 358 baris (87 nama produk unik) — 335 kombinasi
+    SKU×cabang, porsi Merah 40,0%.
+  - Kelompok **Selain LUNA**: 22.766 baris (12.634 nama produk unik) —
+    20.888 kombinasi SKU×cabang, porsi Merah 89,9% (jauh lebih kritis
+    dibanding LUNA, sesuai dugaan karena LUNA ditarget khusus).
+  Termasuk penanganan stok negatif dan kasus tepi filter cabang kosong
+  untuk kedua kelompok.
 - **Penjualan** (rincian satu cabang): 13.989 baris, 5.709 nota unik.
 - **Penjualan** (gabungan 17 cabang): 67.954 baris, 54.012 nota unik.
 - **Revenue Aksesoris** (gabungan 18 cabang): 72.776 baris, 58.550 nota
