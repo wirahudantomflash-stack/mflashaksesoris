@@ -200,14 +200,18 @@ perusahaan** (2 lembar referensi):
   dari GP, Store Manager 2%, Regional Manager 1%). Ditanam persis di
   `logic_aksesoris.py` (`matrix_insentif_pekanan()`), sudah diverifikasi
   cocok 100% dengan angka pada gambar referensi.
-- **Matrix Insentif Per Item**: 4 tier berdasarkan rentang harga jual
-  (Rp50rb–100rb, >100rb–250rb, >250rb–500rb, >500rb), insentif TETAP per
-  unit terjual (bukan % dari omzet) — Rp5.000/Rp10.000/Rp25.000/Rp50.000.
-  Ditanam di `matrix_insentif_per_item()`.
+- **Matrix Insentif Per Item** (v2, diperbarui): 6 tier berdasarkan rentang
+  harga jual (Rp50rb–100rb, >100rb–250rb, >250rb–500rb, >500rb–750rb,
+  >750rb–1jt, >1jt), asumsi Gross Profit **40% konsisten** dari harga acuan
+  di semua tingkat, insentif TETAP per unit terjual = **50% dari GP**
+  secara konsisten (Rp10.000/Rp20.000/Rp50.000/Rp100.000/Rp150.000/
+  Rp200.000). Ditanam di `matrix_insentif_per_item()`.
 - **Kalkulator THP Sales Retail**: Total THP = **Gaji Pokok** + **Insentif
   %GP Bulanan** (Insentif/Pekan × jumlah minggu/bulan, default 4,33) +
   opsional **Insentif Per Item Bulanan** (estimasi jumlah item terjual/hari
-  per tingkat harga × Insentif/Item × hari kerja/bulan).
+  per tingkat harga × Insentif/Item × hari kerja/bulan — otomatis
+  menyesuaikan jumlah kolom input kalau jumlah tier matrix per-item berubah,
+  tidak di-*hardcode* ke 4 atau 6).
   - Fungsi `saran_gaji_pokok()` memberi **titik awal** Gaji Pokok supaya
     tier **Minimum** pas mencapai THP Minimum (default Rp 5jt) — bukan
     jawaban final, karena tier **Maksimum** belum tentu otomatis pas di
@@ -216,16 +220,15 @@ perusahaan** (2 lembar referensi):
   - Kolom **"Status Target"** (✅ dalam target / ⬇️ di bawah / ⬆️ di atas)
     ditampilkan per tier, supaya jelas terlihat kalau kalibrasi Gaji Pokok
     atau asumsi item/hari masih perlu disesuaikan.
-  - **Diuji langsung**: dengan asumsi 1 item/hari di semua tingkat harga,
-    tier Minimum-Maksimum berkisar Rp 5.000.000–Rp 5.866.000 (semua ✅
-    kalau target dianggap 5–8jt karena batas atas belum terlampaui, tapi
-    belum menyentuh Rp 8jt) — realistis, karena rentang insentif murni dari
-    matrix pekanan+per-item dengan asumsi konservatif tidak otomatis
-    selebar itu. Menaikkan asumsi item/hari di tier atas (mis. 1→4 item/hari
-    berjenjang) bisa mendorong tier atas melewati Rp 8jt (terdeteksi
-    sebagai ⬆️ di atas target) — dashboard tidak memaksakan satu jawaban
-    "benar", tapi memberi alat kalibrasi supaya pengguna sendiri yang
-    menentukan asumsi volume penjualan yang realistis di lapangan.
+  - **Diuji dengan matrix per-item v2** (insentif jauh lebih besar dari v1):
+    asumsi 1 item/hari di ke-6 tingkat harga saja sudah menghasilkan
+    **Rp 13.780.000/bulan** dari insentif per item — jauh melampaui target
+    Rp 8jt bahkan dengan Gaji Pokok Rp 0 (`saran_gaji_pokok()` otomatis
+    berhenti di 0, tidak negatif). Ini bukan bug — dashboard dengan sengaja
+    TIDAK memaksakan asumsi 1 item/hari di semua tingkat harga sebagai
+    default yang "benar", karena kenyataannya jarang toko aksesoris laku
+    1 unit/hari di tingkat harga >Rp1 juta. Turunkan asumsi item/hari di
+    tingkat harga tinggi supaya Total THP mendekati rentang target.
 
 ## Target Pencapaian Penjualan LUNA
 
