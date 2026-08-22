@@ -101,10 +101,33 @@ masing-masing** (bukan di sidebar), supaya filter tidak tertukar.
   indikator warna — murni angka.
 - **Bagian 2 & 3 (Produk Favorit / Kebutuhan Belum Terpenuhi)**: memakai
   data **penjualan** aksesoris (bukan cuma stok) untuk menentukan "paling
-  diminati" — ranking dari `QTY` terjual per (Cabang, Nama Barang), Top-N
-  bisa diatur lewat slider. Disandingkan dengan stok saat ini
-  (`produk_favorit_per_cabang()`); kolom **"Wajib Direstock"** (⚠️ Ya / Tidak)
-  dipakai sebagai flag sederhana — **bukan** indikator tri-warna.
+  diminati" — ranking dari `QTY` terjual. Ada **dua mode tampilan**
+  (`st.radio`) yang bisa dipilih pengguna:
+  - **Per Cabang** (`produk_favorit_per_cabang()`): Top-N produk per cabang,
+    Top-N bisa diatur lewat slider.
+  - **Semua Cabang (Gabungan)** (`produk_favorit_semua_cabang()`): qty
+    terjual, potensi omzet & laba dijumlahkan LINTAS CABANG per nama
+    barang — untuk melihat produk mana yang paling mendesak dibenahi
+    secara jaringan (dasar keputusan pembelian besar ke pemasok), bukan
+    per cabang kecil-kecil. Bisa diurutkan dari Qty Terjual / Potensi
+    Omzet / Potensi Laba.
+  Kedua mode menampilkan 4 hal yang diminta pengguna:
+  1. **Rincian nama barang dan jumlah stok** (Stok Saat Ini / Stok Semua
+     Cabang tergantung mode).
+  2. **Potensi omzet dan laba** — dihitung dari `TOTAL HARGA` dan
+     `TOTAL HARGA - HARGA BELI` yang sudah terbukti tercapai secara
+     historis untuk produk itu (bukan proyeksi baru, tapi nilai yang
+     akan terus terealisasi kalau produknya tetap distok).
+  3. **(saran Claude) Estimasi Kebutuhan Restock** — rata-rata terjual per
+     bulan (dari jumlah bulan unik pada data) dikurangi stok saat ini,
+     dibulatkan ke atas, minimal 0 — supaya bukan cuma tahu "butuh
+     restock" tapi juga tahu berapa banyak.
+  4. **(saran Claude) Ranking Prioritas Restock Se-Jaringan** — khusus mode
+     Semua Cabang: kolom "Jumlah Cabang Stok Kosong/Rendah" menunjukkan di
+     berapa cabang produk itu kritis sekaligus, sinyal masalah pasokan
+     sistemik (bukan cuma satu cabang).
+  Kolom **"Wajib Direstock"** (⚠️ Ya / Tidak) dipakai sebagai flag
+  sederhana — **bukan** indikator tri-warna.
   - **Nama produk dicocokkan persis (exact match)** antara data penjualan
     dan data stok — untuk seluruh katalog aksesoris (bukan cuma LUNA),
     tingkat kecocokan ini **97,9%** (diuji dengan data asli), jauh lebih
@@ -115,7 +138,13 @@ masing-masing** (bukan di sidebar), supaya filter tidak tertukar.
     diuji — dan produk-produk terlaris (yang paling sering muncul di daftar
     "Produk Favorit") justru yang paling sering kehabisan stok, karena
     barang laris memang lebih cepat habis. Kotak "Kebutuhan Konsumen Belum
-    Terpenuhi" secara khusus menyoroti pola ini.
+    Terpenuhi" secara khusus menyoroti pola ini, plus kartu **Total Potensi
+    Omzet & Laba** kalau semua kebutuhan yang belum terpenuhi ini terjual.
+  - Total nilai stok jaringan yang dijumlahkan (`Stok Semua Cabang`)
+    di-*clip* minimal 0 — beberapa produk punya anomali stok negatif di
+    sebagian cabang (transaksi keluar tercatat sebelum stok masuk
+    disesuaikan) yang kalau dibiarkan bisa membuat total jaringan
+    kelihatan negatif, padahal secara fisik itu tidak mungkin.
 - **Bagian 4 (Analisa Lokasi)**: 18 titik lokasi cabang MFlash dicari
   langsung berdasarkan nama cabang (bukan perkiraan/koordinat acak) —
   alamat, koordinat, dan rating asli, ditanam di
@@ -258,9 +287,14 @@ Modul-modul logika sudah diuji memakai data asli Anda:
     reference data penjualan (72.776 baris) × data stok — kecocokan nama
     produk 97,9%, ditemukan pola nyata 75,2% baris stok aksesoris berstok
     ≤ 0, dan produk terlaris justru paling sering termasuk di dalamnya
-    (diverifikasi manual, bukan bug pencocokan nama). Bug duplikasi kolom
-    dan kesalahan huruf besar/kecil nama cabang saat digabung dengan data
-    lokasi sempat ditemukan dan sudah diperbaiki sebelum dikirim.
+    (diverifikasi manual, bukan bug pencocokan nama). Kedua mode tampilan
+    (Per Cabang: 90 baris; Semua Cabang Gabungan: diuji dengan 3 pilihan
+    urutan — Qty Terjual, Potensi Omzet, Potensi Laba, masing-masing 10
+    baris) sudah diuji lengkap dengan potensi omzet/laba dan estimasi
+    kebutuhan restock. Bug duplikasi kolom, kesalahan huruf besar/kecil
+    nama cabang saat digabung dengan data lokasi, dan total stok jaringan
+    yang sempat negatif (anomali stok, sudah di-*clip* ke 0) ditemukan dan
+    diperbaiki sebelum dikirim.
   - **Analisa Lokasi**: 18 titik lokasi cabang (dicari langsung, bukan
     perkiraan) berhasil dipetakan ke 8 wilayah administratif Jabodetabek +
     Karawang; digabung dengan data nilai persediaan tanpa baris yang hilang

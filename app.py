@@ -193,7 +193,11 @@ def render_persediaan_tab():
         "dipakai juga di sini."
     )
 
-    top_n_favorit = st.slider("Top berapa produk per cabang", 3, 10, 5, key="pd_top_n_favorit")
+    mode_tampilan = st.radio(
+        "Tampilan", ["Per Cabang", "Semua Cabang (Gabungan)"], horizontal=True, key="pd_mode_tampilan",
+        help="\"Semua Cabang\" menjumlahkan qty terjual, potensi omzet & laba lintas cabang — "
+             "untuk melihat produk mana yang paling mendesak dibenahi secara jaringan, bukan per cabang.",
+    )
 
     df_jual_stok = None
     if raw_aksesoris is None:
@@ -212,40 +216,86 @@ def render_persediaan_tab():
             )
 
     produk_favorit = pd.DataFrame()
-    if df_jual_stok is not None:
+
+    if df_jual_stok is not None and mode_tampilan == "Per Cabang":
+        top_n_favorit = st.slider("Top berapa produk per cabang", 3, 10, 5, key="pd_top_n_favorit")
         produk_favorit = lp.produk_favorit_per_cabang(df_jual_stok, dasar, top_n=top_n_favorit)
 
-    if produk_favorit.empty:
-        if df_jual_stok is not None:
+        if produk_favorit.empty:
             st.info("Tidak ada data penjualan aksesoris pada filter cabang saat ini.")
-    else:
-        tampil_pf = produk_favorit.copy()
-        tampil_pf["Omzet"] = produk_favorit["Omzet"].map(lp.format_rupiah_id)
-        tampil_pf["Stok Saat Ini"] = produk_favorit["Stok Saat Ini"].map(lp.format_int_id)
-        st.dataframe(tampil_pf, use_container_width=True, height=460)
-        st.download_button(
-            "⬇️ Unduh CSV — Produk Favorit per Cabang", produk_favorit.to_csv(index=False).encode("utf-8-sig"),
-            "produk_favorit_per_cabang.csv", "text/csv", key="pd_dl_produk_favorit",
-        )
+        else:
+            tampil_pf = produk_favorit.copy()
+            for c in ["Potensi Omzet", "Potensi Laba"]:
+                tampil_pf[c] = produk_favorit[c].map(lp.format_rupiah_id)
+            tampil_pf["Rata-rata Terjual/Bulan"] = produk_favorit["Rata-rata Terjual/Bulan"].map(lambda x: lp.format_decimal_id(x, 1))
+            tampil_pf["Stok Saat Ini"] = produk_favorit["Stok Saat Ini"].map(lp.format_int_id)
+            tampil_pf["Estimasi Kebutuhan Restock"] = produk_favorit["Estimasi Kebutuhan Restock"].map(lp.format_int_id)
+            st.dataframe(tampil_pf, use_container_width=True, height=460)
+            st.download_button(
+                "⬇️ Unduh CSV — Produk Favorit per Cabang", produk_favorit.to_csv(index=False).encode("utf-8-sig"),
+                "produk_favorit_per_cabang.csv", "text/csv", key="pd_dl_produk_favorit",
+            )
 
+    elif df_jual_stok is not None and mode_tampilan == "Semua Cabang (Gabungan)":
+        c1, c2 = st.columns(2)
+        with c1:
+            top_n_gabungan = st.slider("Top berapa produk (gabungan semua cabang)", 5, 30, 10, key="pd_top_n_gabungan")
+        with c2:
+            urutkan_dari = st.selectbox(
+                "Urutkan berdasarkan", ["Qty Terjual", "Potensi Omzet", "Potensi Laba"], key="pd_urutkan_gabungan",
+            )
+        produk_favorit = lp.produk_favorit_semua_cabang(df_jual_stok, dasar, top_n=top_n_gabungan, urutkan_dari=urutkan_dari)
+
+        if produk_favorit.empty:
+            st.info("Tidak ada data penjualan aksesoris pada filter cabang saat ini.")
+        else:
+            tampil_pf = produk_favorit.copy()
+            for c in ["Potensi Omzet", "Potensi Laba"]:
+                tampil_pf[c] = produk_favorit[c].map(lp.format_rupiah_id)
+            tampil_pf["Rata-rata Terjual/Bulan"] = produk_favorit["Rata-rata Terjual/Bulan"].map(lambda x: lp.format_decimal_id(x, 1))
+            tampil_pf["Stok Semua Cabang"] = produk_favorit["Stok Semua Cabang"].map(lp.format_int_id)
+            tampil_pf["Estimasi Kebutuhan Restock"] = produk_favorit["Estimasi Kebutuhan Restock"].map(lp.format_int_id)
+            st.dataframe(tampil_pf, use_container_width=True, height=460)
+            st.caption(
+                "**\"Jumlah Cabang Stok Kosong/Rendah\"** = berapa dari total cabang yang aktif "
+                "menjual produk ini stoknya sekarang ≤ 2 unit — makin besar angkanya, makin "
+                "mendesak dibenahi secara jaringan (bukan cuma satu cabang)."
+            )
+            st.download_button(
+                "⬇️ Unduh CSV — Produk Favorit Semua Cabang (Gabungan)", produk_favorit.to_csv(index=False).encode("utf-8-sig"),
+                "produk_favorit_semua_cabang.csv", "text/csv", key="pd_dl_produk_favorit_gabungan",
+            )
+
+    if not produk_favorit.empty:
         st.divider()
         st.header("📢 3. Kebutuhan Konsumen yang Belum Terpenuhi")
         kebutuhan = lp.kebutuhan_belum_terpenuhi(produk_favorit)
         n_total = len(produk_favorit)
         n_kurang = len(kebutuhan)
+        label_unit = "kombinasi cabang×produk" if mode_tampilan == "Per Cabang" else "produk"
         st.caption(
-            f"Produk favorit (sudah terbukti laku) tapi stoknya kosong/sangat rendah saat ini "
-            f"di cabang tsb — inilah yang paling menggambarkan permintaan konsumen yang belum "
-            f"terlayani. **{lp.format_int_id(n_kurang)} dari {lp.format_int_id(n_total)}** "
-            f"produk favorit ({lp.format_percent_id(n_kurang/n_total*100 if n_total else 0)}) "
-            "berstatus wajib direstock."
+            f"Produk favorit (sudah terbukti laku) tapi stoknya kosong/sangat rendah — inilah "
+            f"yang paling menggambarkan permintaan konsumen yang belum terlayani. "
+            f"**{lp.format_int_id(n_kurang)} dari {lp.format_int_id(n_total)}** {label_unit} "
+            f"({lp.format_percent_id(n_kurang/n_total*100 if n_total else 0)}) berstatus wajib direstock."
         )
         if kebutuhan.empty:
-            st.success("✅ Semua produk favorit di seluruh cabang stoknya masih memadai.")
+            st.success("✅ Semua produk favorit stoknya masih memadai.")
         else:
             tampil_kbt = kebutuhan.copy()
-            tampil_kbt["Omzet"] = kebutuhan["Omzet"].map(lp.format_rupiah_id)
-            tampil_kbt["Stok Saat Ini"] = kebutuhan["Stok Saat Ini"].map(lp.format_int_id)
+            for c in ["Potensi Omzet", "Potensi Laba"]:
+                tampil_kbt[c] = kebutuhan[c].map(lp.format_rupiah_id)
+            tampil_kbt["Rata-rata Terjual/Bulan"] = kebutuhan["Rata-rata Terjual/Bulan"].map(lambda x: lp.format_decimal_id(x, 1))
+            kolom_stok = "Stok Saat Ini" if mode_tampilan == "Per Cabang" else "Stok Semua Cabang"
+            tampil_kbt[kolom_stok] = kebutuhan[kolom_stok].map(lp.format_int_id)
+            tampil_kbt["Estimasi Kebutuhan Restock"] = kebutuhan["Estimasi Kebutuhan Restock"].map(lp.format_int_id)
+
+            total_potensi_omzet = kebutuhan["Potensi Omzet"].sum()
+            total_potensi_laba = kebutuhan["Potensi Laba"].sum()
+            c1, c2 = st.columns(2)
+            c1.metric("Total Potensi Omzet (kalau semua terpenuhi)", lp.format_rupiah_id(total_potensi_omzet))
+            c2.metric("Total Potensi Laba (kalau semua terpenuhi)", lp.format_rupiah_id(total_potensi_laba))
+
             st.dataframe(tampil_kbt, use_container_width=True, height=420)
             st.download_button(
                 "⬇️ Unduh CSV — Kebutuhan Konsumen Belum Terpenuhi", kebutuhan.to_csv(index=False).encode("utf-8-sig"),

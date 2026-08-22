@@ -271,24 +271,45 @@ def nilai_persediaan_perbandingan(df_luna: pd.DataFrame, df_non_luna: pd.DataFra
     return g[cols]
 
 
+def _jumlah_bulan_data(df_jual: pd.DataFrame) -> int:
+    """Jumlah bulan unik (Tahun+Bulan) pada data penjualan — dipakai sebagai
+    pembagi untuk estimasi rata-rata terjual per bulan."""
+    if df_jual.empty or "TAHUN" not in df_jual.columns or "BULAN" not in df_jual.columns:
+        return 1
+    n = df_jual[["TAHUN", "BULAN"]].drop_duplicates().shape[0]
+    return max(n, 1)
+
+
 def produk_favorit_per_cabang(df_jual: pd.DataFrame, df_stok: pd.DataFrame, top_n: int = 5) -> pd.DataFrame:
     """Produk aksesoris paling diminati (terjual terbanyak) per cabang,
-    disandingkan dengan stok saat ini — supaya langsung kelihatan produk
-    favorit mana yang stoknya kosong/rendah dan wajib segera direstock.
+    disandingkan dengan stok saat ini, potensi omzet & laba, dan estimasi
+    kebutuhan restock bulanan — supaya langsung kelihatan produk favorit
+    mana yang stoknya kosong/rendah, seberapa besar nilainya kalau terjual,
+    dan berapa unit yang sebaiknya dibeli.
 
-    df_jual: data penjualan aksesoris (kolom CABANG, NAMA BARANG, QTY, TOTAL HARGA).
+    df_jual: data penjualan aksesoris (kolom CABANG, NAMA BARANG, QTY,
+    TOTAL HARGA, HARGA BELI, TAHUN, BULAN).
     df_stok: data persediaan yang sudah difilter kategori aksesoris (kolom
     Cabang, Nama Barang, Kts (Semua Gdng)).
     """
-    cols = ["Cabang", "Peringkat", "Nama Barang", "Qty Terjual", "Omzet", "Stok Saat Ini", "Wajib Direstock"]
+    cols = [
+        "Cabang", "Peringkat", "Nama Barang", "Qty Terjual", "Rata-rata Terjual/Bulan",
+        "Potensi Omzet", "Potensi Laba", "Stok Saat Ini", "Estimasi Kebutuhan Restock",
+        "Wajib Direstock",
+    ]
     if df_jual.empty:
         return pd.DataFrame(columns=cols)
 
+    jumlah_bulan = _jumlah_bulan_data(df_jual)
+
     agg = df_jual.groupby(["CABANG", "NAMA BARANG"], dropna=False).agg(
-        **{"Qty Terjual": ("QTY", "sum")}, Omzet=("TOTAL HARGA", "sum"),
+        **{"Qty Terjual": ("QTY", "sum")}, Omzet=("TOTAL HARGA", "sum"), Modal=("HARGA BELI", "sum"),
     ).reset_index()
+    agg["Potensi Laba"] = agg["Omzet"] - agg["Modal"]
     agg["Peringkat"] = agg.groupby("CABANG")["Qty Terjual"].rank(method="first", ascending=False).astype(int)
     top = agg[agg["Peringkat"] <= top_n].sort_values(["CABANG", "Peringkat"]).reset_index(drop=True)
+    top["Rata-rata Terjual/Bulan"] = top["Qty Terjual"] / jumlah_bulan
+    top = top.rename(columns={"Omzet": "Potensi Omzet"})
 
     if not df_stok.empty:
         stok_lookup = df_stok.groupby(["Cabang", "Nama Barang"])["Kts (Semua Gdng)"].sum().reset_index()
@@ -298,16 +319,70 @@ def produk_favorit_per_cabang(df_jual: pd.DataFrame, df_stok: pd.DataFrame, top_
         top["Kts (Semua Gdng)"] = np.nan
 
     top["Stok Saat Ini"] = top["Kts (Semua Gdng)"].fillna(0)
+    top["Estimasi Kebutuhan Restock"] = (top["Rata-rata Terjual/Bulan"] - top["Stok Saat Ini"]).clip(lower=0).round().astype(int)
     top["Wajib Direstock"] = top["Stok Saat Ini"].apply(lambda x: "⚠️ Ya — stok kosong/rendah" if x <= 2 else "Tidak")
     top = top.rename(columns={"CABANG": "Cabang", "NAMA BARANG": "Nama Barang"})
     return top[cols]
 
 
+def produk_favorit_semua_cabang(
+    df_jual: pd.DataFrame, df_stok: pd.DataFrame, top_n: int = 10, urutkan_dari: str = "Qty Terjual",
+) -> pd.DataFrame:
+    """Versi GABUNGAN semua cabang — untuk "Ranking Prioritas Restock
+    Se-Jaringan". Qty terjual, potensi omzet & laba dijumlahkan LINTAS
+    CABANG per nama barang, plus jumlah cabang yang stoknya kosong/rendah
+    untuk produk itu (sinyal urgensi jaringan, bukan cuma satu cabang) dan
+    estimasi kebutuhan restock bulanan total."""
+    cols = [
+        "Peringkat", "Nama Barang", "Qty Terjual", "Rata-rata Terjual/Bulan",
+        "Potensi Omzet", "Potensi Laba", "Stok Semua Cabang", "Estimasi Kebutuhan Restock",
+        "Jumlah Cabang Stok Kosong/Rendah", "Jumlah Cabang Menjual", "Wajib Direstock",
+    ]
+    if df_jual.empty:
+        return pd.DataFrame(columns=cols)
+
+    jumlah_bulan = _jumlah_bulan_data(df_jual)
+
+    agg = df_jual.groupby("NAMA BARANG", dropna=False).agg(
+        **{"Qty Terjual": ("QTY", "sum")}, Omzet=("TOTAL HARGA", "sum"), Modal=("HARGA BELI", "sum"),
+        **{"Jumlah Cabang Menjual": ("CABANG", "nunique")},
+    ).reset_index()
+    agg["Potensi Laba"] = agg["Omzet"] - agg["Modal"]
+    agg["Rata-rata Terjual/Bulan"] = agg["Qty Terjual"] / jumlah_bulan
+    agg = agg.rename(columns={"Omzet": "Potensi Omzet", "NAMA BARANG": "Nama Barang"})
+
+    urutan_kolom = {"Qty Terjual": "Qty Terjual", "Potensi Omzet": "Potensi Omzet", "Potensi Laba": "Potensi Laba"}
+    sort_col = urutan_kolom.get(urutkan_dari, "Qty Terjual")
+    agg = agg.sort_values(sort_col, ascending=False).head(top_n).reset_index(drop=True)
+
+    if not df_stok.empty:
+        stok_per_cabang = df_stok.groupby(["Nama Barang", "Cabang"])["Kts (Semua Gdng)"].sum().reset_index()
+        stok_total = stok_per_cabang.groupby("Nama Barang")["Kts (Semua Gdng)"].sum().clip(lower=0).reset_index().rename(
+            columns={"Kts (Semua Gdng)": "Stok Semua Cabang"}
+        )
+        stok_per_cabang["Kosong"] = stok_per_cabang["Kts (Semua Gdng)"] <= 2
+        jml_kosong = stok_per_cabang.groupby("Nama Barang")["Kosong"].sum().reset_index().rename(
+            columns={"Kosong": "Jumlah Cabang Stok Kosong/Rendah"}
+        )
+        agg = agg.merge(stok_total, on="Nama Barang", how="left")
+        agg = agg.merge(jml_kosong, on="Nama Barang", how="left")
+    else:
+        agg["Stok Semua Cabang"] = np.nan
+        agg["Jumlah Cabang Stok Kosong/Rendah"] = np.nan
+
+    agg["Stok Semua Cabang"] = agg["Stok Semua Cabang"].fillna(0)
+    agg["Jumlah Cabang Stok Kosong/Rendah"] = agg["Jumlah Cabang Stok Kosong/Rendah"].fillna(0).astype(int)
+    agg["Estimasi Kebutuhan Restock"] = (agg["Rata-rata Terjual/Bulan"] - agg["Stok Semua Cabang"]).clip(lower=0).round().astype(int)
+    agg["Wajib Direstock"] = agg["Jumlah Cabang Stok Kosong/Rendah"].apply(lambda x: "⚠️ Ya — ada cabang stok kosong/rendah" if x > 0 else "Tidak")
+    agg["Peringkat"] = range(1, len(agg) + 1)
+    return agg[cols]
+
+
 def kebutuhan_belum_terpenuhi(produk_favorit_df: pd.DataFrame) -> pd.DataFrame:
-    """Saring produk_favorit_per_cabang() ke baris yang perlu tindakan segera
-    saja — produk favorit (sudah terbukti laku) tapi stoknya kosong/rendah
-    saat ini. Ini yang paling menggambarkan "kebutuhan konsumen yang belum
-    terpenuhi" per cabang."""
+    """Saring produk_favorit_per_cabang() / produk_favorit_semua_cabang() ke
+    baris yang perlu tindakan segera saja — produk favorit (sudah terbukti
+    laku) tapi stoknya kosong/rendah saat ini. Ini yang paling menggambarkan
+    "kebutuhan konsumen yang belum terpenuhi"."""
     if produk_favorit_df.empty:
         return produk_favorit_df
     return produk_favorit_df[produk_favorit_df["Wajib Direstock"].str.startswith("⚠️")].reset_index(drop=True)
