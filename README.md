@@ -18,10 +18,10 @@ Satu aplikasi Streamlit dengan dua tab:
      Produk Aksesoris (terlaris & profit), dan Seluruh Sales.
    - **Revenue, HPP & Katalog LUNA**: revenue & tren bulanan, Top 10 produk
      aksesoris terlaris & profit, omzet + HPP seluruh cabang, katalog
-     referensi harga LUNA & potensi profit, **simulasi insentif penjualan
-     aksesoris** (tabel isian, THP interpolasi dari target harian), **target
-     pencapaian penjualan LUNA** (default Rp 2 miliar / 12 bulan mulai
-     Agustus 2026), serta analisa + proyeksi 5–10 tahun.
+     referensi harga LUNA & potensi profit, **matrix insentif resmi &
+     kalkulator THP Sales Retail** (dikalibrasi ke target Rp5-8jt/bulan),
+     **target pencapaian penjualan LUNA** (default Rp 2 miliar / 12 bulan
+     mulai Agustus 2026), serta analisa + proyeksi 5–10 tahun.
 
 Kedua bagian dalam tab Penjualan Aksesoris memakai **satu berkas data
 penjualan yang sama** (satu tombol unggah saja di panel kiri) — dibaca dua
@@ -189,26 +189,43 @@ masing-masing** (bukan di sidebar), supaya filter tidak tertukar.
   Bundling Aksesoris NexLink & LUNA dari Surat Edaran SE/001/IN-MF/IV/2026)
   supaya rekomendasinya konkret, bukan generik.
 
-## Simulasi Insentif Penjualan Aksesoris
+## Matrix Insentif & Kalkulator THP Sales Retail
 
-- Tabel **isian** (`st.data_editor`) — kolom "Penjualan Harian" bisa diedit
-  langsung, baris bisa ditambah/dihapus. Default terisi otomatis dari
-  rentang Penjualan Harian Minimum–Maksimum yang diatur di panel "⚙️ Asumsi
-  Simulasi" (default Rp 500rb–Rp 2jt, bisa diubah).
-- **Estimasi THP dihitung dengan interpolasi LINIER** antara
-  (Penjualan Harian Minimum → THP Minimum) dan (Penjualan Harian Maksimum →
-  THP Maksimum) — default Rp 5jt di titik minimum, Rp 8jt di titik
-  maksimum. Nilai di luar rentang tetap di-*clip* ke THP Minimum/Maksimum
-  (tidak diekstrapolasi).
-- Kolom **"THP thd Gross Profit (%)"** murni informasi tambahan — bukan
-  dasar perhitungan THP — untuk mengecek kewajaran asumsi. Dengan default
-  di atas (GP 40%, 26 hari kerja), rasio ini berkisar **38,5%** (di
-  penjualan harian maksimum) sampai **96,2%** (di penjualan harian
-  minimum). Dashboard menampilkan peringatan otomatis kalau rasio ini
-  di atas 70%, karena itu berarti insentif nyaris menghabiskan seluruh
-  Gross Profit kategori aksesoris kalau dianggap dibiayai murni dari situ
-  — indikasi THP di level itu perlu ditopang sumber lain (gaji pokok,
-  komisi kategori lain), bukan cuma GP aksesoris.
+Dipindahkan dari simulasi generik ke **transkrip matrix insentif resmi
+perusahaan** (2 lembar referensi):
+
+- **Matrix Insentif Pekanan — Retail (Ideal)**: 29 baris (Sales Retail 11
+  tier, Store Manager 9 tier, Regional Manager 9 tier), masing-masing dari
+  Omzet/Pekan → Estimasi GP (asumsi 40%) → Insentif/Pekan (Sales Retail 5%
+  dari GP, Store Manager 2%, Regional Manager 1%). Ditanam persis di
+  `logic_aksesoris.py` (`matrix_insentif_pekanan()`), sudah diverifikasi
+  cocok 100% dengan angka pada gambar referensi.
+- **Matrix Insentif Per Item**: 4 tier berdasarkan rentang harga jual
+  (Rp50rb–100rb, >100rb–250rb, >250rb–500rb, >500rb), insentif TETAP per
+  unit terjual (bukan % dari omzet) — Rp5.000/Rp10.000/Rp25.000/Rp50.000.
+  Ditanam di `matrix_insentif_per_item()`.
+- **Kalkulator THP Sales Retail**: Total THP = **Gaji Pokok** + **Insentif
+  %GP Bulanan** (Insentif/Pekan × jumlah minggu/bulan, default 4,33) +
+  opsional **Insentif Per Item Bulanan** (estimasi jumlah item terjual/hari
+  per tingkat harga × Insentif/Item × hari kerja/bulan).
+  - Fungsi `saran_gaji_pokok()` memberi **titik awal** Gaji Pokok supaya
+    tier **Minimum** pas mencapai THP Minimum (default Rp 5jt) — bukan
+    jawaban final, karena tier **Maksimum** belum tentu otomatis pas di
+    THP Maksimum (default Rp 8jt): itu tergantung seberapa besar asumsi
+    volume item terjual yang diinput.
+  - Kolom **"Status Target"** (✅ dalam target / ⬇️ di bawah / ⬆️ di atas)
+    ditampilkan per tier, supaya jelas terlihat kalau kalibrasi Gaji Pokok
+    atau asumsi item/hari masih perlu disesuaikan.
+  - **Diuji langsung**: dengan asumsi 1 item/hari di semua tingkat harga,
+    tier Minimum-Maksimum berkisar Rp 5.000.000–Rp 5.866.000 (semua ✅
+    kalau target dianggap 5–8jt karena batas atas belum terlampaui, tapi
+    belum menyentuh Rp 8jt) — realistis, karena rentang insentif murni dari
+    matrix pekanan+per-item dengan asumsi konservatif tidak otomatis
+    selebar itu. Menaikkan asumsi item/hari di tier atas (mis. 1→4 item/hari
+    berjenjang) bisa mendorong tier atas melewati Rp 8jt (terdeteksi
+    sebagai ⬆️ di atas target) — dashboard tidak memaksakan satu jawaban
+    "benar", tapi memberi alat kalibrasi supaya pengguna sendiri yang
+    menentukan asumsi volume penjualan yang realistis di lapangan.
 
 ## Target Pencapaian Penjualan LUNA
 
@@ -245,10 +262,13 @@ Modul-modul logika sudah diuji memakai data asli Anda:
 - **Revenue Aksesoris** (gabungan 18 cabang): 72.776 baris, 58.550 nota
   unik, omzet total Rp 4.164.979.227 (margin ~40,8%), Jan–Ags 2026 —
   termasuk simulasi penuh seluruh fungsi dan kasus tepi filter kosong.
-- **Simulasi Insentif**: diuji dengan 7 baris skenario (Rp 500rb–Rp 2jt/hari,
-  GP 40%, 26 hari kerja) — hasil THP Rp 5jt–Rp 8jt sesuai spesifikasi,
-  rasio THP-terhadap-GP 38,5%–96,2% terverifikasi, termasuk kasus tabel
-  dikosongkan pengguna (tidak error).
+- **Matrix Insentif & Kalkulator THP**: `matrix_insentif_pekanan()` (29
+  baris) dan `matrix_insentif_per_item()` (4 baris) diverifikasi cocok
+  100% dengan angka pada gambar referensi resmi. `saran_gaji_pokok()` dan
+  `kalkulator_thp_sales_retail()` diuji dengan beberapa skenario asumsi
+  volume item terjual/hari, termasuk kasus tanpa insentif per item, dan
+  kasus kalibrasi yang mendorong tier atas melewati target (terdeteksi
+  benar sebagai status "di atas target").
 - **Target LUNA**: diuji dengan target Rp 2 M / 12 bulan mulai Agustus 2026
   — hari ke-19 dari 365 hari program, tercapai Rp 33.754.860 (32,4% dari
   target-sampai-hari-ini, 1,7% dari target penuh), 1.198 transaksi LUNA

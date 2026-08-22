@@ -740,85 +740,118 @@ def render_aksesoris_tab():
     st.divider()
 
     # -----------------------------------------------------------------
-    # 3b. Simulasi Insentif Penjualan Aksesoris
+    # 3b. Matrix Insentif Resmi & Kalkulator THP Sales Retail
     # -----------------------------------------------------------------
-    st.header("💸 Simulasi Insentif Penjualan Aksesoris")
+    st.header("💸 Matrix Insentif & Simulasi THP Sales Retail")
     st.caption(
-        "Estimasi Take Home Pay (THP) sales retail berdasarkan target penjualan aksesoris "
-        "harian. Kolom **\"Penjualan Harian\"** bisa diedit langsung — baris bisa ditambah/"
-        "dihapus lewat tombol +/− di pojok tabel."
+        "Berdasarkan referensi resmi: **Matrix Insentif Pekanan** (Sales Retail 5%, "
+        "Store Manager 2%, Regional Manager 1% dari Gross Profit, asumsi GP 40%) dan "
+        "**Matrix Insentif Per Item** (insentif tetap per unit terjual, berdasarkan "
+        "rentang harga jual)."
     )
 
-    with st.expander("⚙️ Asumsi Simulasi (bisa diubah)", expanded=True):
-        p1, p2, p3 = st.columns(3)
-        with p1:
-            gp_persen = st.number_input("Asumsi Gross Profit (%)", min_value=0.0, max_value=100.0, value=40.0, step=1.0, key="sim_gp_persen")
-            hari_kerja = st.number_input("Hari kerja per bulan", min_value=1, max_value=31, value=26, step=1, key="sim_hari_kerja")
-        with p2:
-            thp_min = st.number_input("THP Minimum (Rp)", min_value=0, value=5_000_000, step=500_000, format="%d", key="sim_thp_min")
-            thp_max = st.number_input("THP Maksimum (Rp)", min_value=0, value=8_000_000, step=500_000, format="%d", key="sim_thp_max")
-        with p3:
-            harian_min = st.number_input("Penjualan Harian Minimum (Rp)", min_value=0, value=500_000, step=50_000, format="%d", key="sim_harian_min")
-            harian_max = st.number_input("Penjualan Harian Maksimum (Rp)", min_value=0, value=2_000_000, step=50_000, format="%d", key="sim_harian_max")
-        jumlah_baris = st.slider("Jumlah baris skenario default", 3, 15, 7, key="sim_jumlah_baris")
-
-    if thp_min > thp_max:
-        st.error("THP Minimum harus lebih kecil atau sama dengan THP Maksimum.")
-    elif harian_min > harian_max:
-        st.error("Penjualan Harian Minimum harus lebih kecil atau sama dengan Maksimum.")
-    else:
-        default_harian = np.linspace(harian_min, harian_max, jumlah_baris).round(-3)
-        seed_df = pd.DataFrame({"Penjualan Harian": default_harian})
-
-        edited = st.data_editor(
-            seed_df, num_rows="dynamic", use_container_width=True, key="sim_editor",
-            column_config={
-                "Penjualan Harian": st.column_config.NumberColumn(
-                    "Penjualan Harian (Rp)", min_value=0, step=50_000, format="%d",
-                )
-            },
+    with st.expander("📋 Matrix Insentif Pekanan — Retail (Ideal)", expanded=False):
+        mp = la.matrix_insentif_pekanan()
+        tampil_mp = mp.copy()
+        tampil_mp["Omzet / Pekan"] = mp["Omzet / Pekan"].map(la.format_rupiah_id)
+        tampil_mp["Estimasi GP (40%)"] = mp["Estimasi GP (40%)"].map(la.format_rupiah_id)
+        tampil_mp["% Insentif dari GP"] = (mp["% Insentif dari GP"] * 100).map(lambda x: la.format_percent_id(x, 0))
+        tampil_mp["Insentif / Pekan"] = mp["Insentif / Pekan"].map(la.format_rupiah_id)
+        st.dataframe(tampil_mp, use_container_width=True, height=420)
+        st.download_button(
+            "⬇️ Unduh CSV — Matrix Insentif Pekanan", mp.to_csv(index=False).encode("utf-8-sig"),
+            "matrix_insentif_pekanan.csv", "text/csv", key="ak_dl_matrix_pekanan",
         )
 
-        harian_valid = edited["Penjualan Harian"].dropna()
-        harian_valid = harian_valid[harian_valid > 0]
+    with st.expander("🎁 Matrix Insentif Per Item", expanded=False):
+        mi = la.matrix_insentif_per_item()
+        tampil_mi = mi.copy()
+        tampil_mi["Harga Acuan"] = mi["Harga Acuan"].map(la.format_rupiah_id)
+        tampil_mi["Gross Profit"] = mi["Gross Profit"].map(la.format_rupiah_id)
+        tampil_mi["Insentif / Item"] = mi["Insentif / Item"].map(la.format_rupiah_id)
+        tampil_mi["% Insentif vs GP"] = mi["% Insentif vs GP"].map(lambda x: la.format_percent_id(x, 1))
+        tampil_mi["Sisa GP"] = mi["Sisa GP"].map(la.format_rupiah_id)
+        st.dataframe(tampil_mi, use_container_width=True)
+        st.download_button(
+            "⬇️ Unduh CSV — Matrix Insentif Per Item", mi.to_csv(index=False).encode("utf-8-sig"),
+            "matrix_insentif_per_item.csv", "text/csv", key="ak_dl_matrix_item",
+        )
 
-        if harian_valid.empty:
-            st.info("Isi minimal satu baris \"Penjualan Harian\" di tabel atas untuk melihat hasil simulasi.")
-        else:
-            hasil = la.simulasi_insentif(
-                harian_valid.tolist(), gp_persen=gp_persen, hari_kerja=int(hari_kerja),
-                harian_min=harian_min, harian_max=harian_max, thp_min=thp_min, thp_max=thp_max,
-            )
-            gp_col = f"Gross Profit Bulanan ({gp_persen:.0f}%)"
-            tampil_hasil = hasil.copy()
-            tampil_hasil["Penjualan Harian"] = hasil["Penjualan Harian"].map(la.format_rupiah_id)
-            tampil_hasil["Penjualan Bulanan"] = hasil["Penjualan Bulanan"].map(la.format_rupiah_id)
-            tampil_hasil[gp_col] = hasil[gp_col].map(la.format_rupiah_id)
-            tampil_hasil["Estimasi THP"] = hasil["Estimasi THP"].map(la.format_rupiah_id)
-            tampil_hasil["THP thd Gross Profit (%)"] = hasil["THP thd Gross Profit (%)"].map(la.format_percent_id)
-            st.dataframe(tampil_hasil, use_container_width=True, height=min(80 + 38 * len(hasil), 420))
+    st.subheader("🧮 Kalkulator THP Sales Retail — Target Rp 5jt s.d. Rp 8jt/bulan")
+    st.caption(
+        "Total THP = **Gaji Pokok** + **Insentif %GP** (dari matrix pekanan, dikali jumlah "
+        "minggu/bulan) + opsional **Insentif Per Item** (dari matrix per-item, dikali estimasi "
+        "jumlah item terjual/hari). Kalibrasi Gaji Pokok & asumsi item di bawah supaya seluruh "
+        "tier omzet (Minimum s.d. Maksimum) berstatus ✅ dalam rentang target."
+    )
 
-            rasio_maks = hasil["THP thd Gross Profit (%)"].max()
-            rasio_min = hasil["THP thd Gross Profit (%)"].min()
-            st.caption(
-                f"Kolom **\"THP thd Gross Profit (%)\"** menunjukkan seberapa besar porsi Gross Profit "
-                f"kategori aksesoris yang habis KALAU insentif ini dianggap dibiayai murni dari GP "
-                f"aksesoris saja — berkisar {la.format_percent_id(rasio_min)} sampai {la.format_percent_id(rasio_maks)} "
-                "pada tabel di atas."
-            )
-            if rasio_maks > 70:
-                st.warning(
-                    f"⚠️ Di penjualan harian paling rendah, insentif setara **{la.format_percent_id(rasio_maks)}** "
-                    "dari Gross Profit aksesoris — kalau THP memang murni dibiayai dari situ, hampir tidak "
-                    "menyisakan margin untuk cabang di level penjualan terendah ini. Kemungkinan THP perlu "
-                    "sebagian ditopang dari sumber lain (gaji pokok, komisi kategori lain), bukan cuma GP "
-                    "aksesoris — sesuaikan asumsi di atas kalau perlu."
+    q1, q2 = st.columns(2)
+    with q1:
+        minggu_per_bulan = st.number_input("Jumlah minggu per bulan", min_value=1.0, max_value=6.0, value=4.33, step=0.01, key="thp_minggu")
+        thp_min_target = st.number_input("Target THP Minimum (Rp)", min_value=0, value=5_000_000, step=500_000, format="%d", key="thp_target_min")
+        thp_max_target = st.number_input("Target THP Maksimum (Rp)", min_value=0, value=8_000_000, step=500_000, format="%d", key="thp_target_max")
+    with q2:
+        sertakan_item = st.checkbox("Sertakan Insentif Per Item", value=True, key="thp_sertakan_item")
+        hari_kerja_thp = st.number_input("Hari kerja per bulan (untuk insentif per item)", min_value=1, max_value=31, value=26, step=1, key="thp_hari_kerja")
+
+    item_per_hari_per_tier = None
+    if sertakan_item:
+        st.caption("Estimasi jumlah item aksesoris terjual per HARI, untuk tiap tingkat harga jual (boleh angka desimal, mis. 0,5 = rata-rata 1 item per 2 hari):")
+        mi_ref = la.matrix_insentif_per_item()
+        item_cols = st.columns(len(mi_ref))
+        item_per_hari_per_tier = []
+        for col, (_, row) in zip(item_cols, mi_ref.iterrows()):
+            with col:
+                v = st.number_input(
+                    row["Range Harga Jual"], min_value=0.0, value=1.0, step=0.5,
+                    key=f"thp_item_{row['Range Harga Jual']}",
                 )
+                item_per_hari_per_tier.append(v)
 
-            st.download_button(
-                "⬇️ Unduh CSV — Simulasi Insentif", hasil.to_csv(index=False).encode("utf-8-sig"),
-                "simulasi_insentif_aksesoris.csv", "text/csv", key="ak_dl_simulasi",
-            )
+    saran = la.saran_gaji_pokok(
+        minggu_per_bulan=minggu_per_bulan, sertakan_insentif_item=sertakan_item,
+        item_per_hari_per_tier=item_per_hari_per_tier, hari_kerja=int(hari_kerja_thp),
+        thp_min=thp_min_target,
+    )
+    gaji_pokok = st.number_input(
+        "Gaji Pokok (Rp) — mulai dari saran otomatis, sesuaikan sendiri kalau perlu",
+        min_value=0, value=int(round(saran, -3)), step=100_000, format="%d", key="thp_gaji_pokok",
+    )
+    st.caption(
+        f"💡 Saran awal: **{la.format_rupiah_id(saran)}** — dihitung supaya tier **Minimum** pas "
+        f"mencapai target THP Minimum ({la.format_rupiah_id(thp_min_target)}). Tier **Maksimum** "
+        "belum tentu otomatis pas di target THP Maksimum — cek tabel di bawah, naikkan estimasi "
+        "item/hari atau Gaji Pokok kalau tier atas belum ✅."
+    )
+
+    hasil_thp = la.kalkulator_thp_sales_retail(
+        gaji_pokok=gaji_pokok, minggu_per_bulan=minggu_per_bulan,
+        sertakan_insentif_item=sertakan_item, item_per_hari_per_tier=item_per_hari_per_tier,
+        hari_kerja=int(hari_kerja_thp), thp_min=thp_min_target, thp_max=thp_max_target,
+    )
+
+    tampil_thp = hasil_thp.copy()
+    for col in ["Omzet / Pekan", "Insentif / Pekan", "Insentif %GP Bulanan", "Insentif Per Item Bulanan", "Gaji Pokok", "Total THP"]:
+        tampil_thp[col] = hasil_thp[col].map(la.format_rupiah_id)
+    st.dataframe(tampil_thp, use_container_width=True, height=420)
+
+    n_diluar_target = (~hasil_thp["Status Target"].str.startswith("✅")).sum()
+    if n_diluar_target > 0:
+        di_bawah = (hasil_thp["Status Target"].str.startswith("⬇️")).sum()
+        di_atas = (hasil_thp["Status Target"].str.startswith("⬆️")).sum()
+        pesan = []
+        if di_bawah:
+            pesan.append(f"{di_bawah} tier di bawah target (naikkan Gaji Pokok atau estimasi item/hari)")
+        if di_atas:
+            pesan.append(f"{di_atas} tier di atas target (turunkan Gaji Pokok atau estimasi item/hari)")
+        st.warning("⚠️ " + " · ".join(pesan) + ".")
+    else:
+        st.success("✅ Semua tier Sales Retail (Minimum s.d. Maksimum) berada dalam rentang target THP.")
+
+    st.download_button(
+        "⬇️ Unduh CSV — Kalkulator THP Sales Retail", hasil_thp.to_csv(index=False).encode("utf-8-sig"),
+        "kalkulator_thp_sales_retail.csv", "text/csv", key="ak_dl_thp",
+    )
 
     st.divider()
 

@@ -502,6 +502,143 @@ def simulasi_insentif(
     return out[cols] if not out.empty else pd.DataFrame(columns=cols)
 
 
+# ---------------------------------------------------------------------------
+# 6b. Matrix insentif resmi (transkrip dari referensi perusahaan) + kalkulator
+#     THP Sales Retail yang dikalibrasi ke target Rp 5jt–Rp 8jt/bulan.
+# ---------------------------------------------------------------------------
+
+_MATRIX_PEKANAN_RAW = [
+    # (Jabatan, Basis Pencapaian, Omzet/Pekan, %Insentif dari GP, Keterangan)
+    ("Sales Retail", "Omzet Individu", 5_000_000, 0.05, "Minimum"),
+    ("Sales Retail", "Omzet Individu", 6_000_000, 0.05, ""),
+    ("Sales Retail", "Omzet Individu", 7_000_000, 0.05, ""),
+    ("Sales Retail", "Omzet Individu", 8_000_000, 0.05, ""),
+    ("Sales Retail", "Omzet Individu", 9_000_000, 0.05, ""),
+    ("Sales Retail", "Omzet Individu", 10_000_000, 0.05, "Target 80%"),
+    ("Sales Retail", "Omzet Individu", 11_000_000, 0.05, ""),
+    ("Sales Retail", "Omzet Individu", 12_000_000, 0.05, ""),
+    ("Sales Retail", "Omzet Individu", 13_000_000, 0.05, ""),
+    ("Sales Retail", "Omzet Individu", 14_000_000, 0.05, ""),
+    ("Sales Retail", "Omzet Individu", 15_000_000, 0.05, "Maksimum"),
+    ("Store Manager", "Omzet Toko", 20_000_000, 0.02, "Minimum"),
+    ("Store Manager", "Omzet Toko", 25_000_000, 0.02, ""),
+    ("Store Manager", "Omzet Toko", 30_000_000, 0.02, ""),
+    ("Store Manager", "Omzet Toko", 35_000_000, 0.02, ""),
+    ("Store Manager", "Omzet Toko", 40_000_000, 0.02, "Target 80%"),
+    ("Store Manager", "Omzet Toko", 45_000_000, 0.02, ""),
+    ("Store Manager", "Omzet Toko", 50_000_000, 0.02, ""),
+    ("Store Manager", "Omzet Toko", 55_000_000, 0.02, ""),
+    ("Store Manager", "Omzet Toko", 60_000_000, 0.02, "Maksimum"),
+    ("Regional Manager", "Omzet Regional", 60_000_000, 0.01, "Minimum"),
+    ("Regional Manager", "Omzet Regional", 75_000_000, 0.01, ""),
+    ("Regional Manager", "Omzet Regional", 90_000_000, 0.01, ""),
+    ("Regional Manager", "Omzet Regional", 105_000_000, 0.01, ""),
+    ("Regional Manager", "Omzet Regional", 120_000_000, 0.01, "Target 80%"),
+    ("Regional Manager", "Omzet Regional", 135_000_000, 0.01, ""),
+    ("Regional Manager", "Omzet Regional", 150_000_000, 0.01, ""),
+    ("Regional Manager", "Omzet Regional", 165_000_000, 0.01, ""),
+    ("Regional Manager", "Omzet Regional", 180_000_000, 0.01, "Maksimum"),
+]
+
+GP_PERSEN_MATRIX_PEKANAN = 0.40  # "Asumsi GP 40%" pada matrix resmi
+
+
+def matrix_insentif_pekanan() -> pd.DataFrame:
+    """Transkrip persis dari 'MATRIX INSENTIF PEKANAN - RETAIL (IDEAL)':
+    Sales Retail (5% dari GP), Store Manager (2%), Regional Manager (1%),
+    dengan asumsi GP 40% dari omzet."""
+    df = pd.DataFrame(_MATRIX_PEKANAN_RAW, columns=["Jabatan", "Basis Pencapaian", "Omzet / Pekan", "% Insentif dari GP", "Keterangan"])
+    df["Estimasi GP (40%)"] = df["Omzet / Pekan"] * GP_PERSEN_MATRIX_PEKANAN
+    df["Insentif / Pekan"] = df["Estimasi GP (40%)"] * df["% Insentif dari GP"]
+    return df[["Jabatan", "Basis Pencapaian", "Omzet / Pekan", "Estimasi GP (40%)", "% Insentif dari GP", "Insentif / Pekan", "Keterangan"]]
+
+
+_MATRIX_PER_ITEM_RAW = [
+    ("Rp50.000 - Rp100.000", 50_000, 25_000, 5_000),
+    (">Rp100.000 - Rp250.000", 100_001, 40_000, 10_000),
+    (">Rp250.000 - Rp500.000", 250_001, 75_000, 25_000),
+    (">Rp500.000", 500_001, 150_000, 50_000),
+]
+
+
+def matrix_insentif_per_item() -> pd.DataFrame:
+    """Transkrip persis dari 'MATRIX INSENTIF PER ITEM': insentif tetap per
+    unit terjual berdasarkan rentang harga jual (bukan % dari omzet)."""
+    df = pd.DataFrame(_MATRIX_PER_ITEM_RAW, columns=["Range Harga Jual", "Harga Acuan", "Gross Profit", "Insentif / Item"])
+    df["% Insentif vs GP"] = df["Insentif / Item"] / df["Gross Profit"] * 100
+    df["Sisa GP"] = df["Gross Profit"] - df["Insentif / Item"]
+    return df[["Range Harga Jual", "Harga Acuan", "Gross Profit", "Insentif / Item", "% Insentif vs GP", "Sisa GP"]]
+
+
+def kalkulator_thp_sales_retail(
+    gaji_pokok: float,
+    minggu_per_bulan: float = 4.33,
+    sertakan_insentif_item: bool = False,
+    item_per_hari_per_tier=None,
+    hari_kerja: int = 26,
+    thp_min: float = 5_000_000,
+    thp_max: float = 8_000_000,
+) -> pd.DataFrame:
+    """Hitung Total THP Sales Retail untuk tiap tier omzet mingguan pada
+    matrix resmi = Gaji Pokok + Insentif %GP Bulanan (dari matrix pekanan,
+    dikali jumlah minggu/bulan) + opsional Insentif Per Item Bulanan (dari
+    matrix per-item, dikali estimasi jumlah item terjual/hari per tingkat
+    harga, dikali hari kerja/bulan). Beri tanda ✅/⚠️ apakah Total THP
+    masuk rentang target [thp_min, thp_max]."""
+    matrix = matrix_insentif_pekanan()
+    sales = matrix[matrix["Jabatan"] == "Sales Retail"].copy().reset_index(drop=True)
+
+    sales["Insentif %GP Bulanan"] = sales["Insentif / Pekan"] * minggu_per_bulan
+
+    insentif_item_bulanan = 0.0
+    if sertakan_insentif_item and item_per_hari_per_tier:
+        item_matrix = matrix_insentif_per_item()
+        n = min(len(item_matrix), len(item_per_hari_per_tier))
+        insentif_item_bulanan = sum(
+            float(item_matrix.iloc[i]["Insentif / Item"]) * float(item_per_hari_per_tier[i]) * hari_kerja
+            for i in range(n)
+        )
+
+    sales["Insentif Per Item Bulanan"] = insentif_item_bulanan
+    sales["Gaji Pokok"] = gaji_pokok
+    sales["Total THP"] = gaji_pokok + sales["Insentif %GP Bulanan"] + insentif_item_bulanan
+    sales["Status Target"] = sales["Total THP"].apply(
+        lambda x: "✅ Dalam target" if thp_min <= x <= thp_max else ("⬇️ Di bawah target" if x < thp_min else "⬆️ Di atas target")
+    )
+    return sales[[
+        "Basis Pencapaian", "Omzet / Pekan", "Insentif / Pekan", "Insentif %GP Bulanan",
+        "Insentif Per Item Bulanan", "Gaji Pokok", "Total THP", "Keterangan", "Status Target",
+    ]]
+
+
+def saran_gaji_pokok(
+    minggu_per_bulan: float = 4.33,
+    sertakan_insentif_item: bool = False,
+    item_per_hari_per_tier=None,
+    hari_kerja: int = 26,
+    thp_min: float = 5_000_000,
+) -> float:
+    """Saran awal Gaji Pokok supaya tier omzet MINIMUM Sales Retail pas
+    mencapai thp_min — titik awal untuk dikalibrasi manual oleh pengguna,
+    bukan jawaban final (tier MAKSIMUM belum tentu otomatis pas di thp_max,
+    tergantung seberapa besar kontribusi insentif per item)."""
+    matrix = matrix_insentif_pekanan()
+    sales_min = matrix[(matrix["Jabatan"] == "Sales Retail") & (matrix["Keterangan"] == "Minimum")]
+    if sales_min.empty:
+        return thp_min
+    insentif_min_bulanan = float(sales_min.iloc[0]["Insentif / Pekan"]) * minggu_per_bulan
+
+    insentif_item_bulanan = 0.0
+    if sertakan_insentif_item and item_per_hari_per_tier:
+        item_matrix = matrix_insentif_per_item()
+        n = min(len(item_matrix), len(item_per_hari_per_tier))
+        insentif_item_bulanan = sum(
+            float(item_matrix.iloc[i]["Insentif / Item"]) * float(item_per_hari_per_tier[i]) * hari_kerja
+            for i in range(n)
+        )
+    return max(thp_min - insentif_min_bulanan - insentif_item_bulanan, 0)
+
+
 def target_penjualan_luna(
     df: pd.DataFrame,
     target: float = 2_000_000_000,
