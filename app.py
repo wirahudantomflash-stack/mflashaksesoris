@@ -115,159 +115,8 @@ except Exception as e:
 # TAB 1 — Dashboard Stok Semua Cabang (fokus buffer stok LUNA)
 # ---------------------------------------------------------------------------
 # ---------------------------------------------------------------------------
-# TAB 1 — Dashboard Persediaan Aksesoris (LUNA vs Selain LUNA)
+# TAB 1 — Dashboard Persediaan Aksesoris (versi ringkas, mudah dikontrol)
 # ---------------------------------------------------------------------------
-def _render_kelompok_stok(dff_kelompok, label_kelompok, key_prefix, batas_produk_tampil=None, tampilkan_heatmap=False):
-    """Render indikator + ringkasan cabang/produk + detail + nilai persediaan
-    untuk satu kelompok produk (LUNA atau selain LUNA). Mengembalikan tabel
-    indikator supaya bisa dipakai lagi di bagian Analisa."""
-    ind = lp.indikator_stok_luna(dff_kelompok, batas_merah=batas_merah, batas_kuning=batas_kuning)
-
-    if ind.empty:
-        st.info(f"Tidak ada data {label_kelompok} pada filter ini.")
-        return ind
-
-    total = len(ind)
-    n_merah = (ind["Indikator"] == lp.MERAH).sum()
-    n_kuning = (ind["Indikator"] == lp.KUNING).sum()
-    n_hijau = (ind["Indikator"] == lp.HIJAU).sum()
-    c1, c2, c3 = st.columns(3)
-    c1.metric("🔴 Merah", lp.format_int_id(n_merah), lp.format_percent_id(n_merah / total * 100 if total else 0))
-    c2.metric("🟡 Kuning", lp.format_int_id(n_kuning), lp.format_percent_id(n_kuning / total * 100 if total else 0))
-    c3.metric("🟢 Hijau", lp.format_int_id(n_hijau), lp.format_percent_id(n_hijau / total * 100 if total else 0))
-
-    rc_awal = lp.ringkasan_indikator_cabang(ind)
-    prioritas = lp.cabang_prioritas(rc_awal, n=5)
-    if not prioritas.empty:
-        st.markdown("##### 🚨 Cabang Paling Perlu Perhatian")
-        badge_cols = st.columns(len(prioritas))
-        for col, (_, row) in zip(badge_cols, prioritas.iterrows()):
-            with col:
-                st.error(
-                    f"**{row['Cabang']}**\n\n"
-                    f"{lp.format_percent_id(row['Porsi Merah (%)'])} Merah\n\n"
-                    f"({int(row['Merah'])} item)"
-                )
-
-    st.subheader("Ringkasan per Cabang")
-    st.caption(
-        "Diurutkan dari porsi Merah TERTINGGI — cabang paling perlu segera direstock ada di "
-        "paling atas. Warna latar kolom \"Porsi Merah (%)\" makin pekat = makin kritis."
-    )
-    rc = lp.ringkasan_indikator_cabang(ind)
-    st.bar_chart(rc.set_index("Cabang")[["Merah", "Kuning", "Hijau"]])
-    rc_tampil = rc.drop(columns=["Jumlah SKU LUNA"])
-    styled_rc = lp.styler_gradasi_merah(rc_tampil).format({"Porsi Merah (%)": lp.format_percent_id})
-    st.dataframe(styled_rc, use_container_width=True, height=420)
-    st.download_button(
-        f"⬇️ Unduh CSV — Ringkasan Indikator per Cabang ({label_kelompok})", rc.to_csv(index=False).encode("utf-8-sig"),
-        f"ringkasan_indikator_{key_prefix}_cabang.csv", "text/csv", key=f"{key_prefix}_dl_ringkasan_cabang",
-    )
-
-    if tampilkan_heatmap:
-        st.subheader("🗺️ Peta Stok — Cabang × Produk")
-        st.caption(
-            "Sekali lihat langsung kelihatan pola di seluruh jaringan — warna sel mengikuti "
-            "indikator (🔴🟡🟢), angka di dalamnya menunjukkan jumlah stok. Sel abu-abu \"-\" "
-            "berarti produk itu tidak tercatat sama sekali di cabang tsb (bukan berarti stoknya 0)."
-        )
-        pivot_stok, pivot_ind = lp.pivot_heatmap_stok(ind)
-        if pivot_stok.empty:
-            st.info("Tidak ada data untuk peta stok pada filter ini.")
-        else:
-            st.dataframe(lp.styler_heatmap(pivot_stok, pivot_ind), use_container_width=True, height=520)
-
-    rp_full = lp.ringkasan_indikator_produk(ind)
-    if batas_produk_tampil is not None and len(rp_full) > batas_produk_tampil:
-        st.subheader(f"Ringkasan per Produk (Top {batas_produk_tampil} dari {lp.format_int_id(len(rp_full))} produk unik)")
-        top_n_produk = st.slider(
-            "Tampilkan berapa produk teratas (diurutkan porsi Merah tertinggi)",
-            10, min(200, len(rp_full)), batas_produk_tampil, key=f"{key_prefix}_top_n_produk",
-        )
-        rp = rp_full.head(top_n_produk)
-        st.caption("Tabel di layar dibatasi supaya tetap ringan — unduhan CSV berisi SEMUA produk.")
-    else:
-        st.subheader("Ringkasan per Produk")
-        rp = rp_full
-    st.caption(
-        "Produk yang Merah di BANYAK cabang sekaligus kemungkinan masalah pasokan dari "
-        "pemasok, bukan cuma masalah satu cabang — diurutkan dari porsi Merah tertinggi."
-    )
-    tampil_rp = lp.styler_gradasi_merah(rp).format({"Porsi Merah (%)": lp.format_percent_id})
-    st.dataframe(tampil_rp, use_container_width=True, height=380)
-    st.download_button(
-        f"⬇️ Unduh CSV — Ringkasan Indikator per Produk ({label_kelompok}, semua {lp.format_int_id(len(rp_full))} produk)",
-        rp_full.to_csv(index=False).encode("utf-8-sig"),
-        f"ringkasan_indikator_{key_prefix}_produk.csv", "text/csv", key=f"{key_prefix}_dl_ringkasan_produk",
-    )
-
-    st.subheader("Detail per SKU × Cabang")
-    filter_indikator = st.multiselect(
-        "Filter indikator", [lp.MERAH, lp.KUNING, lp.HIJAU],
-        default=[lp.MERAH, lp.KUNING, lp.HIJAU], key=f"{key_prefix}_filter_indikator",
-    )
-    cari_produk = st.text_input("Cari nama produk", key=f"{key_prefix}_cari_produk")
-
-    detail = ind[ind["Indikator"].isin(filter_indikator)] if filter_indikator else ind.iloc[0:0]
-    if cari_produk:
-        detail = detail[detail["Nama Barang"].str.upper().str.contains(cari_produk.upper(), na=False)]
-
-    if detail.empty:
-        st.info("Tidak ada produk yang cocok dengan filter indikator/pencarian ini.")
-    else:
-        tampil_detail = detail.copy()
-        tampil_detail["Nilai Stok"] = detail["Nilai Stok"].map(lp.format_rupiah_id)
-        st.dataframe(tampil_detail, use_container_width=True, height=420)
-        st.download_button(
-            f"⬇️ Unduh CSV — Detail Indikator Stok ({label_kelompok})", detail.to_csv(index=False).encode("utf-8-sig"),
-            f"detail_indikator_{key_prefix}.csv", "text/csv", key=f"{key_prefix}_dl_detail",
-        )
-
-    st.divider()
-    st.subheader(f"💼 Nilai Persediaan {label_kelompok} per Cabang")
-    nv = lp.nilai_persediaan_cabang(dff_kelompok)
-    if nv.empty:
-        st.info("Tidak ada data pada filter ini.")
-    else:
-        st.bar_chart(nv.set_index("Cabang")["Nilai Persediaan"])
-        tampil_nv = nv.drop(columns=["Jumlah SKU"]).copy()
-        tampil_nv["Total Qty"] = tampil_nv["Total Qty"].map(lp.format_int_id)
-        tampil_nv["Nilai Persediaan"] = tampil_nv["Nilai Persediaan"].map(lp.format_rupiah_id)
-        st.dataframe(tampil_nv, use_container_width=True, height=420)
-        st.download_button(
-            f"⬇️ Unduh CSV — Nilai Persediaan {label_kelompok} per Cabang", nv.to_csv(index=False).encode("utf-8-sig"),
-            f"nilai_persediaan_{key_prefix}_cabang.csv", "text/csv", key=f"{key_prefix}_dl_nilai",
-        )
-
-    return ind
-
-
-def _catatan_kelompok(ind, label_kelompok):
-    """Bikin 3 baris catatan analisa untuk satu kelompok (LUNA / selain LUNA)."""
-    catatan = []
-    if ind.empty:
-        return catatan
-    rc2 = lp.ringkasan_indikator_cabang(ind)
-    if not rc2.empty:
-        prioritas = rc2.iloc[0]
-        catatan.append(
-            f"[{label_kelompok}] Cabang **{prioritas['Cabang']}** paling perlu segera direstock — "
-            f"{lp.format_percent_id(prioritas['Porsi Merah (%)'])} dari item yang dipantau berstatus "
-            f"🔴 Merah ({int(prioritas['Merah'])} item)."
-        )
-        aman = rc2.sort_values("Porsi Merah (%)").iloc[0]
-        catatan.append(
-            f"[{label_kelompok}] Cabang **{aman['Cabang']}** paling aman stoknya — hanya "
-            f"{lp.format_percent_id(aman['Porsi Merah (%)'])} SKU berstatus Merah."
-        )
-    n_merah_total = (ind["Indikator"] == lp.MERAH).sum()
-    if n_merah_total > 0:
-        catatan.append(
-            f"[{label_kelompok}] Total ada **{lp.format_int_id(n_merah_total)}** kombinasi SKU×cabang "
-            "berstatus 🔴 Merah di seluruh jaringan."
-        )
-    return catatan
-
 
 def render_persediaan_tab():
     if err_persediaan:
@@ -301,54 +150,212 @@ def render_persediaan_tab():
     st.divider()
 
     # -----------------------------------------------------------------
-    # 1. Stok Persediaan — Nama Barang LUNA
+    # 1. Nilai Persediaan Aksesoris — LUNA vs Selain LUNA
     # -----------------------------------------------------------------
-    st.header("🔵 1. Stok Persediaan — Nama Barang LUNA")
-    st.caption(
-        "Nama barang mengandung kata \"LUNA\". Indikator dari jumlah stok aktual — "
-        "🔴 Merah = kritis/habis, 🟡 Kuning = menipis, 🟢 Hijau = aman. "
-        "Stok negatif (anomali sistem) otomatis masuk kategori Merah."
-    )
-    ind_luna = _render_kelompok_stok(dff_luna, "LUNA", "luna", tampilkan_heatmap=True)
+    st.header("💰 1. Nilai Persediaan Aksesoris — LUNA vs Selain LUNA")
+
+    nv_banding = lp.nilai_persediaan_perbandingan(dff_luna, dff_non_luna)
+    if nv_banding.empty:
+        st.info("Tidak ada data pada filter ini.")
+    else:
+        total_luna = nv_banding["Nilai LUNA"].sum()
+        total_non = nv_banding["Nilai Selain LUNA"].sum()
+        total_semua = total_luna + total_non
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Nilai Persediaan LUNA", lp.format_rupiah_id(total_luna), lp.format_percent_id(total_luna / total_semua * 100 if total_semua else 0) + " dari total")
+        c2.metric("Nilai Persediaan Selain LUNA", lp.format_rupiah_id(total_non), lp.format_percent_id(total_non / total_semua * 100 if total_semua else 0) + " dari total")
+        c3.metric("Total Nilai Persediaan", lp.format_rupiah_id(total_semua))
+
+        st.bar_chart(nv_banding.set_index("Cabang")[["Nilai LUNA", "Nilai Selain LUNA"]])
+
+        tampil_nv = nv_banding.copy()
+        tampil_nv["Nilai LUNA"] = nv_banding["Nilai LUNA"].map(lp.format_rupiah_id)
+        tampil_nv["Nilai Selain LUNA"] = nv_banding["Nilai Selain LUNA"].map(lp.format_rupiah_id)
+        tampil_nv["Total Nilai"] = nv_banding["Total Nilai"].map(lp.format_rupiah_id)
+        tampil_nv["Porsi LUNA (%)"] = nv_banding["Porsi LUNA (%)"].map(lp.format_percent_id)
+        st.dataframe(tampil_nv, use_container_width=True, height=420)
+        st.download_button(
+            "⬇️ Unduh CSV — Nilai Persediaan LUNA vs Selain LUNA", nv_banding.to_csv(index=False).encode("utf-8-sig"),
+            "nilai_persediaan_luna_vs_selain.csv", "text/csv", key="pd_dl_nilai_banding",
+        )
 
     st.divider()
 
     # -----------------------------------------------------------------
-    # 2. Stok Persediaan — Nama Barang Selain LUNA
+    # 2 & 3. Produk Favorit per Cabang + Kebutuhan Konsumen Belum Terpenuhi
     # -----------------------------------------------------------------
-    st.header("⚪ 2. Stok Persediaan — Nama Barang Selain LUNA")
+    st.header("🏆 2. Produk Paling Diminati per Cabang (Wajib Distok)")
     st.caption(
-        "Seluruh brand aksesoris lain di luar LUNA — sebagai pembanding. "
-        "Ambang indikator warna sama seperti bagian LUNA di atas."
+        "Diranking dari **jumlah terjual** (bukan indikator warna) — sumbernya data penjualan "
+        "aksesoris, disandingkan dengan stok saat ini. Butuh data di panel kiri bagian "
+        "\"🧾 Data Penjualan\" — kalau berkasnya rincian satu cabang saja, isi dulu nama "
+        "cabangnya di tab **Dashboard Penjualan Aksesoris** (bagian atas), nama itu otomatis "
+        "dipakai juga di sini."
     )
-    ind_non_luna = _render_kelompok_stok(dff_non_luna, "Selain LUNA", "nonluna", batas_produk_tampil=30)
+
+    top_n_favorit = st.slider("Top berapa produk per cabang", 3, 10, 5, key="pd_top_n_favorit")
+
+    df_jual_stok = None
+    if raw_aksesoris is None:
+        st.info("Data penjualan belum diunggah — bagian ini butuh data penjualan untuk tahu produk mana yang paling laku.")
+    elif "CABANG" in raw_aksesoris.columns:
+        df_jual_stok = la.finalize_data(raw_aksesoris)
+    else:
+        nama_bersama = st.session_state.get("nama_cabang_bersama")
+        if nama_bersama:
+            df_jual_stok = la.finalize_data(raw_aksesoris, cabang_default=nama_bersama)
+        else:
+            st.info(
+                "Berkas penjualan ini rincian satu cabang saja (tanpa kolom Cabang). Isi dulu "
+                "nama cabangnya di tab **Dashboard Penjualan Aksesoris** (bagian "
+                "\"Ringkasan Cabang, Produk & Sales\"), baru bagian ini akan terisi."
+            )
+
+    produk_favorit = pd.DataFrame()
+    if df_jual_stok is not None:
+        produk_favorit = lp.produk_favorit_per_cabang(df_jual_stok, dasar, top_n=top_n_favorit)
+
+    if produk_favorit.empty:
+        if df_jual_stok is not None:
+            st.info("Tidak ada data penjualan aksesoris pada filter cabang saat ini.")
+    else:
+        tampil_pf = produk_favorit.copy()
+        tampil_pf["Omzet"] = produk_favorit["Omzet"].map(lp.format_rupiah_id)
+        tampil_pf["Stok Saat Ini"] = produk_favorit["Stok Saat Ini"].map(lp.format_int_id)
+        st.dataframe(tampil_pf, use_container_width=True, height=460)
+        st.download_button(
+            "⬇️ Unduh CSV — Produk Favorit per Cabang", produk_favorit.to_csv(index=False).encode("utf-8-sig"),
+            "produk_favorit_per_cabang.csv", "text/csv", key="pd_dl_produk_favorit",
+        )
+
+        st.divider()
+        st.header("📢 3. Kebutuhan Konsumen yang Belum Terpenuhi")
+        kebutuhan = lp.kebutuhan_belum_terpenuhi(produk_favorit)
+        n_total = len(produk_favorit)
+        n_kurang = len(kebutuhan)
+        st.caption(
+            f"Produk favorit (sudah terbukti laku) tapi stoknya kosong/sangat rendah saat ini "
+            f"di cabang tsb — inilah yang paling menggambarkan permintaan konsumen yang belum "
+            f"terlayani. **{lp.format_int_id(n_kurang)} dari {lp.format_int_id(n_total)}** "
+            f"produk favorit ({lp.format_percent_id(n_kurang/n_total*100 if n_total else 0)}) "
+            "berstatus wajib direstock."
+        )
+        if kebutuhan.empty:
+            st.success("✅ Semua produk favorit di seluruh cabang stoknya masih memadai.")
+        else:
+            tampil_kbt = kebutuhan.copy()
+            tampil_kbt["Omzet"] = kebutuhan["Omzet"].map(lp.format_rupiah_id)
+            tampil_kbt["Stok Saat Ini"] = kebutuhan["Stok Saat Ini"].map(lp.format_int_id)
+            st.dataframe(tampil_kbt, use_container_width=True, height=420)
+            st.download_button(
+                "⬇️ Unduh CSV — Kebutuhan Konsumen Belum Terpenuhi", kebutuhan.to_csv(index=False).encode("utf-8-sig"),
+                "kebutuhan_belum_terpenuhi.csv", "text/csv", key="pd_dl_kebutuhan",
+            )
 
     st.divider()
 
     # -----------------------------------------------------------------
-    # Analisa & tindak lanjut (gabungan kedua kelompok)
+    # 4. Analisa Lokasi Cabang MFlash
+    # -----------------------------------------------------------------
+    st.header("📍 4. Analisa Lokasi Cabang MFlash")
+    st.caption(
+        "Lokasi 18 cabang MFlash (dicari langsung dari data lokasi asli — alamat, koordinat, "
+        "dan rating), disandingkan dengan nilai persediaan aksesoris per cabang."
+    )
+
+    lokasi = lp.data_lokasi_cabang()
+    if not nv_banding.empty:
+        lokasi_gabung = lokasi.merge(nv_banding, on="Cabang", how="left")
+    else:
+        lokasi_gabung = lokasi.copy()
+        lokasi_gabung["Total Nilai"] = np.nan
+
+    peta_df = lokasi_gabung.rename(columns={"Lat": "lat", "Lon": "lon"})[["lat", "lon"]]
+    st.map(peta_df, size=60)
+
+    st.subheader("Sebaran Wilayah")
+    ring_wilayah = lp.ringkasan_wilayah(nv_banding) if not nv_banding.empty else pd.DataFrame()
+    if not ring_wilayah.empty:
+        st.bar_chart(ring_wilayah.set_index("Wilayah")["Jumlah Cabang"])
+        tampil_wil = ring_wilayah.copy()
+        tampil_wil["Total Nilai Persediaan"] = ring_wilayah["Total Nilai Persediaan"].map(lp.format_rupiah_id)
+        tampil_wil["Rata-rata Nilai / Cabang"] = ring_wilayah["Rata-rata Nilai / Cabang"].map(lp.format_rupiah_id)
+        st.dataframe(tampil_wil, use_container_width=True)
+
+    with st.expander(f"Lihat detail lokasi ({len(lokasi_gabung)} cabang)"):
+        tampil_lokasi = lokasi_gabung.copy()
+        if "Total Nilai" in tampil_lokasi.columns:
+            tampil_lokasi["Total Nilai"] = tampil_lokasi["Total Nilai"].apply(
+                lambda x: lp.format_rupiah_id(x) if pd.notna(x) else "-"
+            )
+        st.dataframe(
+            tampil_lokasi[["Cabang", "Wilayah", "Alamat", "Rating", "Jumlah Ulasan", "Total Nilai"]] if "Total Nilai" in tampil_lokasi.columns else tampil_lokasi,
+            use_container_width=True, height=460,
+        )
+        st.download_button(
+            "⬇️ Unduh CSV — Lokasi Cabang", lokasi_gabung.to_csv(index=False).encode("utf-8-sig"),
+            "lokasi_cabang.csv", "text/csv", key="pd_dl_lokasi",
+        )
+
+    st.divider()
+
+    # -----------------------------------------------------------------
+    # Peta Stok — Cabang × Produk (SATU-SATUNYA tempat pakai indikator 🔴🟡🟢)
+    # -----------------------------------------------------------------
+    st.header("🗺️ Peta Stok — Cabang × Produk (LUNA)")
+    st.caption(
+        "🔴🟡🟢 hanya dipakai di sini. Merah = stok ≤ 2, Kuning = stok 3–7, Hijau = stok ≥ 8. "
+        "Khusus produk LUNA (87 nama produk, masih kebaca dalam satu grid) — sel abu-abu \"-\" "
+        "berarti produk itu tidak tercatat sama sekali di cabang tsb (bukan berarti stoknya 0)."
+    )
+    ind_luna_heatmap = lp.indikator_stok_luna(dff_luna, batas_merah=batas_merah, batas_kuning=batas_kuning)
+    if ind_luna_heatmap.empty:
+        st.info("Tidak ada data produk LUNA pada filter ini.")
+    else:
+        pivot_stok, pivot_ind = lp.pivot_heatmap_stok(ind_luna_heatmap)
+        if pivot_stok.empty:
+            st.info("Tidak ada data untuk peta stok pada filter ini.")
+        else:
+            st.dataframe(lp.styler_heatmap(pivot_stok, pivot_ind), use_container_width=True, height=520)
+
+    st.divider()
+
+    # -----------------------------------------------------------------
+    # Analisa & tindak lanjut
     # -----------------------------------------------------------------
     st.header("📌 Analisa & Tindak Lanjut")
     catatan = []
 
-    if not ind_luna.empty and not ind_non_luna.empty:
-        porsi_merah_luna = (ind_luna["Indikator"] == lp.MERAH).mean() * 100
-        porsi_merah_non = (ind_non_luna["Indikator"] == lp.MERAH).mean() * 100
-        if porsi_merah_luna < porsi_merah_non:
+    if not nv_banding.empty:
+        top_nilai = nv_banding.iloc[0]
+        catatan.append(
+            f"Cabang **{top_nilai['Cabang']}** punya nilai persediaan aksesoris terbesar "
+            f"({lp.format_rupiah_id(top_nilai['Total Nilai'])}), dengan porsi LUNA "
+            f"{lp.format_percent_id(top_nilai['Porsi LUNA (%)'])}."
+        )
+        porsi_luna_rerata = nv_banding["Porsi LUNA (%)"].mean()
+        catatan.append(
+            f"Rata-rata porsi nilai persediaan LUNA terhadap total di seluruh cabang: "
+            f"**{lp.format_percent_id(porsi_luna_rerata)}**."
+        )
+
+    if not produk_favorit.empty:
+        n_total = len(produk_favorit)
+        n_kurang = len(lp.kebutuhan_belum_terpenuhi(produk_favorit))
+        if n_kurang > 0:
             catatan.append(
-                f"Secara keseluruhan, stok **LUNA** ({lp.format_percent_id(porsi_merah_luna)} Merah) lebih "
-                f"terjaga dibanding brand **selain LUNA** ({lp.format_percent_id(porsi_merah_non)} Merah) — "
-                "wajar mengingat LUNA adalah brand yang ditarget secara khusus."
-            )
-        else:
-            catatan.append(
-                f"Porsi Merah LUNA ({lp.format_percent_id(porsi_merah_luna)}) justru lebih tinggi atau setara "
-                f"dengan brand selain LUNA ({lp.format_percent_id(porsi_merah_non)}) — perlu perhatian ekstra "
-                "mengingat LUNA adalah brand yang wajib disetok semua cabang."
+                f"**{lp.format_percent_id(n_kurang/n_total*100)}** dari produk paling diminati di "
+                "seluruh cabang berstatus wajib direstock — sebagian besar produk terlaris justru "
+                "kehabisan stok, sinyal kuat permintaan konsumen yang belum terlayani optimal."
             )
 
-    catatan += _catatan_kelompok(ind_luna, "LUNA")
-    catatan += _catatan_kelompok(ind_non_luna, "Selain LUNA")
+    if not ring_wilayah.empty:
+        wil_top = ring_wilayah.iloc[0]
+        catatan.append(
+            f"Wilayah **{wil_top['Wilayah']}** punya nilai persediaan aksesoris tertinggi "
+            f"({lp.format_rupiah_id(wil_top['Total Nilai Persediaan'])}) dari "
+            f"{int(wil_top['Jumlah Cabang'])} cabang di wilayah tsb."
+        )
 
     if not catatan:
         catatan.append("Tidak ada data untuk dianalisa pada filter saat ini.")

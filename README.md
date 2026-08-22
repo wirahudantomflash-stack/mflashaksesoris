@@ -2,17 +2,21 @@
 
 Satu aplikasi Streamlit dengan dua tab:
 
-1. **📊 Dashboard Persediaan Aksesoris** — indikator stok dengan kode warna
-   🔴🟡🟢 (berdasarkan jumlah unit stok aktual), dibagi dua bagian:
-   - **Stok Persediaan — Nama Barang LUNA**: fokus brand yang wajib disetok
-     semua cabang, dilengkapi **peta stok (heatmap) Cabang × Produk** untuk
-     pemantauan sekali-lihat.
-   - **Stok Persediaan — Nama Barang Selain LUNA**: brand lain sebagai
-     pembanding.
-   Tiap bagian punya kotak **"Cabang Paling Perlu Perhatian"** (5 cabang
-   dengan porsi Merah tertinggi, ditampilkan paling atas), tabel ringkasan
-   dengan gradasi warna otomatis, ringkasan produk, nilai persediaan per
-   cabang, dan kotak analisa yang membandingkan kondisi LUNA vs selain LUNA.
+1. **📊 Dashboard Persediaan Aksesoris** — versi ringkas, mudah dikontrol,
+   berisi 4 bagian:
+   1. **Nilai Persediaan Aksesoris — LUNA vs Selain LUNA**: perbandingan
+      nilai persediaan per cabang, kartu ringkasan, grafik, dan tabel.
+   2. **Produk Paling Diminati per Cabang (Wajib Distok)**: Top-N produk
+      terlaris per cabang (dari data penjualan), disandingkan dengan stok
+      saat ini.
+   3. **Kebutuhan Konsumen yang Belum Terpenuhi**: produk favorit yang
+      stoknya kosong/rendah — sinyal permintaan yang belum terlayani.
+   4. **Analisa Lokasi Cabang MFlash**: peta 18 cabang (lokasi asli dari
+      pencarian data lokasi), sebaran per wilayah, disandingkan dengan nilai
+      persediaan.
+   Ditutup dengan **Peta Stok (heatmap) Cabang × Produk** khusus LUNA —
+   **satu-satunya** bagian yang memakai indikator warna 🔴🟡🟢 — dan kotak
+   Analisa & Tindak Lanjut.
 2. **🧾 Dashboard Penjualan Aksesoris** — satu tab gabungan berisi dua bagian:
    - **Ringkasan Cabang, Produk & Sales**: ranking Seluruh Cabang, Semua
      Produk Aksesoris (terlaris & profit), dan Seluruh Sales.
@@ -23,10 +27,10 @@ Satu aplikasi Streamlit dengan dua tab:
      **target pencapaian penjualan LUNA** (default Rp 2 miliar / 12 bulan
      mulai Agustus 2026), serta analisa + proyeksi 5–10 tahun.
 
-Kedua bagian dalam tab Penjualan Aksesoris memakai **satu berkas data
-penjualan yang sama** (satu tombol unggah saja di panel kiri) — dibaca dua
-kali secara independen oleh dua modul olah data yang berbeda, jadi tidak
-perlu unggah berkas terpisah untuk tiap bagian.
+Kedua tab memakai **satu berkas data penjualan yang sama** (satu tombol
+unggah saja di panel kiri, bagian "🧾 Data Penjualan") — dibaca ulang secara
+independen oleh tab Persediaan (untuk bagian "Produk Paling Diminati") dan
+tab Penjualan Aksesoris, jadi tidak perlu unggah berkas terpisah.
 
 ## Isi repo
 
@@ -91,48 +95,41 @@ masing-masing** (bukan di sidebar), supaya filter tidak tertukar.
   "LUNA"** (sumber data tidak punya kolom Pemasok/Brand terpisah untuk stok);
   sisanya masuk kelompok "Selain LUNA".
 - Data difilter ke kategori barang **AKSESORIS** (dua ejaan digabung),
-  sesuai kolom `Kategori Barang` — berlaku untuk kedua kelompok.
-- **Kelompok "Selain LUNA" jauh lebih besar** (≈22.700 baris, ≈12.600 nama
-  produk unik, vs LUNA ≈360 baris/≈90 nama produk) — supaya tabel di layar
-  tetap ringan, ringkasan per produk kelompok ini dibatasi tampilan (default
-  30, bisa diperbesar lewat slider di dashboard), tapi **tombol unduh CSV
-  selalu berisi semua produk**, tidak dipotong.
-- **Indikator dari jumlah stok aktual** (`Kts (Semua Gdng)`), bukan
-  persentase relatif terhadap cabang lain — supaya konsisten dan tidak
-  bergantung pada produk pembanding. Ambang batas default diturunkan dari
-  sebaran stok LUNA riil (median 3, kuartil-3 ≈10), dan dipakai sama untuk
-  kedua kelompok supaya bisa dibandingkan apel-ke-apel:
-  - 🔴 **Merah**: stok ≤ 2 (kritis, termasuk 0 dan anomali negatif)
-  - 🟡 **Kuning**: stok 3–7 (menipis, perlu diawasi)
-  - 🟢 **Hijau**: stok ≥ 8 (aman)
-  Ambang ini **bisa diubah dari sidebar** kalau standar operasional MFLASH
-  berbeda dari saran ini.
-- Stok negatif pada sumber data (anomali sistem, biasanya transaksi keluar
-  tercatat sebelum stok masuk disesuaikan) otomatis masuk kategori Merah,
-  bukan disembunyikan atau di-clip jadi 0.
-- **Fitur pemantauan cepat** (supaya tidak perlu baca tabel panjang satu per
-  satu):
-  - **Kotak "Cabang Paling Perlu Perhatian"** — 5 cabang dengan porsi Merah
-    tertinggi, ditampilkan sebagai kartu merah mencolok di paling atas tiap
-    bagian.
-  - **Gradasi warna otomatis** pada kolom "Porsi Merah (%)" di tabel
-    ringkasan cabang & produk — makin pekat merahnya, makin kritis, tanpa
-    perlu membaca angka satu per satu.
-  - **Peta stok (heatmap) Cabang × Produk** — khusus bagian LUNA (87 produk,
-    masih kebaca dalam satu grid). Sel diwarnai mengikuti indikator
-    (🔴🟡🟢), sel abu-abu "-" berarti produk itu tidak tercatat sama sekali
-    di cabang tsb (bukan berarti stoknya 0 — beda makna, sengaja dibedakan
-    warnanya). Tidak dipasang di bagian "Selain LUNA" karena grid-nya akan
-    terlalu besar (12.634 produk) untuk kebaca.
-- Kotak Analisa & Tindak Lanjut membandingkan porsi Merah LUNA vs Selain
-  LUNA secara eksplisit, di samping catatan per kelompok.
-- **Keterbatasan yang perlu diketahui:** indikator ini murni dari jumlah
-  unit fisik, BUKAN "hari persediaan" (days of supply) — karena nama produk
-  di data stok vs data penjualan cuma cocok persis sekitar 45% (variasi
-  penulisan), sehingga menghitung kecepatan jual per produk per cabang
-  belum bisa diandalkan sebagai basis utama. Kalau penamaan produk di kedua
-  sumber data dirapikan/distandardisasi di masa depan, pendekatan berbasis
-  kecepatan jual bisa jadi peningkatan berikutnya.
+  sesuai kolom `Kategori Barang` — berlaku untuk semua bagian di tab ini.
+- **Bagian 1 (Nilai Persediaan)**: perbandingan langsung nilai persediaan
+  LUNA vs Selain LUNA per cabang (`nilai_persediaan_perbandingan()`), tanpa
+  indikator warna — murni angka.
+- **Bagian 2 & 3 (Produk Favorit / Kebutuhan Belum Terpenuhi)**: memakai
+  data **penjualan** aksesoris (bukan cuma stok) untuk menentukan "paling
+  diminati" — ranking dari `QTY` terjual per (Cabang, Nama Barang), Top-N
+  bisa diatur lewat slider. Disandingkan dengan stok saat ini
+  (`produk_favorit_per_cabang()`); kolom **"Wajib Direstock"** (⚠️ Ya / Tidak)
+  dipakai sebagai flag sederhana — **bukan** indikator tri-warna.
+  - **Nama produk dicocokkan persis (exact match)** antara data penjualan
+    dan data stok — untuk seluruh katalog aksesoris (bukan cuma LUNA),
+    tingkat kecocokan ini **97,9%** (diuji dengan data asli), jauh lebih
+    baik dari kecocokan produk LUNA saja (~45%, karena variasi penulisan
+    nama LUNA lebih beragam antar cabang).
+  - **Temuan nyata dari data asli** (bukan bug): **75,2%** dari seluruh
+    baris stok aksesoris berstok ≤ 0 di seluruh jaringan pada data yang
+    diuji — dan produk-produk terlaris (yang paling sering muncul di daftar
+    "Produk Favorit") justru yang paling sering kehabisan stok, karena
+    barang laris memang lebih cepat habis. Kotak "Kebutuhan Konsumen Belum
+    Terpenuhi" secara khusus menyoroti pola ini.
+- **Bagian 4 (Analisa Lokasi)**: 18 titik lokasi cabang MFlash dicari
+  langsung berdasarkan nama cabang (bukan perkiraan/koordinat acak) —
+  alamat, koordinat, dan rating asli, ditanam di
+  `logic_persediaan.py` (`data_lokasi_cabang()`). Peta pakai `st.map()`
+  bawaan Streamlit. Sebaran per wilayah (`ringkasan_wilayah()`)
+  mengelompokkan 18 cabang ke 8 wilayah administratif (Jakarta Timur
+  terpadat dengan 4 cabang: Cilangkap, Condet, Klender, Radjiman).
+- **Peta Stok (heatmap) Cabang × Produk — SATU-SATUNYA bagian yang memakai
+  indikator warna 🔴🟡🟢** (sesuai permintaan eksplisit): khusus produk LUNA
+  (87 nama produk, masih kebaca dalam satu grid; tidak dipasang untuk
+  Selain LUNA karena 12.634 nama produk akan membuat grid tidak kebaca).
+  Ambang: 🔴 Merah stok ≤ 2, 🟡 Kuning 3–7, 🟢 Hijau ≥ 8 (nilai tetap di kode,
+  lihat catatan di bagian "Panel kiri"). Sel abu-abu "-" berarti produk
+  tidak tercatat sama sekali di cabang tsb (bukan berarti stoknya 0).
 - Kode Barang **tidak** dipakai sebagai kunci pembanding antar cabang
   karena penomorannya independen per cabang (kode yang sama bisa merujuk
   ke produk berbeda di cabang lain) — nama barang yang dipakai sebagai
@@ -253,13 +250,24 @@ perusahaan** (2 lembar referensi):
 
 Modul-modul logika sudah diuji memakai data asli Anda:
 - **Persediaan** (`logic_persediaan.py`): 23.124 baris persediaan, 18 cabang.
-  - Kelompok **LUNA**: 358 baris (87 nama produk unik) — 335 kombinasi
-    SKU×cabang, porsi Merah 40,0%.
-  - Kelompok **Selain LUNA**: 22.766 baris (12.634 nama produk unik) —
-    20.888 kombinasi SKU×cabang, porsi Merah 89,9% (jauh lebih kritis
-    dibanding LUNA, sesuai dugaan karena LUNA ditarget khusus).
-  Termasuk penanganan stok negatif dan kasus tepi filter cabang kosong
-  untuk kedua kelompok.
+  - **Nilai Persediaan**: LUNA Rp 268.940.246 vs Selain LUNA Rp 984.757.586
+    (porsi LUNA rata-rata bervariasi per cabang, tertinggi di Ceger 54,5%,
+    terendah di Jatiwaringin 2,8%) — diuji lengkap dengan kasus tepi filter
+    cabang kosong.
+  - **Produk Favorit & Kebutuhan Belum Terpenuhi**: diuji dengan cross-
+    reference data penjualan (72.776 baris) × data stok — kecocokan nama
+    produk 97,9%, ditemukan pola nyata 75,2% baris stok aksesoris berstok
+    ≤ 0, dan produk terlaris justru paling sering termasuk di dalamnya
+    (diverifikasi manual, bukan bug pencocokan nama). Bug duplikasi kolom
+    dan kesalahan huruf besar/kecil nama cabang saat digabung dengan data
+    lokasi sempat ditemukan dan sudah diperbaiki sebelum dikirim.
+  - **Analisa Lokasi**: 18 titik lokasi cabang (dicari langsung, bukan
+    perkiraan) berhasil dipetakan ke 8 wilayah administratif Jabodetabek +
+    Karawang; digabung dengan data nilai persediaan tanpa baris yang hilang
+    (0 kombinasi Cabang tidak cocok).
+  - Termasuk kasus tepi filter cabang kosong, data penjualan belum
+    diunggah, dan berkas penjualan rincian satu cabang tanpa nama cabang
+    terisi.
 - **Penjualan** (rincian satu cabang): 13.989 baris, 5.709 nota unik.
 - **Penjualan** (gabungan 17 cabang): 67.954 baris, 54.012 nota unik.
 - **Revenue Aksesoris** (gabungan 18 cabang): 72.776 baris, 58.550 nota

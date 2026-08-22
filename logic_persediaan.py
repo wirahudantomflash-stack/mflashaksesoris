@@ -250,6 +250,122 @@ def styler_gradasi_merah(df: pd.DataFrame, kolom: str = "Porsi Merah (%)"):
 
 
 # ---------------------------------------------------------------------------
+# Dashboard sederhana: nilai persediaan LUNA vs Selain LUNA, produk favorit
+# per cabang, kebutuhan konsumen yang belum terpenuhi, lokasi cabang.
+# CATATAN: bagian ini SENGAJA tidak memakai indikator warna Merah/Kuning/
+# Hijau — indikator tri-warna itu hanya dipakai di Peta Stok (heatmap).
+# ---------------------------------------------------------------------------
+
+def nilai_persediaan_perbandingan(df_luna: pd.DataFrame, df_non_luna: pd.DataFrame) -> pd.DataFrame:
+    """Bandingkan nilai persediaan LUNA vs Selain LUNA per cabang, dalam
+    satu tabel sejajar supaya mudah dikontrol sekali lihat."""
+    cols = ["Cabang", "Nilai LUNA", "Nilai Selain LUNA", "Total Nilai", "Porsi LUNA (%)"]
+    nv_luna = nilai_persediaan_cabang(df_luna)[["Cabang", "Nilai Persediaan"]].rename(columns={"Nilai Persediaan": "Nilai LUNA"})
+    nv_non = nilai_persediaan_cabang(df_non_luna)[["Cabang", "Nilai Persediaan"]].rename(columns={"Nilai Persediaan": "Nilai Selain LUNA"})
+    g = nv_luna.merge(nv_non, on="Cabang", how="outer").fillna(0)
+    if g.empty:
+        return pd.DataFrame(columns=cols)
+    g["Total Nilai"] = g["Nilai LUNA"] + g["Nilai Selain LUNA"]
+    g["Porsi LUNA (%)"] = np.where(g["Total Nilai"] != 0, g["Nilai LUNA"] / g["Total Nilai"] * 100, 0)
+    g = g.sort_values("Total Nilai", ascending=False).reset_index(drop=True)
+    return g[cols]
+
+
+def produk_favorit_per_cabang(df_jual: pd.DataFrame, df_stok: pd.DataFrame, top_n: int = 5) -> pd.DataFrame:
+    """Produk aksesoris paling diminati (terjual terbanyak) per cabang,
+    disandingkan dengan stok saat ini — supaya langsung kelihatan produk
+    favorit mana yang stoknya kosong/rendah dan wajib segera direstock.
+
+    df_jual: data penjualan aksesoris (kolom CABANG, NAMA BARANG, QTY, TOTAL HARGA).
+    df_stok: data persediaan yang sudah difilter kategori aksesoris (kolom
+    Cabang, Nama Barang, Kts (Semua Gdng)).
+    """
+    cols = ["Cabang", "Peringkat", "Nama Barang", "Qty Terjual", "Omzet", "Stok Saat Ini", "Wajib Direstock"]
+    if df_jual.empty:
+        return pd.DataFrame(columns=cols)
+
+    agg = df_jual.groupby(["CABANG", "NAMA BARANG"], dropna=False).agg(
+        **{"Qty Terjual": ("QTY", "sum")}, Omzet=("TOTAL HARGA", "sum"),
+    ).reset_index()
+    agg["Peringkat"] = agg.groupby("CABANG")["Qty Terjual"].rank(method="first", ascending=False).astype(int)
+    top = agg[agg["Peringkat"] <= top_n].sort_values(["CABANG", "Peringkat"]).reset_index(drop=True)
+
+    if not df_stok.empty:
+        stok_lookup = df_stok.groupby(["Cabang", "Nama Barang"])["Kts (Semua Gdng)"].sum().reset_index()
+        stok_lookup = stok_lookup.rename(columns={"Cabang": "CABANG", "Nama Barang": "NAMA BARANG"})
+        top = top.merge(stok_lookup, on=["CABANG", "NAMA BARANG"], how="left")
+    else:
+        top["Kts (Semua Gdng)"] = np.nan
+
+    top["Stok Saat Ini"] = top["Kts (Semua Gdng)"].fillna(0)
+    top["Wajib Direstock"] = top["Stok Saat Ini"].apply(lambda x: "⚠️ Ya — stok kosong/rendah" if x <= 2 else "Tidak")
+    top = top.rename(columns={"CABANG": "Cabang", "NAMA BARANG": "Nama Barang"})
+    return top[cols]
+
+
+def kebutuhan_belum_terpenuhi(produk_favorit_df: pd.DataFrame) -> pd.DataFrame:
+    """Saring produk_favorit_per_cabang() ke baris yang perlu tindakan segera
+    saja — produk favorit (sudah terbukti laku) tapi stoknya kosong/rendah
+    saat ini. Ini yang paling menggambarkan "kebutuhan konsumen yang belum
+    terpenuhi" per cabang."""
+    if produk_favorit_df.empty:
+        return produk_favorit_df
+    return produk_favorit_df[produk_favorit_df["Wajib Direstock"].str.startswith("⚠️")].reset_index(drop=True)
+
+
+# Lokasi 18 cabang MFlash (dicari langsung by name pada Google Maps —
+# alamat, koordinat, dan rating asli, bukan perkiraan).
+_LOKASI_CABANG_RAW = [
+    ("Bintara", -6.2333032, 106.9663475, "Jl. Bintara No.31, Bekasi Barat, Kota Bekasi", "Kota Bekasi", 4.9, 5625),
+    ("Ceger", -6.2625655, 106.7371545, "Jl. Ceger Raya No.1b, Pondok Aren, Tangerang Selatan", "Tangerang Selatan", 4.9, 4586),
+    ("Cibinong", -6.4721488, 106.8430932, "Jl. Raya Cikaret, Pabuaran, Cibinong, Kab. Bogor", "Kab. Bogor", 4.9, 743),
+    ("Cibubur", -6.3999095, 106.9591839, "Jl. Alternatif Cibubur, Cileungsi, Kab. Bogor", "Kab. Bogor", 4.9, 56),
+    ("Cikampek", -6.4209110, 107.4741629, "Jl. Ir. Haji Juanda, Kota Baru, Karawang", "Karawang", 4.9, 520),
+    ("Cilangkap", -6.3418003, 106.9054954, "Jl. Raya Cilangkap No.6, Cipayung, Jakarta Timur", "Jakarta Timur", 4.8, 595),
+    ("Cinere", -6.3311695, 106.7838377, "Jl. Cinere Raya No.11, Cinere, Kota Depok", "Kota Depok", 4.9, 810),
+    ("Condet", -6.2799532, 106.8551896, "Jl. Raya Condet, Kramat Jati, Jakarta Timur", "Jakarta Timur", 4.9, 1864),
+    ("Dramaga", -6.5561290, 106.7037966, "Jl. Raya Tanjakan Cinangneng, Ciampea, Kab. Bogor", "Kab. Bogor", 4.9, 1928),
+    ("Jatibening", -6.2653955, 106.9441790, "Jl. Caman Raya, Pondok Gede, Kota Bekasi", "Kota Bekasi", 4.8, 1730),
+    ("Jatimulya", -6.2660474, 107.0166413, "Jl. HM. Joyo Martono No.9-4, Tambun Selatan, Kab. Bekasi", "Kab. Bekasi", 4.9, 3079),
+    ("Jatiwaringin", -6.2592160, 106.9101611, "Jl. Raya Jatiwaringin No.6, Pondok Gede, Kota Bekasi", "Kota Bekasi", 4.9, 345),
+    ("Klender", -6.2060058, 106.9029880, "Jl. Raya Bekasi KM.17, Cakung, Jakarta Timur", "Jakarta Timur", 4.9, 8237),
+    ("Pejaten", -6.2770950, 106.8304872, "Pejaten Office Park, Jl. Buncit Raya, Pasar Minggu, Jakarta Selatan", "Jakarta Selatan", 5.0, 64),
+    ("Radjiman", -6.2083183, 106.9230241, "Jl. Dr. KRT Radjiman Widyodiningrat No.20, Cakung, Jakarta Timur", "Jakarta Timur", 4.9, 1972),
+    ("Sawangan", -6.3948944, 106.7991948, "Jl. Raya Sawangan, Pancoran Mas, Kota Depok", "Kota Depok", 4.9, 1506),
+    ("Telukjambe", -6.3321200, 107.3125335, "Jl. Raya Teluk Jambe No.15, Telukjambe Timur, Karawang", "Karawang", 4.9, 1090),
+    ("Warbong", -6.2704798, 107.1157773, "Jl. Raya Imam Bonjol, Cikarang Barat, Kab. Bekasi", "Kab. Bekasi", 5.0, 1568),
+]
+
+
+def data_lokasi_cabang() -> pd.DataFrame:
+    """Data lokasi 18 cabang MFlash (nama, koordinat, alamat, wilayah,
+    rating Google) — dicari manual per nama cabang, bukan perkiraan."""
+    return pd.DataFrame(
+        _LOKASI_CABANG_RAW,
+        columns=["Cabang", "Lat", "Lon", "Alamat", "Wilayah", "Rating", "Jumlah Ulasan"],
+    )
+
+
+def ringkasan_wilayah(df_nilai_perbandingan: pd.DataFrame) -> pd.DataFrame:
+    """Gabungkan lokasi (wilayah) dengan nilai persediaan per cabang, untuk
+    melihat wilayah mana yang paling besar nilai persediaannya / paling
+    padat jumlah cabangnya."""
+    lokasi = data_lokasi_cabang()[["Cabang", "Wilayah"]]
+    cols = ["Wilayah", "Jumlah Cabang", "Total Nilai Persediaan", "Rata-rata Nilai / Cabang"]
+    if df_nilai_perbandingan.empty:
+        return pd.DataFrame(columns=cols)
+    g = df_nilai_perbandingan.merge(lokasi, on="Cabang", how="left")
+    ring = g.groupby("Wilayah").agg(
+        **{"Jumlah Cabang": ("Cabang", "nunique")},
+        **{"Total Nilai Persediaan": ("Total Nilai", "sum")},
+    ).reset_index()
+    ring["Rata-rata Nilai / Cabang"] = np.where(
+        ring["Jumlah Cabang"] != 0, ring["Total Nilai Persediaan"] / ring["Jumlah Cabang"], 0,
+    )
+    return ring.sort_values("Total Nilai Persediaan", ascending=False).reset_index(drop=True)[cols]
+
+
+# ---------------------------------------------------------------------------
 # Format angka gaya Indonesia
 # ---------------------------------------------------------------------------
 
