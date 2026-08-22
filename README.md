@@ -1,4 +1,4 @@
-# MFLASH — Dashboard Cabang (Persediaan Aksesoris LUNA + Penjualan Aksesoris)
+# MFlash Dashboard Aksesoris (Persediaan LUNA + Penjualan Aksesoris)
 
 Satu aplikasi Streamlit dengan dua tab:
 
@@ -30,12 +30,19 @@ perlu unggah berkas terpisah untuk tiap bagian.
 
 ```
 app.py               # aplikasi utama (2 tab)
+flash_logo.png        # logo Flash — dipakai di judul halaman & sidebar (st.logo)
 logic_persediaan.py    # logika indikator stok LUNA per cabang
 logic_penjualan.py    # logika olah data penjualan/cabang (umum)
 logic_aksesoris.py     # logika olah data revenue penjualan aksesoris
 logic_pembelian.py     # TIDAK dipakai app.py lagi — lihat catatan di bawah
 requirements.txt      # dependensi untuk Streamlit Cloud
 ```
+
+> **Penting:** `flash_logo.png` **wajib** ada di root repo, sejajar dengan
+> `app.py` — dipanggil lewat `st.set_page_config(page_icon="flash_logo.png")`
+> dan `st.logo("flash_logo.png")`. Kalau berkas ini tidak diunggah, aplikasi
+> akan gagal jalan (`FileNotFoundError`) karena keduanya dipanggil di baris
+> paling awal skrip.
 
 > **Catatan:** `logic_pembelian.py` (dashboard porsi pemasok yang lama)
 > sudah tidak lagi dipanggil dari `app.py` sejak tab Pembelian diganti
@@ -45,7 +52,8 @@ requirements.txt      # dependensi untuk Streamlit Cloud
 
 ## Cara pakai di GitHub + Streamlit Cloud
 
-1. Buat repo baru, unggah berkas-berkas yang relevan di atas.
+1. Buat repo baru, unggah berkas-berkas yang relevan di atas — **termasuk
+   `flash_logo.png`, wajib ada** (lihat catatan di bagian "Isi repo").
 2. **Opsional:** taruh berkas data langsung di root repo (sejajar `app.py`)
    supaya termuat otomatis tanpa upload manual tiap buka aplikasi:
    - `Persediaan_Aksesoris_Regional.xlsx` (harus punya sheet
