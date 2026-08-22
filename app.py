@@ -48,10 +48,11 @@ upl_penjualan = st.sidebar.file_uploader(
 
 st.sidebar.divider()
 # NOTE: kontrol ambang indikator (Merah/Kuning) sementara disembunyikan dari
-# sidebar atas permintaan — dipakai default tetap di kode saja (2 / 7),
-# supaya fokus dashboard murni ke kontrol stok menipis tanpa perlu
-# pengaturan tambahan. Bisa dimunculkan lagi kapan saja kalau dibutuhkan.
-batas_merah, batas_kuning = 2, 7
+# sidebar atas permintaan — dipakai default tetap di kode saja, supaya
+# fokus dashboard murni ke kontrol stok menipis tanpa perlu pengaturan
+# tambahan. Bisa dimunculkan lagi kapan saja kalau dibutuhkan.
+# Merah: stok <= 25 · Kuning: stok 26-99 · Hijau: stok >= 100
+batas_merah, batas_kuning = 25, 99
 
 # ---------------------------------------------------------------------------
 # Muat data
@@ -354,7 +355,7 @@ def render_persediaan_tab():
     # -----------------------------------------------------------------
     st.header("🗺️ Peta Stok — Cabang × Produk (LUNA)")
     st.caption(
-        "🔴🟡🟢 hanya dipakai di sini. Merah = stok ≤ 2, Kuning = stok 3–7, Hijau = stok ≥ 8. "
+        "🔴🟡🟢 hanya dipakai di sini. Merah = stok ≤ 25, Kuning = stok 26–99, Hijau = stok ≥ 100. "
         "Khusus produk LUNA (87 nama produk, masih kebaca dalam satu grid) — sel abu-abu \"-\" "
         "berarti produk itu tidak tercatat sama sekali di cabang tsb (bukan berarti stoknya 0)."
     )

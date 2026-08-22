@@ -82,7 +82,7 @@ Sidebar dipakai bersama oleh kedua tab, berisi:
 > "Jumlah SKU" **sementara disembunyikan** dari sidebar & tampilan dashboard
 > atas permintaan — supaya fokus murni ke kontrol stok menipis tanpa
 > distraksi angka tambahan. Ambang tetap dipakai di belakang layar dengan
-> nilai default (Merah ≤ 2 unit, Kuning 3–7 unit, Hijau ≥ 8 unit), diatur
+> nilai (Merah ≤ 25 unit, Kuning 26–99 unit, Hijau ≥ 100 unit), diatur
 > lewat variabel `batas_merah`/`batas_kuning` di awal `app.py` kalau perlu
 > diubah. Beri tahu saya kapan saja kalau kontrolnya mau dimunculkan lagi.
 
@@ -156,8 +156,8 @@ masing-masing** (bukan di sidebar), supaya filter tidak tertukar.
   indikator warna 🔴🟡🟢** (sesuai permintaan eksplisit): khusus produk LUNA
   (87 nama produk, masih kebaca dalam satu grid; tidak dipasang untuk
   Selain LUNA karena 12.634 nama produk akan membuat grid tidak kebaca).
-  Ambang: 🔴 Merah stok ≤ 2, 🟡 Kuning 3–7, 🟢 Hijau ≥ 8 (nilai tetap di kode,
-  lihat catatan di bagian "Panel kiri"). Sel abu-abu "-" berarti produk
+  Ambang: 🔴 Merah stok ≤ 25, 🟡 Kuning 26–99, 🟢 Hijau ≥ 100 (nilai tetap
+  di kode, lihat catatan di bagian "Panel kiri"). Sel abu-abu "-" berarti produk
   tidak tercatat sama sekali di cabang tsb (bukan berarti stoknya 0).
 - Kode Barang **tidak** dipakai sebagai kunci pembanding antar cabang
   karena penomorannya independen per cabang (kode yang sama bisa merujuk

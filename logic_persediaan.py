@@ -10,14 +10,14 @@ Cara kerja indikator stok LUNA:
 2. Indikator dihitung dari **jumlah stok aktual** (`Kts (Semua Gdng)`), bukan
    persentase relatif — supaya konsisten dan mudah dipahami tanpa perlu
    pembanding antar cabang atau antar produk.
-3. Ambang batas default (bisa diubah dari dashboard):
-   - 🔴 Merah  : stok ≤ 2  (termasuk 0 dan anomali negatif — kritis, perlu
-                 restock segera)
-   - 🟡 Kuning : stok 3–7  (menipis, perlu diawasi)
-   - 🟢 Hijau  : stok ≥ 8  (aman)
-   Ambang ini diturunkan dari sebaran stok LUNA riil di data (median 3,
-   kuartil-3 sekitar 10) — bukan angka sembarang, tapi tetap best-effort
-   karena sumber data tidak punya kolom "par level" / target stok resmi.
+3. Ambang batas (ditetapkan dari `app.py`, saat ini tetap/tidak muncul di
+   sidebar):
+   - 🔴 Merah  : stok ≤ 25   (kritis, perlu restock segera; termasuk 0 dan
+                 anomali negatif)
+   - 🟡 Kuning : stok 26–99  (menipis, perlu diawasi)
+   - 🟢 Hijau  : stok ≥ 100  (aman)
+   Ambang ini ditentukan langsung oleh pengguna — bukan hasil analisa
+   statistik atas sebaran data.
 
 Keterbatasan yang perlu diketahui pengguna: karena tidak ada data kecepatan
 jual per produk per cabang yang bisa dicocokkan andal (nama produk di data
@@ -97,7 +97,7 @@ def apply_filters(df: pd.DataFrame, cabang=None, hanya_aksesoris: bool = True, f
     return out
 
 
-def klasifikasi_stok(qty: float, batas_merah: float = 2, batas_kuning: float = 7) -> str:
+def klasifikasi_stok(qty: float, batas_merah: float = 25, batas_kuning: float = 99) -> str:
     if qty <= batas_merah:
         return MERAH
     if qty <= batas_kuning:
@@ -105,7 +105,7 @@ def klasifikasi_stok(qty: float, batas_merah: float = 2, batas_kuning: float = 7
     return HIJAU
 
 
-def indikator_stok_luna(df: pd.DataFrame, batas_merah: float = 2, batas_kuning: float = 7) -> pd.DataFrame:
+def indikator_stok_luna(df: pd.DataFrame, batas_merah: float = 25, batas_kuning: float = 99) -> pd.DataFrame:
     """Indikator stok per (Cabang, Kode Barang, Nama Barang) — fungsi ini generik,
     bisa dipakai untuk himpunan produk manapun yang sudah difilter sebelumnya
     (LUNA maupun selain LUNA), bukan cuma untuk LUNA meski nama fungsinya begitu.
