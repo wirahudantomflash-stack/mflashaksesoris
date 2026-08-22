@@ -18,8 +18,10 @@ Satu aplikasi Streamlit dengan dua tab:
      Produk Aksesoris (terlaris & profit), dan Seluruh Sales.
    - **Revenue, HPP & Katalog LUNA**: revenue & tren bulanan, Top 10 produk
      aksesoris terlaris & profit, omzet + HPP seluruh cabang, katalog
-     referensi harga LUNA & potensi profit, serta analisa + proyeksi
-     5–10 tahun.
+     referensi harga LUNA & potensi profit, **simulasi insentif penjualan
+     aksesoris** (tabel isian, THP interpolasi dari target harian), **target
+     pencapaian penjualan LUNA** (default Rp 2 miliar / 12 bulan mulai
+     Agustus 2026), serta analisa + proyeksi 5–10 tahun.
 
 Kedua bagian dalam tab Penjualan Aksesoris memakai **satu berkas data
 penjualan yang sama** (satu tombol unggah saja di panel kiri) — dibaca dua
@@ -187,6 +189,46 @@ masing-masing** (bukan di sidebar), supaya filter tidak tertukar.
   Bundling Aksesoris NexLink & LUNA dari Surat Edaran SE/001/IN-MF/IV/2026)
   supaya rekomendasinya konkret, bukan generik.
 
+## Simulasi Insentif Penjualan Aksesoris
+
+- Tabel **isian** (`st.data_editor`) — kolom "Penjualan Harian" bisa diedit
+  langsung, baris bisa ditambah/dihapus. Default terisi otomatis dari
+  rentang Penjualan Harian Minimum–Maksimum yang diatur di panel "⚙️ Asumsi
+  Simulasi" (default Rp 500rb–Rp 2jt, bisa diubah).
+- **Estimasi THP dihitung dengan interpolasi LINIER** antara
+  (Penjualan Harian Minimum → THP Minimum) dan (Penjualan Harian Maksimum →
+  THP Maksimum) — default Rp 5jt di titik minimum, Rp 8jt di titik
+  maksimum. Nilai di luar rentang tetap di-*clip* ke THP Minimum/Maksimum
+  (tidak diekstrapolasi).
+- Kolom **"THP thd Gross Profit (%)"** murni informasi tambahan — bukan
+  dasar perhitungan THP — untuk mengecek kewajaran asumsi. Dengan default
+  di atas (GP 40%, 26 hari kerja), rasio ini berkisar **38,5%** (di
+  penjualan harian maksimum) sampai **96,2%** (di penjualan harian
+  minimum). Dashboard menampilkan peringatan otomatis kalau rasio ini
+  di atas 70%, karena itu berarti insentif nyaris menghabiskan seluruh
+  Gross Profit kategori aksesoris kalau dianggap dibiayai murni dari situ
+  — indikasi THP di level itu perlu ditopang sumber lain (gaji pokok,
+  komisi kategori lain), bukan cuma GP aksesoris.
+
+## Target Pencapaian Penjualan LUNA
+
+- Default: **Rp 2.000.000.000** dalam **12 bulan mulai Agustus 2026**
+  (1 Agu 2026 – 31 Jul 2027) — ketiganya bisa diubah langsung dari
+  dashboard (target, tanggal mulai, durasi bulan).
+- Produk LUNA diidentifikasi dari **nama barang mengandung kata "LUNA"**,
+  dihitung dari **seluruh data penjualan** (tidak terpengaruh filter
+  tahun/bulan/cabang di bagian atas tab), supaya progress tidak
+  "menghilang" cuma karena pengguna sedang menyaring tampilan lain.
+- **Tanggal acuan "hari berjalan" memakai tanggal faktur TERAKHIR pada
+  data** (bukan tanggal hari ini) — prinsip yang sama dipakai di bagian
+  Proyeksi 5–10 Tahun, supaya persentase tidak terlihat rendah cuma karena
+  data belum diperbarui.
+- Dua ukuran pencapaian ditampilkan sekaligus: **% Pencapaian** (dibanding
+  target yang SEHARUSNYA sudah tercapai sampai hari ke sekian dari total
+  hari program) dan **% dari Target Penuh** (dibanding target 12 bulan
+  penuh) — supaya jelas mana yang jadi ukuran "on-track" dan mana yang
+  ukuran progres keseluruhan.
+
 ## Pengujian
 
 Modul-modul logika sudah diuji memakai data asli Anda:
@@ -203,6 +245,14 @@ Modul-modul logika sudah diuji memakai data asli Anda:
 - **Revenue Aksesoris** (gabungan 18 cabang): 72.776 baris, 58.550 nota
   unik, omzet total Rp 4.164.979.227 (margin ~40,8%), Jan–Ags 2026 —
   termasuk simulasi penuh seluruh fungsi dan kasus tepi filter kosong.
+- **Simulasi Insentif**: diuji dengan 7 baris skenario (Rp 500rb–Rp 2jt/hari,
+  GP 40%, 26 hari kerja) — hasil THP Rp 5jt–Rp 8jt sesuai spesifikasi,
+  rasio THP-terhadap-GP 38,5%–96,2% terverifikasi, termasuk kasus tabel
+  dikosongkan pengguna (tidak error).
+- **Target LUNA**: diuji dengan target Rp 2 M / 12 bulan mulai Agustus 2026
+  — hari ke-19 dari 365 hari program, tercapai Rp 33.754.860 (32,4% dari
+  target-sampai-hari-ini, 1,7% dari target penuh), 1.198 transaksi LUNA
+  tercatat; termasuk kasus tepi target Rp 0 dan program yang belum dimulai.
 
 **Catatan jujur:** lingkungan tempat saya membuat berkas ini tidak
 tersambung internet, sehingga saya tidak bisa memasang paket `streamlit`

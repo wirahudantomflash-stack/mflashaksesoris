@@ -2,6 +2,7 @@ import os
 import io
 import streamlit as st
 import pandas as pd
+import numpy as np
 
 import logic_persediaan as lp
 import logic_penjualan as ljl
@@ -735,6 +736,144 @@ def render_aksesoris_tab():
                 lambda x: la.format_rupiah_id(x) if pd.notna(x) else "-"
             )
             st.dataframe(tampil_mat, use_container_width=True, height=320)
+
+    st.divider()
+
+    # -----------------------------------------------------------------
+    # 3b. Simulasi Insentif Penjualan Aksesoris
+    # -----------------------------------------------------------------
+    st.header("💸 Simulasi Insentif Penjualan Aksesoris")
+    st.caption(
+        "Estimasi Take Home Pay (THP) sales retail berdasarkan target penjualan aksesoris "
+        "harian. Kolom **\"Penjualan Harian\"** bisa diedit langsung — baris bisa ditambah/"
+        "dihapus lewat tombol +/− di pojok tabel."
+    )
+
+    with st.expander("⚙️ Asumsi Simulasi (bisa diubah)", expanded=True):
+        p1, p2, p3 = st.columns(3)
+        with p1:
+            gp_persen = st.number_input("Asumsi Gross Profit (%)", min_value=0.0, max_value=100.0, value=40.0, step=1.0, key="sim_gp_persen")
+            hari_kerja = st.number_input("Hari kerja per bulan", min_value=1, max_value=31, value=26, step=1, key="sim_hari_kerja")
+        with p2:
+            thp_min = st.number_input("THP Minimum (Rp)", min_value=0, value=5_000_000, step=500_000, format="%d", key="sim_thp_min")
+            thp_max = st.number_input("THP Maksimum (Rp)", min_value=0, value=8_000_000, step=500_000, format="%d", key="sim_thp_max")
+        with p3:
+            harian_min = st.number_input("Penjualan Harian Minimum (Rp)", min_value=0, value=500_000, step=50_000, format="%d", key="sim_harian_min")
+            harian_max = st.number_input("Penjualan Harian Maksimum (Rp)", min_value=0, value=2_000_000, step=50_000, format="%d", key="sim_harian_max")
+        jumlah_baris = st.slider("Jumlah baris skenario default", 3, 15, 7, key="sim_jumlah_baris")
+
+    if thp_min > thp_max:
+        st.error("THP Minimum harus lebih kecil atau sama dengan THP Maksimum.")
+    elif harian_min > harian_max:
+        st.error("Penjualan Harian Minimum harus lebih kecil atau sama dengan Maksimum.")
+    else:
+        default_harian = np.linspace(harian_min, harian_max, jumlah_baris).round(-3)
+        seed_df = pd.DataFrame({"Penjualan Harian": default_harian})
+
+        edited = st.data_editor(
+            seed_df, num_rows="dynamic", use_container_width=True, key="sim_editor",
+            column_config={
+                "Penjualan Harian": st.column_config.NumberColumn(
+                    "Penjualan Harian (Rp)", min_value=0, step=50_000, format="%d",
+                )
+            },
+        )
+
+        harian_valid = edited["Penjualan Harian"].dropna()
+        harian_valid = harian_valid[harian_valid > 0]
+
+        if harian_valid.empty:
+            st.info("Isi minimal satu baris \"Penjualan Harian\" di tabel atas untuk melihat hasil simulasi.")
+        else:
+            hasil = la.simulasi_insentif(
+                harian_valid.tolist(), gp_persen=gp_persen, hari_kerja=int(hari_kerja),
+                harian_min=harian_min, harian_max=harian_max, thp_min=thp_min, thp_max=thp_max,
+            )
+            gp_col = f"Gross Profit Bulanan ({gp_persen:.0f}%)"
+            tampil_hasil = hasil.copy()
+            tampil_hasil["Penjualan Harian"] = hasil["Penjualan Harian"].map(la.format_rupiah_id)
+            tampil_hasil["Penjualan Bulanan"] = hasil["Penjualan Bulanan"].map(la.format_rupiah_id)
+            tampil_hasil[gp_col] = hasil[gp_col].map(la.format_rupiah_id)
+            tampil_hasil["Estimasi THP"] = hasil["Estimasi THP"].map(la.format_rupiah_id)
+            tampil_hasil["THP thd Gross Profit (%)"] = hasil["THP thd Gross Profit (%)"].map(la.format_percent_id)
+            st.dataframe(tampil_hasil, use_container_width=True, height=min(80 + 38 * len(hasil), 420))
+
+            rasio_maks = hasil["THP thd Gross Profit (%)"].max()
+            rasio_min = hasil["THP thd Gross Profit (%)"].min()
+            st.caption(
+                f"Kolom **\"THP thd Gross Profit (%)\"** menunjukkan seberapa besar porsi Gross Profit "
+                f"kategori aksesoris yang habis KALAU insentif ini dianggap dibiayai murni dari GP "
+                f"aksesoris saja — berkisar {la.format_percent_id(rasio_min)} sampai {la.format_percent_id(rasio_maks)} "
+                "pada tabel di atas."
+            )
+            if rasio_maks > 70:
+                st.warning(
+                    f"⚠️ Di penjualan harian paling rendah, insentif setara **{la.format_percent_id(rasio_maks)}** "
+                    "dari Gross Profit aksesoris — kalau THP memang murni dibiayai dari situ, hampir tidak "
+                    "menyisakan margin untuk cabang di level penjualan terendah ini. Kemungkinan THP perlu "
+                    "sebagian ditopang dari sumber lain (gaji pokok, komisi kategori lain), bukan cuma GP "
+                    "aksesoris — sesuaikan asumsi di atas kalau perlu."
+                )
+
+            st.download_button(
+                "⬇️ Unduh CSV — Simulasi Insentif", hasil.to_csv(index=False).encode("utf-8-sig"),
+                "simulasi_insentif_aksesoris.csv", "text/csv", key="ak_dl_simulasi",
+            )
+
+    st.divider()
+
+    # -----------------------------------------------------------------
+    # 3c. Target Pencapaian Penjualan LUNA
+    # -----------------------------------------------------------------
+    st.header("🎯 Target Pencapaian Penjualan Aksesoris LUNA")
+
+    t1, t2, t3 = st.columns(3)
+    with t1:
+        target_rp = st.number_input("Target (Rp)", min_value=0, value=2_000_000_000, step=100_000_000, format="%d", key="target_luna_rp")
+    with t2:
+        tanggal_mulai_target = st.date_input("Mulai program", value=pd.Timestamp("2026-08-01"), key="target_luna_mulai")
+    with t3:
+        durasi_bulan_target = st.number_input("Durasi (bulan)", min_value=1, max_value=60, value=12, step=1, key="target_luna_durasi")
+
+    tprog = la.target_penjualan_luna(
+        df, target=target_rp, tanggal_mulai=tanggal_mulai_target, durasi_bulan=int(durasi_bulan_target),
+    )
+
+    st.caption(
+        f"Periode program: {tprog['tanggal_mulai'].strftime('%d %b %Y')} – "
+        f"{tprog['tanggal_selesai'].strftime('%d %b %Y')} ({tprog['total_hari_program']} hari). "
+        "Nama barang diidentifikasi mengandung kata \"LUNA\"."
+    )
+
+    if tprog["hari_berjalan"] == 0:
+        st.info("Data faktur belum masuk periode program ini, atau program belum dimulai — indikator belum bisa dihitung.")
+    else:
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Tercapai", la.format_rupiah_id(tprog["tercapai"]))
+        c2.metric("Target s/d Hari Ini", la.format_rupiah_id(tprog["target_sampai_hari_ini"]))
+        c3.metric("% Pencapaian (vs target s/d hari ini)", la.format_percent_id(tprog["pct_pencapaian"]))
+        c4.metric("% dari Target Penuh", la.format_percent_id(tprog["pct_dari_target_penuh"]))
+
+        st.progress(min(tprog["pct_pencapaian"] / 100, 1.0) if tprog["pct_pencapaian"] else 0)
+
+        st.caption(
+            f"Tanggal acuan: **{tprog['tgl_acuan'].strftime('%d %b %Y')}** (tanggal faktur terakhir pada "
+            f"data, bukan tanggal hari ini) — hari ke-{tprog['hari_berjalan']} dari "
+            f"{tprog['total_hari_program']} hari program, sisa {la.format_int_id(tprog['sisa_hari'])} hari. "
+            f"{la.format_int_id(tprog['jumlah_transaksi'])} baris transaksi LUNA tercatat dalam periode ini."
+        )
+
+        if tprog["pct_pencapaian"] < 80:
+            st.warning(
+                f"⚠️ Pencapaian baru **{la.format_percent_id(tprog['pct_pencapaian'])}** dari target yang "
+                "seharusnya sudah dicapai sampai hari ini — di bawah jalur target. Perlu dorongan tambahan "
+                "kalau ingin mengejar Rp " + la.format_int_id(tprog["target"]) + f" dalam {tprog['total_hari_program']} hari."
+            )
+        else:
+            st.success(
+                f"✅ Pencapaian **{la.format_percent_id(tprog['pct_pencapaian'])}** dari target yang "
+                "seharusnya — di jalur yang baik."
+            )
 
     st.divider()
 

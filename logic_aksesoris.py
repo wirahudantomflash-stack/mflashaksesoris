@@ -459,6 +459,102 @@ def ringkasan_margin_katalog(katalog: pd.DataFrame) -> pd.DataFrame:
 
 
 # ---------------------------------------------------------------------------
+# 6. Simulasi insentif penjualan & target pencapaian LUNA
+# ---------------------------------------------------------------------------
+
+def simulasi_insentif(
+    penjualan_harian_list,
+    gp_persen: float = 40,
+    hari_kerja: int = 26,
+    harian_min: float = 500_000,
+    harian_max: float = 2_000_000,
+    thp_min: float = 5_000_000,
+    thp_max: float = 8_000_000,
+) -> pd.DataFrame:
+    """Simulasi insentif/THP sales retail dari target penjualan aksesoris
+    harian. THP diinterpolasi LINIER antara (harian_min -> thp_min) dan
+    (harian_max -> thp_max) — bukan dihitung sebagai % dari Gross Profit
+    (supaya tidak terkesan insentif "dibiayai murni" dari GP kategori
+    aksesoris saja), tapi kolom "THP thd Gross Profit (%)" tetap ditampilkan
+    sebagai informasi seberapa besar porsi GP yang habis kalau insentif ini
+    dianggap dibiayai dari situ — berguna untuk cek kewajaran asumsi.
+    Nilai di luar rentang harian_min/harian_max tetap di-clip ke thp_min/
+    thp_max (tidak diekstrapolasi di luar rentang)."""
+    cols = ["Penjualan Harian", "Penjualan Bulanan", f"Gross Profit Bulanan ({gp_persen:.0f}%)", "Estimasi THP", "THP thd Gross Profit (%)"]
+    rows = []
+    rentang = (harian_max - harian_min) or 1
+    for harian in penjualan_harian_list:
+        harian = float(harian)
+        bulanan = harian * hari_kerja
+        gp_bulanan = bulanan * gp_persen / 100
+        frac = (harian - harian_min) / rentang
+        frac = min(max(frac, 0), 1)
+        thp = thp_min + frac * (thp_max - thp_min)
+        thp_thd_gp = (thp / gp_bulanan * 100) if gp_bulanan else 0
+        rows.append({
+            "Penjualan Harian": harian,
+            "Penjualan Bulanan": bulanan,
+            f"Gross Profit Bulanan ({gp_persen:.0f}%)": gp_bulanan,
+            "Estimasi THP": thp,
+            "THP thd Gross Profit (%)": thp_thd_gp,
+        })
+    out = pd.DataFrame(rows)
+    return out[cols] if not out.empty else pd.DataFrame(columns=cols)
+
+
+def target_penjualan_luna(
+    df: pd.DataFrame,
+    target: float = 2_000_000_000,
+    tanggal_mulai=None,
+    durasi_bulan: int = 12,
+) -> dict:
+    """Indikator pencapaian target penjualan produk LUNA (nama barang
+    mengandung kata "LUNA") dalam jangka waktu tertentu (default: 12 bulan
+    mulai Agustus 2026). Tanggal acuan "hari berjalan" memakai tanggal
+    faktur TERAKHIR pada data (bukan tanggal hari ini), supaya persentase
+    tidak terlihat rendah cuma karena data belum diperbarui — konsisten
+    dengan prinsip yang sama dipakai di proyeksi lain pada dashboard ini."""
+    if tanggal_mulai is None:
+        tanggal_mulai = pd.Timestamp("2026-08-01")
+    else:
+        tanggal_mulai = pd.Timestamp(tanggal_mulai)
+    tanggal_selesai = tanggal_mulai + pd.DateOffset(months=durasi_bulan) - pd.Timedelta(days=1)
+    total_hari_program = (tanggal_selesai - tanggal_mulai).days + 1
+
+    df_periode = df[(df["TGL FAKTUR"] >= tanggal_mulai) & (df["TGL FAKTUR"] <= tanggal_selesai)]
+    df_luna = df_periode[df_periode["NAMA BARANG"].astype(str).str.upper().str.contains("LUNA", na=False)]
+    tercapai = df_luna["TOTAL HARGA"].sum()
+
+    tgl_acuan = df["TGL FAKTUR"].max()
+    if pd.isna(tgl_acuan) or tgl_acuan < tanggal_mulai:
+        hari_berjalan = 0
+    else:
+        tgl_efektif = min(tgl_acuan, tanggal_selesai)
+        hari_berjalan = (tgl_efektif - tanggal_mulai).days + 1
+    hari_berjalan = max(hari_berjalan, 0)
+
+    target_sampai_hari_ini = target * (hari_berjalan / total_hari_program) if total_hari_program else 0
+    pct_pencapaian = (tercapai / target_sampai_hari_ini * 100) if target_sampai_hari_ini else 0
+    pct_dari_target_penuh = (tercapai / target * 100) if target else 0
+    sisa_hari = max(total_hari_program - hari_berjalan, 0)
+
+    return dict(
+        tercapai=tercapai,
+        target=target,
+        target_sampai_hari_ini=target_sampai_hari_ini,
+        pct_pencapaian=pct_pencapaian,
+        pct_dari_target_penuh=pct_dari_target_penuh,
+        tanggal_mulai=tanggal_mulai,
+        tanggal_selesai=tanggal_selesai,
+        hari_berjalan=hari_berjalan,
+        total_hari_program=total_hari_program,
+        sisa_hari=sisa_hari,
+        tgl_acuan=tgl_acuan,
+        jumlah_transaksi=len(df_luna),
+    )
+
+
+# ---------------------------------------------------------------------------
 # Format angka gaya Indonesia
 # ---------------------------------------------------------------------------
 
