@@ -814,9 +814,8 @@ def render_aksesoris_tab():
     st.header("💸 Matrix Insentif Aksesoris")
     st.caption(
         "Berdasarkan referensi resmi terbaru: **Skema Tiering Sales Retail** (GP 30%, insentif "
-        "50% dari GP, Gaji Bulanan tetap, THP dihitung langsung per tier), **Store Manager & "
-        "Regional Manager** (GP 30%, 2% & 1% dari GP), dan **Matrix Insentif Per Item** (insentif "
-        "tetap per unit terjual berdasarkan rentang harga jual)."
+        "50% dari GP, Gaji Bulanan tetap, THP dihitung langsung per tier) dan **Matrix Insentif "
+        "Per Item** (insentif tetap per unit terjual berdasarkan rentang harga jual)."
     )
 
     st.subheader("📋 Skema Tiering Insentif — Sales Retail")
@@ -845,18 +844,6 @@ def render_aksesoris_tab():
     st.download_button(
         "⬇️ Unduh CSV — Skema Tiering Sales Retail", sr_tiering.to_csv(index=False).encode("utf-8-sig"),
         "skema_tiering_sales_retail.csv", "text/csv", key="ak_dl_tiering_sr",
-    )
-
-    st.subheader("📋 Matrix Insentif — Store Manager & Regional Manager")
-    mgr = la.matrix_insentif_manager()
-    tampil_mgr = mgr.copy()
-    for col in ["Omzet / Pekan", "Omzet / Bulan", "Estimasi GP (30%)", "Insentif / Pekan", "Insentif / Bulan"]:
-        tampil_mgr[col] = mgr[col].map(la.format_rupiah_id)
-    tampil_mgr["% Insentif dari GP"] = (mgr["% Insentif dari GP"] * 100).map(lambda x: la.format_percent_id(x, 0))
-    st.dataframe(tampil_mgr, use_container_width=True, height=420)
-    st.download_button(
-        "⬇️ Unduh CSV — Matrix Insentif Manager", mgr.to_csv(index=False).encode("utf-8-sig"),
-        "matrix_insentif_manager.csv", "text/csv", key="ak_dl_matrix_manager",
     )
 
     with st.expander("🎁 Matrix Insentif Per Item", expanded=False):

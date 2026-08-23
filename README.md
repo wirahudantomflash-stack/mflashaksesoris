@@ -232,16 +232,18 @@ ditranskrip dari `Aksesoris_Skema_Insentif_Tiering_Sales_Retail.xlsx`:
   di ujung bawah/atas sedikit di luar rentang itu — dashboard menandainya
   dengan status ✅/⬇️/⬆️ per baris, tanpa memaksakan kalibrasi ulang karena
   angkanya memang sudah baku dari skema resmi.
-- **Matrix Insentif — Store Manager & Regional Manager**
-  (`matrix_insentif_manager()`): 17 baris (Store Manager 8 tier Rp20jt–
-  Rp55jt/pekan @2% dari GP, Regional Manager 9 tier Rp60jt–Rp180jt/pekan
-  @1% dari GP) — sama seperti skema sebelumnya, ditranskrip ulang dari
-  sumber baru untuk konsistensi satu berkas data.
 - **Matrix Insentif Per Item** (tidak berubah dari sebelumnya): 6 tier
   berdasarkan rentang harga jual, GP 30% konsisten, insentif TETAP 50%
   dari GP di semua tingkat (Rp7.500/Rp15.000/Rp37.500/Rp75.000/
   Rp112.500/Rp150.000). Pengecualian produk **HYDROGEL** tetap berlaku:
   insentif TETAP Rp10.000/pcs berapa pun harga jualnya.
+
+> **Catatan**: bagian "Matrix Insentif — Store Manager & Regional Manager"
+> sudah **dihapus dari tampilan dashboard** atas permintaan. Fungsinya
+> (`matrix_insentif_manager()`, 17 baris: Store Manager 8 tier @2% dari
+> GP, Regional Manager 9 tier @1% dari GP) TIDAK dihapus dari
+> `logic_aksesoris.py` — tetap tersedia dan berfungsi kalau suatu saat
+> perlu dimunculkan lagi.
 
 > **Catatan penting soal berkas sumber**: 2 baris pada
 > `Aksesoris_Skema_Insentif_Tiering_Sales_Retail.xlsx` tampak salah ketik
