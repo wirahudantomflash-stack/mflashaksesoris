@@ -215,92 +215,51 @@ masing-masing** (bukan di sidebar), supaya filter tidak tertukar.
   Bundling Aksesoris NexLink & LUNA dari Surat Edaran SE/001/IN-MF/IV/2026)
   supaya rekomendasinya konkret, bukan generik.
 
-## Matrix Insentif & Kalkulator THP Sales Retail
+## Matrix Insentif Aksesoris (v3 — Skema Tiering)
 
-Dipindahkan dari simulasi generik ke **transkrip matrix insentif resmi
-perusahaan** (2 lembar referensi):
+Diperbarui dari matrix pekanan lama ke **skema tiering resmi terbaru**,
+ditranskrip dari `Aksesoris_Skema_Insentif_Tiering_Sales_Retail.xlsx`:
 
-- **Matrix Insentif Pekanan — Retail (Ideal) v2**: 29 baris (Sales Retail 11
-  tier, Store Manager 9 tier, Regional Manager 9 tier), masing-masing dari
-  Omzet/Pekan → **Omzet/Bulan** (×4 minggu, bukan 4,33 — persis matrix
-  resmi) → Estimasi GP (asumsi **30%**) → Insentif/Pekan (Sales Retail 5%
-  dari GP, Store Manager 2%, Regional Manager 1%) → **Insentif/Bulan**
-  (×4 minggu). Ditanam persis di `logic_aksesoris.py`
-  (`matrix_insentif_pekanan()`), sudah diverifikasi cocok 100% dengan
-  angka pada gambar referensi untuk seluruh 29 baris, termasuk kolom
-  Omzet/Bulan dan Insentif/Bulan.
-- **Matrix Insentif Per Item** (v3): 6 tier berdasarkan rentang
-  harga jual (Rp50rb–100rb, >100rb–250rb, >250rb–500rb, >500rb–750rb,
-  >750rb–1jt, >1jt), asumsi Gross Profit **30% konsisten** dari harga acuan
-  di semua tingkat, insentif TETAP per unit terjual = **50% dari GP**
-  secara konsisten (Rp7.500/Rp15.000/Rp37.500/Rp75.000/Rp112.500/
-  Rp150.000). Ditanam di `matrix_insentif_per_item()`.
-  - **Pengecualian — produk HYDROGEL**: insentif TETAP
-    **Rp10.000/pcs** (`INSENTIF_HYDROGEL_PER_PCS`), berapa pun harga
-    jualnya — tidak mengikuti tingkat harga pada matrix di atas. Diaktifkan
-    lewat opsi terpisah "Sertakan Insentif Hydrogel" di kalkulator (tidak
-    otomatis, karena kalkulator tidak membaca nama produk dari data
-    penjualan asli — estimasi jumlah hydrogel terjual/hari diisi manual).
-- **Kalkulator THP Sales Retail**: Total THP = **Gaji Pokok** + **Insentif
-  %GP Bulanan** (langsung dari kolom "Insentif / Bulan" RESMI pada matrix
-  pekanan — bukan lagi estimasi Insentif/Pekan × minggu/bulan yang bisa
-  menyimpang dari referensi) + opsional **Insentif Per Item Bulanan**
-  (estimasi jumlah item terjual/hari per tingkat harga × Insentif/Item ×
-  hari kerja/bulan — otomatis menyesuaikan jumlah kolom input kalau jumlah
-  tier matrix per-item berubah, tidak di-*hardcode* ke 4 atau 6) + opsional
-  **Insentif Hydrogel Bulanan** (estimasi jumlah hydrogel terjual/hari ×
-  Rp10.000 × hari kerja/bulan — komponen terpisah dari Insentif Per Item
-  karena hydrogel dikecualikan dari aturan tingkat harga umum).
-  - Fungsi `saran_gaji_pokok()` memberi **titik awal** Gaji Pokok supaya
-    tier **Minimum** pas mencapai THP Minimum (default Rp 5jt) — bukan
-    jawaban final, karena tier **Maksimum** belum tentu otomatis pas di
-    THP Maksimum (default Rp 8jt): itu tergantung seberapa besar asumsi
-    volume item terjual yang diinput.
-  - Kolom **"Status Target"** (✅ dalam target / ⬇️ di bawah / ⬆️ di atas)
-    ditampilkan per tier, supaya jelas terlihat kalau kalibrasi Gaji Pokok
-    atau asumsi item/hari masih perlu disesuaikan.
-  - **Konteks bisnis yang perlu diketahui**: kalau target Store Manager
-    Rp 60 juta/bulan omzet AKSESORIS dibagi rata ke 4 Sales Retail per
-    toko, rata-rata kontribusi tiap Sales Retail adalah Rp 15 juta/bulan =
-    **Rp 3,75 juta/pekan** — ini di BAWAH tier Minimum pada matrix Sales
-    Retail (Rp 5 juta/pekan). Kemungkinan basis "Omzet Individu" pada
-    matrix pekanan dimaksudkan untuk omzet keseluruhan (bukan aksesoris
-    saja); kalau memang murni dari aksesoris, target per-Sales-Retail
-    belum menyentuh tier insentif terendah sekalipun pada matrix ini.
-    **Lihat bagian "🎯 Target Individual Sales Retail — Aksesoris" di bawah**
-    untuk skema target & insentif yang dirancang khusus per individu pada
-    skala Rp 3,75jt/pekan ini.
-  - **Diuji dengan matrix per-item v2** (insentif jauh lebih besar dari v1):
-    asumsi 1 item/hari di ke-6 tingkat harga saja sudah menghasilkan
-    **Rp 13.780.000/bulan** dari insentif per item — jauh melampaui target
-    Rp 8jt bahkan dengan Gaji Pokok Rp 0 (`saran_gaji_pokok()` otomatis
-    berhenti di 0, tidak negatif). Ini bukan bug — dashboard dengan sengaja
-    TIDAK memaksakan asumsi 1 item/hari di semua tingkat harga sebagai
-    default yang "benar", karena kenyataannya jarang toko aksesoris laku
-    1 unit/hari di tingkat harga >Rp1 juta. Turunkan asumsi item/hari di
-    tingkat harga tinggi supaya Total THP mendekati rentang target.
+- **Skema Tiering Insentif — Sales Retail** (`matrix_tiering_sales_retail()`):
+  10 tier Omzet/Pekan Rp750rb–Rp7,5jt, GP 30%, insentif **50% dari GP**
+  (beda dari skema lama yang 5%), **Gaji Bulanan TETAP
+  Rp4.000.000** (`GAJI_BULANAN_SALES_RETAIL`), **THP dihitung langsung per
+  tier** = Gaji Bulanan + Insentif/Bulan — bukan lagi kalkulator kalibrasi
+  manual seperti skema lama, karena skema baru ini sudah membakukan Gaji
+  Bulanan & THP-nya sendiri di sumbernya. Sudah diverifikasi cocok 100%
+  dengan seluruh 10 baris pada berkas sumber. Dari 10 tier, **6 tier sudah
+  otomatis pas dalam target Rp5–8jt** (tier Rp2,25jt–Rp6jt/pekan); 4 tier
+  di ujung bawah/atas sedikit di luar rentang itu — dashboard menandainya
+  dengan status ✅/⬇️/⬆️ per baris, tanpa memaksakan kalibrasi ulang karena
+  angkanya memang sudah baku dari skema resmi.
+- **Matrix Insentif — Store Manager & Regional Manager**
+  (`matrix_insentif_manager()`): 17 baris (Store Manager 8 tier Rp20jt–
+  Rp55jt/pekan @2% dari GP, Regional Manager 9 tier Rp60jt–Rp180jt/pekan
+  @1% dari GP) — sama seperti skema sebelumnya, ditranskrip ulang dari
+  sumber baru untuk konsistensi satu berkas data.
+- **Matrix Insentif Per Item** (tidak berubah dari sebelumnya): 6 tier
+  berdasarkan rentang harga jual, GP 30% konsisten, insentif TETAP 50%
+  dari GP di semua tingkat (Rp7.500/Rp15.000/Rp37.500/Rp75.000/
+  Rp112.500/Rp150.000). Pengecualian produk **HYDROGEL** tetap berlaku:
+  insentif TETAP Rp10.000/pcs berapa pun harga jualnya.
 
-## Target Individual Sales Retail — Aksesoris
+> **Catatan penting soal berkas sumber**: 2 baris pada
+> `Aksesoris_Skema_Insentif_Tiering_Sales_Retail.xlsx` tampak salah ketik
+> dan SENGAJA DIKELUARKAN dari transkripsi —
+> baris "Store Manager" Rp15jt/pekan yang memakai insentif 50% (pola Sales
+> Retail, bukan pola Store Manager 2%), dan baris "Regional Manager"
+> Rp60jt/pekan yang memakai insentif 2% (pola Store Manager, bukan pola
+> Regional Manager 1%). Kalau kedua baris itu ternyata disengaja, beri
+> tahu untuk dikoreksi.
 
-Skema terpisah dari matrix pekanan umum, khusus untuk situasi target
-omzet aksesoris Store Manager (mis. Rp 60jt/bulan) yang dibagi ke beberapa
-Sales Retail per toko (mis. 4 orang):
-
-- Fungsi `target_individual_sales_retail()` di `logic_aksesoris.py`
-  menghitung Target Omzet/Bulan, Estimasi GP, Insentif/Pekan, dan
-  Insentif/Bulan **per individu** — memakai persentase yang sama dengan
-  matrix pekanan resmi (default GP 30%, insentif Sales Retail 5% dari GP,
-  4 minggu/bulan), tapi target omzet per orang **tidak harus rata**.
-- Di dashboard: tabel **isian** (`st.data_editor`) — nama & target Rp/pekan
-  tiap orang bisa diedit langsung, baris bisa ditambah/dihapus (jumlah
-  Sales Retail per toko tidak dikunci ke 4).
-- Default terisi otomatis dari pembagian rata **Target Omzet Aksesoris
-  Toko/Bulan ÷ Jumlah Sales Retail ÷ Jumlah Minggu/Bulan** (default
-  Rp 60jt ÷ 4 orang ÷ 4 minggu = Rp 3,75jt/pekan per orang, sudah
-  diverifikasi total kembali tepat Rp 60jt/bulan).
-- Kartu metrik menampilkan **Selisih dari Target Toko** — kalau Anda ubah
-  target salah satu orang secara manual, langsung kelihatan apakah total
-  gabungan masih pas dengan target toko atau sudah melenceng.
+> **Catatan migrasi**: skema lama (`matrix_insentif_pekanan()`,
+> `kalkulator_thp_sales_retail()`, `saran_gaji_pokok()`,
+> `target_individual_sales_retail()`) TIDAK dihapus dari
+> `logic_aksesoris.py` — fungsinya tetap ada dan berfungsi, hanya sudah
+> tidak dipanggil dari `app.py` lagi (bagian "Kalkulator THP Sales Retail"
+> dan "Target Individual Sales Retail — Aksesoris" sudah dihapus dari
+> tampilan dashboard sesuai permintaan). Boleh dihapus dari berkas kalau
+> memang sudah tidak dibutuhkan sama sekali.
 
 ## Target Pencapaian Penjualan LUNA
 

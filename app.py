@@ -809,30 +809,55 @@ def render_aksesoris_tab():
     st.divider()
 
     # -----------------------------------------------------------------
-    # 3b. Matrix Insentif Resmi & Kalkulator THP Sales Retail
+    # 3b. Matrix Insentif Resmi (Skema v3 — Tiering Sales Retail + Manager)
     # -----------------------------------------------------------------
-    st.header("💸 Matrix Insentif & Simulasi THP Sales Retail")
+    st.header("💸 Matrix Insentif Aksesoris")
     st.caption(
-        "Berdasarkan referensi resmi: **Matrix Insentif Pekanan** (Sales Retail 5%, "
-        "Store Manager 2%, Regional Manager 1% dari Gross Profit, asumsi GP 40%) dan "
-        "**Matrix Insentif Per Item** (insentif tetap per unit terjual, berdasarkan "
-        "rentang harga jual)."
+        "Berdasarkan referensi resmi terbaru: **Skema Tiering Sales Retail** (GP 30%, insentif "
+        "50% dari GP, Gaji Bulanan tetap, THP dihitung langsung per tier), **Store Manager & "
+        "Regional Manager** (GP 30%, 2% & 1% dari GP), dan **Matrix Insentif Per Item** (insentif "
+        "tetap per unit terjual berdasarkan rentang harga jual)."
     )
 
-    with st.expander("📋 Matrix Insentif Pekanan — Retail (Ideal)", expanded=False):
-        mp = la.matrix_insentif_pekanan()
-        tampil_mp = mp.copy()
-        tampil_mp["Omzet / Pekan"] = mp["Omzet / Pekan"].map(la.format_rupiah_id)
-        tampil_mp["Omzet / Bulan"] = mp["Omzet / Bulan"].map(la.format_rupiah_id)
-        tampil_mp["Estimasi GP (30%)"] = mp["Estimasi GP (30%)"].map(la.format_rupiah_id)
-        tampil_mp["% Insentif dari GP"] = (mp["% Insentif dari GP"] * 100).map(lambda x: la.format_percent_id(x, 0))
-        tampil_mp["Insentif / Pekan"] = mp["Insentif / Pekan"].map(la.format_rupiah_id)
-        tampil_mp["Insentif / Bulan"] = mp["Insentif / Bulan"].map(la.format_rupiah_id)
-        st.dataframe(tampil_mp, use_container_width=True, height=420)
-        st.download_button(
-            "⬇️ Unduh CSV — Matrix Insentif Pekanan", mp.to_csv(index=False).encode("utf-8-sig"),
-            "matrix_insentif_pekanan.csv", "text/csv", key="ak_dl_matrix_pekanan",
+    st.subheader("📋 Skema Tiering Insentif — Sales Retail")
+    st.caption(
+        f"10 tier Omzet/Pekan Rp750rb–Rp7,5jt. **Gaji Bulanan tetap "
+        f"{la.format_rupiah_id(la.GAJI_BULANAN_SALES_RETAIL)}**, THP = Gaji Bulanan + Insentif/Bulan "
+        "— dihitung langsung dari skema resmi, bukan hasil kalibrasi manual."
+    )
+    sr_tiering = la.matrix_tiering_sales_retail()
+    sr_tiering["Status Target (Rp5–8jt)"] = sr_tiering["THP"].apply(
+        lambda x: "✅ Dalam target" if 5_000_000 <= x <= 8_000_000 else ("⬇️ Di bawah target" if x < 5_000_000 else "⬆️ Di atas target")
+    )
+    tampil_sr = sr_tiering.copy()
+    for col in ["Tiering Omzet / Pekan", "Omzet / Bulan", "Estimasi GP (30%)", "Insentif / Pekan", "Insentif / Bulan", "Gaji Bulanan", "THP"]:
+        tampil_sr[col] = sr_tiering[col].map(la.format_rupiah_id)
+    tampil_sr["% Insentif dari GP"] = (sr_tiering["% Insentif dari GP"] * 100).map(lambda x: la.format_percent_id(x, 0))
+    st.dataframe(tampil_sr, use_container_width=True, height=420)
+
+    n_luar_target = (~sr_tiering["Status Target (Rp5–8jt)"].str.startswith("✅")).sum()
+    if n_luar_target > 0:
+        st.caption(
+            f"ℹ️ {n_luar_target} dari {len(sr_tiering)} tier berada di luar rentang target Rp5–8jt "
+            "(tier terendah & tertinggi sedikit melenceng dari target — bagian dari skema resmi ini, "
+            "bukan sesuatu yang dikalibrasi ulang oleh dashboard)."
         )
+    st.download_button(
+        "⬇️ Unduh CSV — Skema Tiering Sales Retail", sr_tiering.to_csv(index=False).encode("utf-8-sig"),
+        "skema_tiering_sales_retail.csv", "text/csv", key="ak_dl_tiering_sr",
+    )
+
+    st.subheader("📋 Matrix Insentif — Store Manager & Regional Manager")
+    mgr = la.matrix_insentif_manager()
+    tampil_mgr = mgr.copy()
+    for col in ["Omzet / Pekan", "Omzet / Bulan", "Estimasi GP (30%)", "Insentif / Pekan", "Insentif / Bulan"]:
+        tampil_mgr[col] = mgr[col].map(la.format_rupiah_id)
+    tampil_mgr["% Insentif dari GP"] = (mgr["% Insentif dari GP"] * 100).map(lambda x: la.format_percent_id(x, 0))
+    st.dataframe(tampil_mgr, use_container_width=True, height=420)
+    st.download_button(
+        "⬇️ Unduh CSV — Matrix Insentif Manager", mgr.to_csv(index=False).encode("utf-8-sig"),
+        "matrix_insentif_manager.csv", "text/csv", key="ak_dl_matrix_manager",
+    )
 
     with st.expander("🎁 Matrix Insentif Per Item", expanded=False):
         mi = la.matrix_insentif_per_item()
@@ -851,177 +876,6 @@ def render_aksesoris_tab():
         st.download_button(
             "⬇️ Unduh CSV — Matrix Insentif Per Item", mi.to_csv(index=False).encode("utf-8-sig"),
             "matrix_insentif_per_item.csv", "text/csv", key="ak_dl_matrix_item",
-        )
-
-    st.subheader("🧮 Kalkulator THP Sales Retail — Target Rp 5jt s.d. Rp 8jt/bulan")
-    st.caption(
-        "Total THP = **Gaji Pokok** + **Insentif %GP Bulanan** (kolom \"Insentif / Bulan\" RESMI "
-        "dari matrix pekanan — sudah dihitung 4 minggu/bulan, bukan estimasi) + opsional "
-        "**Insentif Per Item** (dari matrix per-item, dikali estimasi jumlah item terjual/hari) + "
-        "opsional **Insentif Hydrogel** (tetap Rp10.000/pcs, terpisah dari matrix tingkat harga). "
-        "Kalibrasi Gaji Pokok & asumsi item di bawah supaya seluruh tier omzet (Minimum s.d. "
-        "Maksimum) berstatus ✅ dalam rentang target."
-    )
-
-    q1, q2 = st.columns(2)
-    with q1:
-        thp_min_target = st.number_input("Target THP Minimum (Rp)", min_value=0, value=5_000_000, step=500_000, format="%d", key="thp_target_min")
-        thp_max_target = st.number_input("Target THP Maksimum (Rp)", min_value=0, value=8_000_000, step=500_000, format="%d", key="thp_target_max")
-    with q2:
-        sertakan_item = st.checkbox("Sertakan Insentif Per Item", value=True, key="thp_sertakan_item")
-        hari_kerja_thp = st.number_input("Hari kerja per bulan (untuk insentif per item)", min_value=1, max_value=31, value=26, step=1, key="thp_hari_kerja")
-
-    item_per_hari_per_tier = None
-    if sertakan_item:
-        st.caption("Estimasi jumlah item aksesoris terjual per HARI, untuk tiap tingkat harga jual (boleh angka desimal, mis. 0,5 = rata-rata 1 item per 2 hari):")
-        mi_ref = la.matrix_insentif_per_item()
-        item_cols = st.columns(len(mi_ref))
-        item_per_hari_per_tier = []
-        for col, (_, row) in zip(item_cols, mi_ref.iterrows()):
-            with col:
-                v = st.number_input(
-                    row["Range Harga Jual"], min_value=0.0, value=1.0, step=0.5,
-                    key=f"thp_item_{row['Range Harga Jual']}",
-                )
-                item_per_hari_per_tier.append(v)
-
-    c_hydro1, c_hydro2 = st.columns([1, 2])
-    with c_hydro1:
-        sertakan_hydrogel = st.checkbox("Sertakan Insentif Hydrogel", value=False, key="thp_sertakan_hydrogel")
-    with c_hydro2:
-        hydrogel_per_hari = 0.0
-        if sertakan_hydrogel:
-            hydrogel_per_hari = st.number_input(
-                f"Estimasi Hydrogel terjual/hari (Rp{la.format_int_id(la.INSENTIF_HYDROGEL_PER_PCS)}/pcs)",
-                min_value=0.0, value=1.0, step=0.5, key="thp_hydrogel_per_hari",
-            )
-
-    saran = la.saran_gaji_pokok(
-        sertakan_insentif_item=sertakan_item,
-        item_per_hari_per_tier=item_per_hari_per_tier,
-        sertakan_insentif_hydrogel=sertakan_hydrogel, hydrogel_per_hari=hydrogel_per_hari,
-        hari_kerja=int(hari_kerja_thp), thp_min=thp_min_target,
-    )
-    gaji_pokok = st.number_input(
-        "Gaji Pokok (Rp) — mulai dari saran otomatis, sesuaikan sendiri kalau perlu",
-        min_value=0, value=int(round(saran, -3)), step=100_000, format="%d", key="thp_gaji_pokok",
-    )
-    st.caption(
-        f"💡 Saran awal: **{la.format_rupiah_id(saran)}** — dihitung supaya tier **Minimum** pas "
-        f"mencapai target THP Minimum ({la.format_rupiah_id(thp_min_target)}). Tier **Maksimum** "
-        "belum tentu otomatis pas di target THP Maksimum — cek tabel di bawah, naikkan estimasi "
-        "item/hari atau Gaji Pokok kalau tier atas belum ✅."
-    )
-
-    hasil_thp = la.kalkulator_thp_sales_retail(
-        gaji_pokok=gaji_pokok,
-        sertakan_insentif_item=sertakan_item, item_per_hari_per_tier=item_per_hari_per_tier,
-        sertakan_insentif_hydrogel=sertakan_hydrogel, hydrogel_per_hari=hydrogel_per_hari,
-        hari_kerja=int(hari_kerja_thp), thp_min=thp_min_target, thp_max=thp_max_target,
-    )
-
-    tampil_thp = hasil_thp.copy()
-    for col in ["Omzet / Pekan", "Omzet / Bulan", "Insentif / Pekan", "Insentif %GP Bulanan", "Insentif Per Item Bulanan", "Insentif Hydrogel Bulanan", "Gaji Pokok", "Total THP"]:
-        tampil_thp[col] = hasil_thp[col].map(la.format_rupiah_id)
-    st.dataframe(tampil_thp, use_container_width=True, height=420)
-
-    n_diluar_target = (~hasil_thp["Status Target"].str.startswith("✅")).sum()
-    if n_diluar_target > 0:
-        di_bawah = (hasil_thp["Status Target"].str.startswith("⬇️")).sum()
-        di_atas = (hasil_thp["Status Target"].str.startswith("⬆️")).sum()
-        pesan = []
-        if di_bawah:
-            pesan.append(f"{di_bawah} tier di bawah target (naikkan Gaji Pokok atau estimasi item/hari)")
-        if di_atas:
-            pesan.append(f"{di_atas} tier di atas target (turunkan Gaji Pokok atau estimasi item/hari)")
-        st.warning("⚠️ " + " · ".join(pesan) + ".")
-    else:
-        st.success("✅ Semua tier Sales Retail (Minimum s.d. Maksimum) berada dalam rentang target THP.")
-
-    st.download_button(
-        "⬇️ Unduh CSV — Kalkulator THP Sales Retail", hasil_thp.to_csv(index=False).encode("utf-8-sig"),
-        "kalkulator_thp_sales_retail.csv", "text/csv", key="ak_dl_thp",
-    )
-
-    st.divider()
-
-    # -----------------------------------------------------------------
-    # 3b2. Target Individual Sales Retail — Aksesoris
-    # -----------------------------------------------------------------
-    st.subheader("🎯 Target Individual Sales Retail — Aksesoris")
-    st.caption(
-        "Ketika target omzet aksesoris Store Manager dibagi ke beberapa Sales Retail per toko, "
-        "targetnya bisa BEDA-BEDA per orang (tidak harus rata) — tabel di bawah bisa diedit langsung "
-        "per baris. Perhitungan GP & insentif memakai persentase yang sama dengan matrix pekanan resmi."
-    )
-
-    r1, r2, r3 = st.columns(3)
-    with r1:
-        target_toko_bulanan = st.number_input(
-            "Target Omzet Aksesoris Toko (Rp/bulan)", min_value=0, value=60_000_000, step=1_000_000,
-            format="%d", key="tis_target_toko",
-        )
-    with r2:
-        jumlah_sales_toko = st.number_input(
-            "Jumlah Sales Retail per Toko", min_value=1, max_value=20, value=4, step=1, key="tis_jumlah_sales",
-        )
-    with r3:
-        minggu_per_bulan_tis = st.number_input(
-            "Jumlah minggu per bulan", min_value=1, max_value=6, value=4, step=1, key="tis_minggu",
-        )
-
-    target_rata_pekan = target_toko_bulanan / jumlah_sales_toko / minggu_per_bulan_tis if jumlah_sales_toko and minggu_per_bulan_tis else 0
-    st.caption(
-        f"Kalau dibagi rata: {la.format_rupiah_id(target_toko_bulanan)} ÷ {int(jumlah_sales_toko)} orang ÷ "
-        f"{int(minggu_per_bulan_tis)} minggu = **{la.format_rupiah_id(target_rata_pekan)}/pekan per orang** "
-        "(baris di tabel bawah sudah terisi otomatis dengan angka ini, tapi bisa Anda ubah satu per satu)."
-    )
-
-    seed_sales = pd.DataFrame({
-        "Sales Retail": [f"Sales Retail {i+1}" for i in range(int(jumlah_sales_toko))],
-        "Target Omzet Aksesoris / Pekan": [target_rata_pekan] * int(jumlah_sales_toko),
-    })
-
-    edited_sales = st.data_editor(
-        seed_sales, num_rows="dynamic", use_container_width=True, key="tis_editor",
-        column_config={
-            "Sales Retail": st.column_config.TextColumn("Sales Retail"),
-            "Target Omzet Aksesoris / Pekan": st.column_config.NumberColumn(
-                "Target Omzet Aksesoris / Pekan (Rp)", min_value=0, step=50_000, format="%d",
-            ),
-        },
-    )
-
-    edited_sales = edited_sales.dropna(subset=["Sales Retail", "Target Omzet Aksesoris / Pekan"])
-    edited_sales = edited_sales[edited_sales["Sales Retail"].astype(str).str.strip() != ""]
-
-    if edited_sales.empty:
-        st.info("Isi minimal satu baris \"Sales Retail\" di tabel atas untuk melihat hasil perhitungan.")
-    else:
-        hasil_individual = la.target_individual_sales_retail(
-            edited_sales["Sales Retail"].tolist(),
-            edited_sales["Target Omzet Aksesoris / Pekan"].tolist(),
-            gp_persen=0.30, insentif_persen=0.05, minggu_per_bulan=int(minggu_per_bulan_tis),
-        )
-        tampil_individual = hasil_individual.copy()
-        for col in ["Target Omzet Aksesoris / Pekan", "Target Omzet Aksesoris / Bulan", "Estimasi GP", "Insentif / Pekan", "Insentif / Bulan"]:
-            tampil_individual[col] = hasil_individual[col].map(la.format_rupiah_id)
-        st.dataframe(tampil_individual, use_container_width=True, height=min(80 + 38 * len(hasil_individual), 380))
-
-        total_omzet_bulan = hasil_individual["Target Omzet Aksesoris / Bulan"].sum()
-        total_insentif_bulan = hasil_individual["Insentif / Bulan"].sum()
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Total Target Omzet Toko/Bulan", la.format_rupiah_id(total_omzet_bulan))
-        c2.metric("Total Insentif Toko/Bulan", la.format_rupiah_id(total_insentif_bulan))
-        selisih_target = total_omzet_bulan - target_toko_bulanan
-        c3.metric(
-            "Selisih dari Target Toko", la.format_rupiah_id(selisih_target),
-            delta=f"{'+' if selisih_target >= 0 else ''}{la.format_percent_id(selisih_target/target_toko_bulanan*100 if target_toko_bulanan else 0)}",
-        )
-
-        st.download_button(
-            "⬇️ Unduh CSV — Target Individual Sales Retail", hasil_individual.to_csv(index=False).encode("utf-8-sig"),
-            "target_individual_sales_retail.csv", "text/csv", key="ak_dl_target_individual",
         )
 
     st.divider()

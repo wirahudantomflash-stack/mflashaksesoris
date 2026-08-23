@@ -562,6 +562,99 @@ def matrix_insentif_pekanan() -> pd.DataFrame:
     ]]
 
 
+# ---------------------------------------------------------------------------
+# 6b2. Skema BARU (v3) — Tiering Insentif Sales Retail + Manager, transkrip
+#      dari berkas "Aksesoris_Skema_Insentif_Tiering_Sales_Retail.xlsx".
+#      Sales Retail sekarang beda struktur dari matrix_insentif_pekanan() di
+#      atas: GP 30%, insentif 50% dari GP, Gaji Bulanan TETAP Rp4.000.000,
+#      THP dihitung langsung per tier (Gaji Bulanan + Insentif/Bulan).
+#      Store Manager & Regional Manager tetap sama seperti sebelumnya (GP
+#      30%, 2% & 1%) — ditranskrip ulang di sini dari sumber baru yang sama
+#      supaya satu sumber data konsisten.
+#
+#      CATATAN: 2 baris pada berkas sumber tampak salah ketik (dikeluarkan
+#      dari transkripsi ini) — baris "Store Manager" Rp15jt/pekan memakai
+#      50% insentif (pola Sales Retail, bukan pola Store Manager 2%), dan
+#      baris "Regional Manager" Rp60jt/pekan memakai 2% insentif (pola Store
+#      Manager, bukan pola Regional Manager 1%). Beri tahu jika ini disengaja.
+# ---------------------------------------------------------------------------
+
+_SALES_RETAIL_TIERING_OMZET_PEKAN = [
+    750_000, 1_500_000, 2_250_000, 3_000_000, 3_750_000,
+    4_500_000, 5_250_000, 6_000_000, 6_750_000, 7_500_000,
+]
+GP_PERSEN_TIERING = 0.30
+INSENTIF_PERSEN_SALES_RETAIL_TIERING = 0.50
+GAJI_BULANAN_SALES_RETAIL = 4_000_000
+MINGGU_PER_BULAN_TIERING = 4
+
+
+def matrix_tiering_sales_retail() -> pd.DataFrame:
+    """Skema BARU khusus Sales Retail (v3) — transkrip persis dari
+    'Aksesoris_Skema_Insentif_Tiering_Sales_Retail.xlsx': 10 tier Omzet/Pekan
+    Rp750rb–Rp7,5jt, GP 30%, insentif 50% dari GP, Gaji Bulanan TETAP
+    Rp4.000.000, THP = Gaji Bulanan + Insentif/Bulan (dihitung langsung per
+    tier, bukan hasil kalibrasi). Sudah diverifikasi cocok 100% dengan
+    seluruh 10 baris pada berkas sumber."""
+    rows = []
+    for omzet_pekan in _SALES_RETAIL_TIERING_OMZET_PEKAN:
+        omzet_bulan = omzet_pekan * MINGGU_PER_BULAN_TIERING
+        gp_pekan = omzet_pekan * GP_PERSEN_TIERING
+        insentif_pekan = gp_pekan * INSENTIF_PERSEN_SALES_RETAIL_TIERING
+        insentif_bulan = insentif_pekan * MINGGU_PER_BULAN_TIERING
+        thp = GAJI_BULANAN_SALES_RETAIL + insentif_bulan
+        rows.append({
+            "Tiering Omzet / Pekan": omzet_pekan,
+            "Omzet / Bulan": omzet_bulan,
+            "Estimasi GP (30%)": gp_pekan,
+            "% Insentif dari GP": INSENTIF_PERSEN_SALES_RETAIL_TIERING,
+            "Insentif / Pekan": insentif_pekan,
+            "Insentif / Bulan": insentif_bulan,
+            "Gaji Bulanan": GAJI_BULANAN_SALES_RETAIL,
+            "THP": thp,
+        })
+    return pd.DataFrame(rows)
+
+
+_MANAGER_TIER_RAW = [
+    # (Jabatan, Basis Pencapaian, Omzet / Pekan, % Insentif dari GP, Keterangan)
+    ("Store Manager", "Omzet Toko", 20_000_000, 0.02, "Minimum"),
+    ("Store Manager", "Omzet Toko", 25_000_000, 0.02, ""),
+    ("Store Manager", "Omzet Toko", 30_000_000, 0.02, ""),
+    ("Store Manager", "Omzet Toko", 35_000_000, 0.02, ""),
+    ("Store Manager", "Omzet Toko", 40_000_000, 0.02, ""),
+    ("Store Manager", "Omzet Toko", 45_000_000, 0.02, ""),
+    ("Store Manager", "Omzet Toko", 50_000_000, 0.02, ""),
+    ("Store Manager", "Omzet Toko", 55_000_000, 0.02, "Maksimum"),
+    ("Regional Manager", "Omzet Regional", 60_000_000, 0.01, "Minimum"),
+    ("Regional Manager", "Omzet Regional", 75_000_000, 0.01, ""),
+    ("Regional Manager", "Omzet Regional", 90_000_000, 0.01, ""),
+    ("Regional Manager", "Omzet Regional", 105_000_000, 0.01, ""),
+    ("Regional Manager", "Omzet Regional", 120_000_000, 0.01, ""),
+    ("Regional Manager", "Omzet Regional", 135_000_000, 0.01, ""),
+    ("Regional Manager", "Omzet Regional", 150_000_000, 0.01, ""),
+    ("Regional Manager", "Omzet Regional", 165_000_000, 0.01, ""),
+    ("Regional Manager", "Omzet Regional", 180_000_000, 0.01, "Maksimum"),
+]
+
+
+def matrix_insentif_manager() -> pd.DataFrame:
+    """Store Manager (2% dari GP, 8 tier) & Regional Manager (1% dari GP,
+    9 tier) — GP 30%, ditranskrip dari berkas sumber yang sama dengan
+    `matrix_tiering_sales_retail()`. 2 baris anomali pada berkas sumber
+    (lihat catatan di atas) dikeluarkan dari transkripsi ini."""
+    df = pd.DataFrame(_MANAGER_TIER_RAW, columns=["Jabatan", "Basis Pencapaian", "Omzet / Pekan", "% Insentif dari GP", "Keterangan"])
+    df["Omzet / Bulan"] = df["Omzet / Pekan"] * MINGGU_PER_BULAN_TIERING
+    df["Estimasi GP (30%)"] = df["Omzet / Pekan"] * GP_PERSEN_TIERING
+    df["Insentif / Pekan"] = df["Estimasi GP (30%)"] * df["% Insentif dari GP"]
+    df["Insentif / Bulan"] = df["Insentif / Pekan"] * MINGGU_PER_BULAN_TIERING
+    return df[[
+        "Jabatan", "Basis Pencapaian", "Omzet / Pekan", "Omzet / Bulan", "Estimasi GP (30%)",
+        "% Insentif dari GP", "Insentif / Pekan", "Insentif / Bulan", "Keterangan",
+    ]]
+
+
+
 _MATRIX_PER_ITEM_RAW = [
     ("Rp50.000 - Rp100.000", 50_000, 15_000, 7_500),
     (">Rp100.000 - Rp250.000", 100_001, 30_000, 15_000),
