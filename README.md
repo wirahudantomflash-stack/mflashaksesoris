@@ -220,24 +220,28 @@ masing-masing** (bukan di sidebar), supaya filter tidak tertukar.
 Dipindahkan dari simulasi generik ke **transkrip matrix insentif resmi
 perusahaan** (2 lembar referensi):
 
-- **Matrix Insentif Pekanan — Retail (Ideal)**: 29 baris (Sales Retail 11
+- **Matrix Insentif Pekanan — Retail (Ideal) v2**: 29 baris (Sales Retail 11
   tier, Store Manager 9 tier, Regional Manager 9 tier), masing-masing dari
-  Omzet/Pekan → Estimasi GP (asumsi 40%) → Insentif/Pekan (Sales Retail 5%
-  dari GP, Store Manager 2%, Regional Manager 1%). Ditanam persis di
-  `logic_aksesoris.py` (`matrix_insentif_pekanan()`), sudah diverifikasi
-  cocok 100% dengan angka pada gambar referensi.
-- **Matrix Insentif Per Item** (v3, diperbarui): 6 tier berdasarkan rentang
+  Omzet/Pekan → **Omzet/Bulan** (×4 minggu, bukan 4,33 — persis matrix
+  resmi) → Estimasi GP (asumsi **30%**) → Insentif/Pekan (Sales Retail 5%
+  dari GP, Store Manager 2%, Regional Manager 1%) → **Insentif/Bulan**
+  (×4 minggu). Ditanam persis di `logic_aksesoris.py`
+  (`matrix_insentif_pekanan()`), sudah diverifikasi cocok 100% dengan
+  angka pada gambar referensi untuk seluruh 29 baris, termasuk kolom
+  Omzet/Bulan dan Insentif/Bulan.
+- **Matrix Insentif Per Item** (v3): 6 tier berdasarkan rentang
   harga jual (Rp50rb–100rb, >100rb–250rb, >250rb–500rb, >500rb–750rb,
   >750rb–1jt, >1jt), asumsi Gross Profit **30% konsisten** dari harga acuan
   di semua tingkat, insentif TETAP per unit terjual = **50% dari GP**
   secara konsisten (Rp7.500/Rp15.000/Rp37.500/Rp75.000/Rp112.500/
   Rp150.000). Ditanam di `matrix_insentif_per_item()`.
 - **Kalkulator THP Sales Retail**: Total THP = **Gaji Pokok** + **Insentif
-  %GP Bulanan** (Insentif/Pekan × jumlah minggu/bulan, default 4,33) +
-  opsional **Insentif Per Item Bulanan** (estimasi jumlah item terjual/hari
-  per tingkat harga × Insentif/Item × hari kerja/bulan — otomatis
-  menyesuaikan jumlah kolom input kalau jumlah tier matrix per-item berubah,
-  tidak di-*hardcode* ke 4 atau 6).
+  %GP Bulanan** (langsung dari kolom "Insentif / Bulan" RESMI pada matrix
+  pekanan — bukan lagi estimasi Insentif/Pekan × minggu/bulan yang bisa
+  menyimpang dari referensi) + opsional **Insentif Per Item Bulanan**
+  (estimasi jumlah item terjual/hari per tingkat harga × Insentif/Item ×
+  hari kerja/bulan — otomatis menyesuaikan jumlah kolom input kalau jumlah
+  tier matrix per-item berubah, tidak di-*hardcode* ke 4 atau 6).
   - Fungsi `saran_gaji_pokok()` memberi **titik awal** Gaji Pokok supaya
     tier **Minimum** pas mencapai THP Minimum (default Rp 5jt) — bukan
     jawaban final, karena tier **Maksimum** belum tentu otomatis pas di
@@ -246,6 +250,14 @@ perusahaan** (2 lembar referensi):
   - Kolom **"Status Target"** (✅ dalam target / ⬇️ di bawah / ⬆️ di atas)
     ditampilkan per tier, supaya jelas terlihat kalau kalibrasi Gaji Pokok
     atau asumsi item/hari masih perlu disesuaikan.
+  - **Konteks bisnis yang perlu diketahui**: kalau target Store Manager
+    Rp 60 juta/bulan omzet AKSESORIS dibagi rata ke 4 Sales Retail per
+    toko, rata-rata kontribusi tiap Sales Retail adalah Rp 15 juta/bulan =
+    **Rp 3,75 juta/pekan** — ini di BAWAH tier Minimum pada matrix Sales
+    Retail (Rp 5 juta/pekan). Kemungkinan basis "Omzet Individu" pada
+    matrix pekanan dimaksudkan untuk omzet keseluruhan (bukan aksesoris
+    saja); kalau memang murni dari aksesoris, target per-Sales-Retail
+    belum menyentuh tier insentif terendah sekalipun pada matrix ini.
   - **Diuji dengan matrix per-item v2** (insentif jauh lebih besar dari v1):
     asumsi 1 item/hari di ke-6 tingkat harga saja sudah menghasilkan
     **Rp 13.780.000/bulan** dari insentif per item — jauh melampaui target

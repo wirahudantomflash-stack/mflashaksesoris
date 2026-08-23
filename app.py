@@ -823,9 +823,11 @@ def render_aksesoris_tab():
         mp = la.matrix_insentif_pekanan()
         tampil_mp = mp.copy()
         tampil_mp["Omzet / Pekan"] = mp["Omzet / Pekan"].map(la.format_rupiah_id)
-        tampil_mp["Estimasi GP (40%)"] = mp["Estimasi GP (40%)"].map(la.format_rupiah_id)
+        tampil_mp["Omzet / Bulan"] = mp["Omzet / Bulan"].map(la.format_rupiah_id)
+        tampil_mp["Estimasi GP (30%)"] = mp["Estimasi GP (30%)"].map(la.format_rupiah_id)
         tampil_mp["% Insentif dari GP"] = (mp["% Insentif dari GP"] * 100).map(lambda x: la.format_percent_id(x, 0))
         tampil_mp["Insentif / Pekan"] = mp["Insentif / Pekan"].map(la.format_rupiah_id)
+        tampil_mp["Insentif / Bulan"] = mp["Insentif / Bulan"].map(la.format_rupiah_id)
         st.dataframe(tampil_mp, use_container_width=True, height=420)
         st.download_button(
             "⬇️ Unduh CSV — Matrix Insentif Pekanan", mp.to_csv(index=False).encode("utf-8-sig"),
@@ -848,15 +850,15 @@ def render_aksesoris_tab():
 
     st.subheader("🧮 Kalkulator THP Sales Retail — Target Rp 5jt s.d. Rp 8jt/bulan")
     st.caption(
-        "Total THP = **Gaji Pokok** + **Insentif %GP** (dari matrix pekanan, dikali jumlah "
-        "minggu/bulan) + opsional **Insentif Per Item** (dari matrix per-item, dikali estimasi "
-        "jumlah item terjual/hari). Kalibrasi Gaji Pokok & asumsi item di bawah supaya seluruh "
-        "tier omzet (Minimum s.d. Maksimum) berstatus ✅ dalam rentang target."
+        "Total THP = **Gaji Pokok** + **Insentif %GP Bulanan** (kolom \"Insentif / Bulan\" RESMI "
+        "dari matrix pekanan — sudah dihitung 4 minggu/bulan, bukan estimasi) + opsional "
+        "**Insentif Per Item** (dari matrix per-item, dikali estimasi jumlah item terjual/hari). "
+        "Kalibrasi Gaji Pokok & asumsi item di bawah supaya seluruh tier omzet (Minimum s.d. "
+        "Maksimum) berstatus ✅ dalam rentang target."
     )
 
     q1, q2 = st.columns(2)
     with q1:
-        minggu_per_bulan = st.number_input("Jumlah minggu per bulan", min_value=1.0, max_value=6.0, value=4.33, step=0.01, key="thp_minggu")
         thp_min_target = st.number_input("Target THP Minimum (Rp)", min_value=0, value=5_000_000, step=500_000, format="%d", key="thp_target_min")
         thp_max_target = st.number_input("Target THP Maksimum (Rp)", min_value=0, value=8_000_000, step=500_000, format="%d", key="thp_target_max")
     with q2:
@@ -878,7 +880,7 @@ def render_aksesoris_tab():
                 item_per_hari_per_tier.append(v)
 
     saran = la.saran_gaji_pokok(
-        minggu_per_bulan=minggu_per_bulan, sertakan_insentif_item=sertakan_item,
+        sertakan_insentif_item=sertakan_item,
         item_per_hari_per_tier=item_per_hari_per_tier, hari_kerja=int(hari_kerja_thp),
         thp_min=thp_min_target,
     )
@@ -894,13 +896,13 @@ def render_aksesoris_tab():
     )
 
     hasil_thp = la.kalkulator_thp_sales_retail(
-        gaji_pokok=gaji_pokok, minggu_per_bulan=minggu_per_bulan,
+        gaji_pokok=gaji_pokok,
         sertakan_insentif_item=sertakan_item, item_per_hari_per_tier=item_per_hari_per_tier,
         hari_kerja=int(hari_kerja_thp), thp_min=thp_min_target, thp_max=thp_max_target,
     )
 
     tampil_thp = hasil_thp.copy()
-    for col in ["Omzet / Pekan", "Insentif / Pekan", "Insentif %GP Bulanan", "Insentif Per Item Bulanan", "Gaji Pokok", "Total THP"]:
+    for col in ["Omzet / Pekan", "Omzet / Bulan", "Insentif / Pekan", "Insentif %GP Bulanan", "Insentif Per Item Bulanan", "Gaji Pokok", "Total THP"]:
         tampil_thp[col] = hasil_thp[col].map(la.format_rupiah_id)
     st.dataframe(tampil_thp, use_container_width=True, height=420)
 
