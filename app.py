@@ -220,11 +220,21 @@ def render_persediaan_tab():
 
     if df_jual_stok is not None and mode_tampilan == "Per Cabang":
         top_n_favorit = st.slider("Top berapa produk per cabang", 3, 10, 5, key="pd_top_n_favorit")
-        produk_favorit = lp.produk_favorit_per_cabang(df_jual_stok, dasar, top_n=top_n_favorit)
+        produk_favorit_semua = lp.produk_favorit_per_cabang(df_jual_stok, dasar, top_n=top_n_favorit)
 
-        if produk_favorit.empty:
+        if produk_favorit_semua.empty:
             st.info("Tidak ada data penjualan aksesoris pada filter cabang saat ini.")
         else:
+            cabang_favorit_opsi = ["— Semua Cabang —"] + sorted(produk_favorit_semua["Cabang"].unique().tolist())
+            cabang_favorit_pilihan = st.selectbox(
+                "Pilih Cabang", cabang_favorit_opsi, key="pd_pilih_cabang_favorit",
+                help="Pilih satu cabang untuk fokus, atau \"— Semua Cabang —\" untuk melihat semuanya sekaligus.",
+            )
+            produk_favorit = (
+                produk_favorit_semua if cabang_favorit_pilihan == "— Semua Cabang —"
+                else produk_favorit_semua[produk_favorit_semua["Cabang"] == cabang_favorit_pilihan]
+            )
+
             tampil_pf = produk_favorit.copy()
             for c in ["Potensi Omzet", "Potensi Laba"]:
                 tampil_pf[c] = produk_favorit[c].map(lp.format_rupiah_id)
@@ -233,7 +243,8 @@ def render_persediaan_tab():
             tampil_pf["Estimasi Kebutuhan Restock"] = produk_favorit["Estimasi Kebutuhan Restock"].map(lp.format_int_id)
             st.dataframe(tampil_pf, use_container_width=True, height=460)
             st.download_button(
-                "⬇️ Unduh CSV — Produk Favorit per Cabang", produk_favorit.to_csv(index=False).encode("utf-8-sig"),
+                "⬇️ Unduh CSV — Produk Favorit per Cabang (semua cabang, tidak terpengaruh pilihan di atas)",
+                produk_favorit_semua.to_csv(index=False).encode("utf-8-sig"),
                 "produk_favorit_per_cabang.csv", "text/csv", key="pd_dl_produk_favorit",
             )
 
