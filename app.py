@@ -946,6 +946,87 @@ def render_aksesoris_tab():
     st.divider()
 
     # -----------------------------------------------------------------
+    # 3b2. Target Individual Sales Retail — Aksesoris
+    # -----------------------------------------------------------------
+    st.subheader("🎯 Target Individual Sales Retail — Aksesoris")
+    st.caption(
+        "Ketika target omzet aksesoris Store Manager dibagi ke beberapa Sales Retail per toko, "
+        "targetnya bisa BEDA-BEDA per orang (tidak harus rata) — tabel di bawah bisa diedit langsung "
+        "per baris. Perhitungan GP & insentif memakai persentase yang sama dengan matrix pekanan resmi."
+    )
+
+    r1, r2, r3 = st.columns(3)
+    with r1:
+        target_toko_bulanan = st.number_input(
+            "Target Omzet Aksesoris Toko (Rp/bulan)", min_value=0, value=60_000_000, step=1_000_000,
+            format="%d", key="tis_target_toko",
+        )
+    with r2:
+        jumlah_sales_toko = st.number_input(
+            "Jumlah Sales Retail per Toko", min_value=1, max_value=20, value=4, step=1, key="tis_jumlah_sales",
+        )
+    with r3:
+        minggu_per_bulan_tis = st.number_input(
+            "Jumlah minggu per bulan", min_value=1, max_value=6, value=4, step=1, key="tis_minggu",
+        )
+
+    target_rata_pekan = target_toko_bulanan / jumlah_sales_toko / minggu_per_bulan_tis if jumlah_sales_toko and minggu_per_bulan_tis else 0
+    st.caption(
+        f"Kalau dibagi rata: {la.format_rupiah_id(target_toko_bulanan)} ÷ {int(jumlah_sales_toko)} orang ÷ "
+        f"{int(minggu_per_bulan_tis)} minggu = **{la.format_rupiah_id(target_rata_pekan)}/pekan per orang** "
+        "(baris di tabel bawah sudah terisi otomatis dengan angka ini, tapi bisa Anda ubah satu per satu)."
+    )
+
+    seed_sales = pd.DataFrame({
+        "Sales Retail": [f"Sales Retail {i+1}" for i in range(int(jumlah_sales_toko))],
+        "Target Omzet Aksesoris / Pekan": [target_rata_pekan] * int(jumlah_sales_toko),
+    })
+
+    edited_sales = st.data_editor(
+        seed_sales, num_rows="dynamic", use_container_width=True, key="tis_editor",
+        column_config={
+            "Sales Retail": st.column_config.TextColumn("Sales Retail"),
+            "Target Omzet Aksesoris / Pekan": st.column_config.NumberColumn(
+                "Target Omzet Aksesoris / Pekan (Rp)", min_value=0, step=50_000, format="%d",
+            ),
+        },
+    )
+
+    edited_sales = edited_sales.dropna(subset=["Sales Retail", "Target Omzet Aksesoris / Pekan"])
+    edited_sales = edited_sales[edited_sales["Sales Retail"].astype(str).str.strip() != ""]
+
+    if edited_sales.empty:
+        st.info("Isi minimal satu baris \"Sales Retail\" di tabel atas untuk melihat hasil perhitungan.")
+    else:
+        hasil_individual = la.target_individual_sales_retail(
+            edited_sales["Sales Retail"].tolist(),
+            edited_sales["Target Omzet Aksesoris / Pekan"].tolist(),
+            gp_persen=0.30, insentif_persen=0.05, minggu_per_bulan=int(minggu_per_bulan_tis),
+        )
+        tampil_individual = hasil_individual.copy()
+        for col in ["Target Omzet Aksesoris / Pekan", "Target Omzet Aksesoris / Bulan", "Estimasi GP", "Insentif / Pekan", "Insentif / Bulan"]:
+            tampil_individual[col] = hasil_individual[col].map(la.format_rupiah_id)
+        st.dataframe(tampil_individual, use_container_width=True, height=min(80 + 38 * len(hasil_individual), 380))
+
+        total_omzet_bulan = hasil_individual["Target Omzet Aksesoris / Bulan"].sum()
+        total_insentif_bulan = hasil_individual["Insentif / Bulan"].sum()
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Total Target Omzet Toko/Bulan", la.format_rupiah_id(total_omzet_bulan))
+        c2.metric("Total Insentif Toko/Bulan", la.format_rupiah_id(total_insentif_bulan))
+        selisih_target = total_omzet_bulan - target_toko_bulanan
+        c3.metric(
+            "Selisih dari Target Toko", la.format_rupiah_id(selisih_target),
+            delta=f"{'+' if selisih_target >= 0 else ''}{la.format_percent_id(selisih_target/target_toko_bulanan*100 if target_toko_bulanan else 0)}",
+        )
+
+        st.download_button(
+            "⬇️ Unduh CSV — Target Individual Sales Retail", hasil_individual.to_csv(index=False).encode("utf-8-sig"),
+            "target_individual_sales_retail.csv", "text/csv", key="ak_dl_target_individual",
+        )
+
+    st.divider()
+
+    # -----------------------------------------------------------------
     # 3c. Target Pencapaian Penjualan LUNA
     # -----------------------------------------------------------------
     st.header("🎯 Target Pencapaian Penjualan Aksesoris LUNA")

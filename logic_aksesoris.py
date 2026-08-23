@@ -675,6 +675,45 @@ def saran_gaji_pokok(
     return max(thp_min - insentif_min_bulanan - insentif_item_bulanan - insentif_hydrogel_bulanan, 0)
 
 
+# ---------------------------------------------------------------------------
+# 6c. Target penjualan aksesoris per individu Sales Retail
+# ---------------------------------------------------------------------------
+
+def target_individual_sales_retail(
+    nama_list,
+    target_omzet_pekan_list,
+    gp_persen: float = 0.30,
+    insentif_persen: float = 0.05,
+    minggu_per_bulan: int = 4,
+) -> pd.DataFrame:
+    """Target penjualan aksesoris & estimasi insentif per INDIVIDU Sales
+    Retail (bukan per tier omzet umum seperti matrix pekanan) — dipakai
+    saat target Store Manager (mis. Rp 60jt/bulan omzet aksesoris) dibagi
+    ke beberapa Sales Retail per toko. Pakai persentase yang sama dengan
+    matrix pekanan resmi (default GP 30%, insentif Sales Retail 5% dari GP),
+    tapi target omzet per pekan BISA BEDA-BEDA per orang (tidak harus rata)."""
+    cols = ["Sales Retail", "Target Omzet Aksesoris / Pekan", "Target Omzet Aksesoris / Bulan",
+            "Estimasi GP", "Insentif / Pekan", "Insentif / Bulan"]
+    rows = []
+    n = min(len(nama_list), len(target_omzet_pekan_list))
+    for i in range(n):
+        nama = nama_list[i]
+        omzet_pekan = float(target_omzet_pekan_list[i])
+        omzet_bulan = omzet_pekan * minggu_per_bulan
+        gp_pekan = omzet_pekan * gp_persen
+        insentif_pekan = gp_pekan * insentif_persen
+        insentif_bulan = insentif_pekan * minggu_per_bulan
+        rows.append({
+            "Sales Retail": nama,
+            "Target Omzet Aksesoris / Pekan": omzet_pekan,
+            "Target Omzet Aksesoris / Bulan": omzet_bulan,
+            "Estimasi GP": gp_pekan,
+            "Insentif / Pekan": insentif_pekan,
+            "Insentif / Bulan": insentif_bulan,
+        })
+    return pd.DataFrame(rows, columns=cols) if rows else pd.DataFrame(columns=cols)
+
+
 def target_penjualan_luna(
     df: pd.DataFrame,
     target: float = 2_000_000_000,

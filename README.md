@@ -267,6 +267,9 @@ perusahaan** (2 lembar referensi):
     matrix pekanan dimaksudkan untuk omzet keseluruhan (bukan aksesoris
     saja); kalau memang murni dari aksesoris, target per-Sales-Retail
     belum menyentuh tier insentif terendah sekalipun pada matrix ini.
+    **Lihat bagian "🎯 Target Individual Sales Retail — Aksesoris" di bawah**
+    untuk skema target & insentif yang dirancang khusus per individu pada
+    skala Rp 3,75jt/pekan ini.
   - **Diuji dengan matrix per-item v2** (insentif jauh lebih besar dari v1):
     asumsi 1 item/hari di ke-6 tingkat harga saja sudah menghasilkan
     **Rp 13.780.000/bulan** dari insentif per item — jauh melampaui target
@@ -276,6 +279,28 @@ perusahaan** (2 lembar referensi):
     default yang "benar", karena kenyataannya jarang toko aksesoris laku
     1 unit/hari di tingkat harga >Rp1 juta. Turunkan asumsi item/hari di
     tingkat harga tinggi supaya Total THP mendekati rentang target.
+
+## Target Individual Sales Retail — Aksesoris
+
+Skema terpisah dari matrix pekanan umum, khusus untuk situasi target
+omzet aksesoris Store Manager (mis. Rp 60jt/bulan) yang dibagi ke beberapa
+Sales Retail per toko (mis. 4 orang):
+
+- Fungsi `target_individual_sales_retail()` di `logic_aksesoris.py`
+  menghitung Target Omzet/Bulan, Estimasi GP, Insentif/Pekan, dan
+  Insentif/Bulan **per individu** — memakai persentase yang sama dengan
+  matrix pekanan resmi (default GP 30%, insentif Sales Retail 5% dari GP,
+  4 minggu/bulan), tapi target omzet per orang **tidak harus rata**.
+- Di dashboard: tabel **isian** (`st.data_editor`) — nama & target Rp/pekan
+  tiap orang bisa diedit langsung, baris bisa ditambah/dihapus (jumlah
+  Sales Retail per toko tidak dikunci ke 4).
+- Default terisi otomatis dari pembagian rata **Target Omzet Aksesoris
+  Toko/Bulan ÷ Jumlah Sales Retail ÷ Jumlah Minggu/Bulan** (default
+  Rp 60jt ÷ 4 orang ÷ 4 minggu = Rp 3,75jt/pekan per orang, sudah
+  diverifikasi total kembali tepat Rp 60jt/bulan).
+- Kartu metrik menampilkan **Selisih dari Target Toko** — kalau Anda ubah
+  target salah satu orang secara manual, langsung kelihatan apakah total
+  gabungan masih pas dengan target toko atau sudah melenceng.
 
 ## Target Pencapaian Penjualan LUNA
 
