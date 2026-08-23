@@ -300,6 +300,13 @@ def produk_favorit_per_cabang(df_jual: pd.DataFrame, df_stok: pd.DataFrame, top_
     if df_jual.empty:
         return pd.DataFrame(columns=cols)
 
+    # Buang baris dengan NAMA BARANG kosong/NaN — bukan SKU sungguhan,
+    # jangan sampai ikut masuk ranking produk favorit maupun opsi cabang.
+    nama = df_jual["NAMA BARANG"].astype(str).str.strip()
+    df_jual = df_jual[df_jual["NAMA BARANG"].notna() & (nama != "") & (nama.str.lower() != "nan")]
+    if df_jual.empty:
+        return pd.DataFrame(columns=cols)
+
     jumlah_bulan = _jumlah_bulan_data(df_jual)
 
     agg = df_jual.groupby(["CABANG", "NAMA BARANG"], dropna=False).agg(
@@ -338,6 +345,12 @@ def produk_favorit_semua_cabang(
         "Potensi Omzet", "Potensi Laba", "Stok Semua Cabang", "Estimasi Kebutuhan Restock",
         "Jumlah Cabang Stok Kosong/Rendah", "Jumlah Cabang Menjual", "Wajib Direstock",
     ]
+    if df_jual.empty:
+        return pd.DataFrame(columns=cols)
+
+    # Buang baris dengan NAMA BARANG kosong/NaN — bukan SKU sungguhan.
+    nama = df_jual["NAMA BARANG"].astype(str).str.strip()
+    df_jual = df_jual[df_jual["NAMA BARANG"].notna() & (nama != "") & (nama.str.lower() != "nan")]
     if df_jual.empty:
         return pd.DataFrame(columns=cols)
 
