@@ -554,18 +554,18 @@ def matrix_insentif_pekanan() -> pd.DataFrame:
 
 
 _MATRIX_PER_ITEM_RAW = [
-    ("Rp50.000 - Rp100.000", 50_000, 20_000, 10_000),
-    (">Rp100.000 - Rp250.000", 100_001, 40_000, 20_000),
-    (">Rp250.000 - Rp500.000", 250_001, 100_000, 50_000),
-    (">Rp500.000 - >Rp750.000", 500_001, 200_000, 100_000),
-    (">Rp750.000 - >Rp1.000.000", 750_001, 300_000, 150_000),
-    (">Rp1.000.000", 1_000_001, 400_000, 200_000),
+    ("Rp50.000 - Rp100.000", 50_000, 15_000, 7_500),
+    (">Rp100.000 - Rp250.000", 100_001, 30_000, 15_000),
+    (">Rp250.000 - Rp500.000", 250_001, 75_000, 37_500),
+    (">Rp500.000 - Rp750.000", 500_001, 150_000, 75_000),
+    (">Rp750.000 - Rp1.000.000", 750_001, 225_000, 112_500),
+    (">Rp1.000.000", 1_000_001, 300_000, 150_000),
 ]
 
 
 def matrix_insentif_per_item() -> pd.DataFrame:
     """Transkrip persis dari 'MATRIX INSENTIF PER ITEM' (6 tingkat harga jual,
-    asumsi Gross Profit 40% dari harga acuan, Insentif = 50% dari GP secara
+    asumsi Gross Profit 30% dari harga acuan, Insentif = 50% dari GP secara
     konsisten di semua tingkat) — insentif tetap per unit terjual (bukan %
     dari omzet)."""
     df = pd.DataFrame(_MATRIX_PER_ITEM_RAW, columns=["Range Harga Jual", "Harga Acuan", "Gross Profit", "Insentif / Item"])

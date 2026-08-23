@@ -226,12 +226,12 @@ perusahaan** (2 lembar referensi):
   dari GP, Store Manager 2%, Regional Manager 1%). Ditanam persis di
   `logic_aksesoris.py` (`matrix_insentif_pekanan()`), sudah diverifikasi
   cocok 100% dengan angka pada gambar referensi.
-- **Matrix Insentif Per Item** (v2, diperbarui): 6 tier berdasarkan rentang
+- **Matrix Insentif Per Item** (v3, diperbarui): 6 tier berdasarkan rentang
   harga jual (Rp50rb–100rb, >100rb–250rb, >250rb–500rb, >500rb–750rb,
-  >750rb–1jt, >1jt), asumsi Gross Profit **40% konsisten** dari harga acuan
+  >750rb–1jt, >1jt), asumsi Gross Profit **30% konsisten** dari harga acuan
   di semua tingkat, insentif TETAP per unit terjual = **50% dari GP**
-  secara konsisten (Rp10.000/Rp20.000/Rp50.000/Rp100.000/Rp150.000/
-  Rp200.000). Ditanam di `matrix_insentif_per_item()`.
+  secara konsisten (Rp7.500/Rp15.000/Rp37.500/Rp75.000/Rp112.500/
+  Rp150.000). Ditanam di `matrix_insentif_per_item()`.
 - **Kalkulator THP Sales Retail**: Total THP = **Gaji Pokok** + **Insentif
   %GP Bulanan** (Insentif/Pekan × jumlah minggu/bulan, default 4,33) +
   opsional **Insentif Per Item Bulanan** (estimasi jumlah item terjual/hari
