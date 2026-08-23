@@ -843,6 +843,11 @@ def render_aksesoris_tab():
         tampil_mi["% Insentif vs GP"] = mi["% Insentif vs GP"].map(lambda x: la.format_percent_id(x, 1))
         tampil_mi["Sisa GP"] = mi["Sisa GP"].map(la.format_rupiah_id)
         st.dataframe(tampil_mi, use_container_width=True)
+        st.info(
+            f"🧊 **Pengecualian — Produk HYDROGEL**: insentif TETAP "
+            f"**{la.format_rupiah_id(la.INSENTIF_HYDROGEL_PER_PCS)}/pcs**, berapa pun harga jualnya "
+            "— tidak mengikuti tingkat harga pada tabel di atas."
+        )
         st.download_button(
             "⬇️ Unduh CSV — Matrix Insentif Per Item", mi.to_csv(index=False).encode("utf-8-sig"),
             "matrix_insentif_per_item.csv", "text/csv", key="ak_dl_matrix_item",
@@ -852,7 +857,8 @@ def render_aksesoris_tab():
     st.caption(
         "Total THP = **Gaji Pokok** + **Insentif %GP Bulanan** (kolom \"Insentif / Bulan\" RESMI "
         "dari matrix pekanan — sudah dihitung 4 minggu/bulan, bukan estimasi) + opsional "
-        "**Insentif Per Item** (dari matrix per-item, dikali estimasi jumlah item terjual/hari). "
+        "**Insentif Per Item** (dari matrix per-item, dikali estimasi jumlah item terjual/hari) + "
+        "opsional **Insentif Hydrogel** (tetap Rp10.000/pcs, terpisah dari matrix tingkat harga). "
         "Kalibrasi Gaji Pokok & asumsi item di bawah supaya seluruh tier omzet (Minimum s.d. "
         "Maksimum) berstatus ✅ dalam rentang target."
     )
@@ -879,10 +885,22 @@ def render_aksesoris_tab():
                 )
                 item_per_hari_per_tier.append(v)
 
+    c_hydro1, c_hydro2 = st.columns([1, 2])
+    with c_hydro1:
+        sertakan_hydrogel = st.checkbox("Sertakan Insentif Hydrogel", value=False, key="thp_sertakan_hydrogel")
+    with c_hydro2:
+        hydrogel_per_hari = 0.0
+        if sertakan_hydrogel:
+            hydrogel_per_hari = st.number_input(
+                f"Estimasi Hydrogel terjual/hari (Rp{la.format_int_id(la.INSENTIF_HYDROGEL_PER_PCS)}/pcs)",
+                min_value=0.0, value=1.0, step=0.5, key="thp_hydrogel_per_hari",
+            )
+
     saran = la.saran_gaji_pokok(
         sertakan_insentif_item=sertakan_item,
-        item_per_hari_per_tier=item_per_hari_per_tier, hari_kerja=int(hari_kerja_thp),
-        thp_min=thp_min_target,
+        item_per_hari_per_tier=item_per_hari_per_tier,
+        sertakan_insentif_hydrogel=sertakan_hydrogel, hydrogel_per_hari=hydrogel_per_hari,
+        hari_kerja=int(hari_kerja_thp), thp_min=thp_min_target,
     )
     gaji_pokok = st.number_input(
         "Gaji Pokok (Rp) — mulai dari saran otomatis, sesuaikan sendiri kalau perlu",
@@ -898,11 +916,12 @@ def render_aksesoris_tab():
     hasil_thp = la.kalkulator_thp_sales_retail(
         gaji_pokok=gaji_pokok,
         sertakan_insentif_item=sertakan_item, item_per_hari_per_tier=item_per_hari_per_tier,
+        sertakan_insentif_hydrogel=sertakan_hydrogel, hydrogel_per_hari=hydrogel_per_hari,
         hari_kerja=int(hari_kerja_thp), thp_min=thp_min_target, thp_max=thp_max_target,
     )
 
     tampil_thp = hasil_thp.copy()
-    for col in ["Omzet / Pekan", "Omzet / Bulan", "Insentif / Pekan", "Insentif %GP Bulanan", "Insentif Per Item Bulanan", "Gaji Pokok", "Total THP"]:
+    for col in ["Omzet / Pekan", "Omzet / Bulan", "Insentif / Pekan", "Insentif %GP Bulanan", "Insentif Per Item Bulanan", "Insentif Hydrogel Bulanan", "Gaji Pokok", "Total THP"]:
         tampil_thp[col] = hasil_thp[col].map(la.format_rupiah_id)
     st.dataframe(tampil_thp, use_container_width=True, height=420)
 

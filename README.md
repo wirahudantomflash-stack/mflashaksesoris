@@ -235,13 +235,22 @@ perusahaan** (2 lembar referensi):
   di semua tingkat, insentif TETAP per unit terjual = **50% dari GP**
   secara konsisten (Rp7.500/Rp15.000/Rp37.500/Rp75.000/Rp112.500/
   Rp150.000). Ditanam di `matrix_insentif_per_item()`.
+  - **Pengecualian — produk HYDROGEL**: insentif TETAP
+    **Rp10.000/pcs** (`INSENTIF_HYDROGEL_PER_PCS`), berapa pun harga
+    jualnya — tidak mengikuti tingkat harga pada matrix di atas. Diaktifkan
+    lewat opsi terpisah "Sertakan Insentif Hydrogel" di kalkulator (tidak
+    otomatis, karena kalkulator tidak membaca nama produk dari data
+    penjualan asli — estimasi jumlah hydrogel terjual/hari diisi manual).
 - **Kalkulator THP Sales Retail**: Total THP = **Gaji Pokok** + **Insentif
   %GP Bulanan** (langsung dari kolom "Insentif / Bulan" RESMI pada matrix
   pekanan — bukan lagi estimasi Insentif/Pekan × minggu/bulan yang bisa
   menyimpang dari referensi) + opsional **Insentif Per Item Bulanan**
   (estimasi jumlah item terjual/hari per tingkat harga × Insentif/Item ×
   hari kerja/bulan — otomatis menyesuaikan jumlah kolom input kalau jumlah
-  tier matrix per-item berubah, tidak di-*hardcode* ke 4 atau 6).
+  tier matrix per-item berubah, tidak di-*hardcode* ke 4 atau 6) + opsional
+  **Insentif Hydrogel Bulanan** (estimasi jumlah hydrogel terjual/hari ×
+  Rp10.000 × hari kerja/bulan — komponen terpisah dari Insentif Per Item
+  karena hydrogel dikecualikan dari aturan tingkat harga umum).
   - Fungsi `saran_gaji_pokok()` memberi **titik awal** Gaji Pokok supaya
     tier **Minimum** pas mencapai THP Minimum (default Rp 5jt) — bukan
     jawaban final, karena tier **Maksimum** belum tentu otomatis pas di

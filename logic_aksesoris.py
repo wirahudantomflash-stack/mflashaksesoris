@@ -571,12 +571,21 @@ _MATRIX_PER_ITEM_RAW = [
     (">Rp1.000.000", 1_000_001, 300_000, 150_000),
 ]
 
+# Pengecualian: produk HYDROGEL (mis. "VIVAN HYDROGEL BASIC ...") dapat
+# insentif TETAP per pcs, terlepas dari tingkat harga jualnya pada matrix
+# umum di atas — beda perlakuan karena hydrogel biasanya harga jualnya
+# tinggi (masuk tingkat atas) tapi marginnya beda karakteristik.
+INSENTIF_HYDROGEL_PER_PCS = 10_000
+KATA_KUNCI_HYDROGEL = "HYDROGEL"
+
 
 def matrix_insentif_per_item() -> pd.DataFrame:
     """Transkrip persis dari 'MATRIX INSENTIF PER ITEM' (6 tingkat harga jual,
     asumsi Gross Profit 30% dari harga acuan, Insentif = 50% dari GP secara
     konsisten di semua tingkat) — insentif tetap per unit terjual (bukan %
-    dari omzet)."""
+    dari omzet). CATATAN: produk HYDROGEL PENGECUALIAN dari tabel ini —
+    insentifnya tetap Rp10.000/pcs berapa pun harga jualnya, lihat
+    `INSENTIF_HYDROGEL_PER_PCS`."""
     df = pd.DataFrame(_MATRIX_PER_ITEM_RAW, columns=["Range Harga Jual", "Harga Acuan", "Gross Profit", "Insentif / Item"])
     df["% Insentif vs GP"] = df["Insentif / Item"] / df["Gross Profit"] * 100
     df["Sisa GP"] = df["Gross Profit"] - df["Insentif / Item"]
@@ -587,6 +596,8 @@ def kalkulator_thp_sales_retail(
     gaji_pokok: float,
     sertakan_insentif_item: bool = False,
     item_per_hari_per_tier=None,
+    sertakan_insentif_hydrogel: bool = False,
+    hydrogel_per_hari: float = 0,
     hari_kerja: int = 26,
     thp_min: float = 5_000_000,
     thp_max: float = 8_000_000,
@@ -595,8 +606,10 @@ def kalkulator_thp_sales_retail(
     matrix resmi = Gaji Pokok + Insentif %GP Bulanan (kolom "Insentif / Bulan"
     RESMI dari matrix pekanan v2, bukan estimasi minggu×4,33) + opsional
     Insentif Per Item Bulanan (dari matrix per-item, dikali estimasi jumlah
-    item terjual/hari per tingkat harga, dikali hari kerja/bulan). Beri
-    tanda ✅/⚠️ apakah Total THP masuk rentang target [thp_min, thp_max]."""
+    item terjual/hari per tingkat harga, dikali hari kerja/bulan) + opsional
+    Insentif Hydrogel Bulanan (Rp10.000/pcs TETAP, terpisah dari matrix
+    per-item karena hydrogel dikecualikan dari aturan tingkat harga umum).
+    Beri tanda ✅/⚠️ apakah Total THP masuk rentang target [thp_min, thp_max]."""
     matrix = matrix_insentif_pekanan()
     sales = matrix[matrix["Jabatan"] == "Sales Retail"].copy().reset_index(drop=True)
 
@@ -611,28 +624,35 @@ def kalkulator_thp_sales_retail(
             for i in range(n)
         )
 
+    insentif_hydrogel_bulanan = 0.0
+    if sertakan_insentif_hydrogel:
+        insentif_hydrogel_bulanan = INSENTIF_HYDROGEL_PER_PCS * float(hydrogel_per_hari) * hari_kerja
+
     sales["Insentif Per Item Bulanan"] = insentif_item_bulanan
+    sales["Insentif Hydrogel Bulanan"] = insentif_hydrogel_bulanan
     sales["Gaji Pokok"] = gaji_pokok
-    sales["Total THP"] = gaji_pokok + sales["Insentif %GP Bulanan"] + insentif_item_bulanan
+    sales["Total THP"] = gaji_pokok + sales["Insentif %GP Bulanan"] + insentif_item_bulanan + insentif_hydrogel_bulanan
     sales["Status Target"] = sales["Total THP"].apply(
         lambda x: "✅ Dalam target" if thp_min <= x <= thp_max else ("⬇️ Di bawah target" if x < thp_min else "⬆️ Di atas target")
     )
     return sales[[
         "Basis Pencapaian", "Omzet / Pekan", "Omzet / Bulan", "Insentif / Pekan", "Insentif %GP Bulanan",
-        "Insentif Per Item Bulanan", "Gaji Pokok", "Total THP", "Keterangan", "Status Target",
+        "Insentif Per Item Bulanan", "Insentif Hydrogel Bulanan", "Gaji Pokok", "Total THP", "Keterangan", "Status Target",
     ]]
 
 
 def saran_gaji_pokok(
     sertakan_insentif_item: bool = False,
     item_per_hari_per_tier=None,
+    sertakan_insentif_hydrogel: bool = False,
+    hydrogel_per_hari: float = 0,
     hari_kerja: int = 26,
     thp_min: float = 5_000_000,
 ) -> float:
     """Saran awal Gaji Pokok supaya tier omzet MINIMUM Sales Retail pas
     mencapai thp_min — titik awal untuk dikalibrasi manual oleh pengguna,
     bukan jawaban final (tier MAKSIMUM belum tentu otomatis pas di thp_max,
-    tergantung seberapa besar kontribusi insentif per item)."""
+    tergantung seberapa besar kontribusi insentif per item & hydrogel)."""
     matrix = matrix_insentif_pekanan()
     sales_min = matrix[(matrix["Jabatan"] == "Sales Retail") & (matrix["Keterangan"] == "Minimum")]
     if sales_min.empty:
@@ -647,7 +667,12 @@ def saran_gaji_pokok(
             float(item_matrix.iloc[i]["Insentif / Item"]) * float(item_per_hari_per_tier[i]) * hari_kerja
             for i in range(n)
         )
-    return max(thp_min - insentif_min_bulanan - insentif_item_bulanan, 0)
+
+    insentif_hydrogel_bulanan = 0.0
+    if sertakan_insentif_hydrogel:
+        insentif_hydrogel_bulanan = INSENTIF_HYDROGEL_PER_PCS * float(hydrogel_per_hari) * hari_kerja
+
+    return max(thp_min - insentif_min_bulanan - insentif_item_bulanan - insentif_hydrogel_bulanan, 0)
 
 
 def target_penjualan_luna(
