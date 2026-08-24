@@ -8,7 +8,7 @@ import logic_persediaan as lp
 import logic_penjualan as ljl
 import logic_aksesoris as la
 
-st.set_page_config(page_title="MFlash Dashboard Aksesoris", page_icon="flash_logo.png", layout="wide")
+st.set_page_config(page_title="MFlash Dashboard Gadget dan Aksesoris", page_icon="flash_logo.png", layout="wide")
 
 st.logo("flash_logo.png")
 
@@ -16,7 +16,7 @@ col_logo, col_judul = st.columns([1, 8])
 with col_logo:
     st.image("flash_logo.png", width=90)
 with col_judul:
-    st.title("MFlash Dashboard Aksesoris")
+    st.title("MFlash Dashboard Gadget dan Aksesoris")
     st.caption("Madinah Group Indonesia · 18 cabang service gadget")
 
 BULAN_NAMA = {

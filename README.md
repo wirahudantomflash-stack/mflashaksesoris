@@ -1,4 +1,4 @@
-# MFlash Dashboard Aksesoris (Persediaan LUNA + Parfum + Penjualan Aksesoris)
+# MFlash Dashboard Gadget dan Aksesoris (Persediaan LUNA + Parfum + Penjualan Aksesoris)
 
 Satu aplikasi Streamlit dengan tiga tab:
 
@@ -56,19 +56,16 @@ Parfum berbeda:
   turut mencakup Parfum, bagian ini bisa ditambahkan dengan pola yang sama.
 - **Tidak ada peta lokasi cabang** — dianggap tidak perlu diulang di tab
   terpisah (sudah ada di tab Aksesoris).
-- **Ambang indikator BEDA dari Aksesoris** — skala stok Parfum jauh lebih
-  kecil (median 2 unit, kuartil-3 = 6 unit) dibanding Aksesoris (skala
-  ratusan). Memakai ambang Aksesoris (25/99) apa adanya akan membuat
-  **86% produk Parfum otomatis Merah** (diverifikasi: 101 dari 117 baris)
-  — kehilangan sinyal yang berguna. Dikalibrasi ulang khusus untuk Parfum:
-  - 🔴 **Merah**: stok ≤ 1
-  - 🟡 **Kuning**: stok 2–6
-  - 🟢 **Hijau**: stok ≥ 7
-  Hasilnya jauh lebih seimbang (37,6% Merah, bukan 86%) dan lebih berguna
-  untuk aksi nyata.
-- **Peta Stok (heatmap) Cabang × Produk tetap ada** — bahkan lebih ringkas
-  dari LUNA (15 nama produk saja vs 87 untuk LUNA), jadi tetap sepenuhnya
-  kebaca dalam satu grid.
+- **Tidak ada indikator stok 🔴🟡🟢, ringkasan indikator, maupun Peta Stok
+  (heatmap)** — dihapus atas permintaan. Tab Parfum sekarang hanya berisi
+  2 bagian: **Nilai Persediaan Parfum per Cabang** dan **Analisa & Tindak
+  Lanjut** (berbasis nilai persediaan saja). Fungsi-fungsi indikator di
+  `logic_persediaan.py` (`indikator_stok_luna`, `ringkasan_indikator_cabang`,
+  `pivot_heatmap_stok`, `styler_heatmap`, dst) TIDAK dihapus dari kode —
+  tetap dipakai di tab Persediaan Aksesoris, hanya sudah tidak dipanggil
+  dari tab Parfum. Ambang khusus Parfum yang sempat dikalibrasi (Merah≤1,
+  Kuning 2–6, Hijau≥7) juga sudah tidak dipakai di mana pun, tapi angkanya
+  dicatat di sini kalau suatu saat indikatornya mau dimunculkan lagi.
 
 ## Isi repo
 
@@ -356,13 +353,8 @@ Modul-modul logika sudah diuji memakai data asli Anda:
   difilter ke kategori PARFUM lewat parameter baru `kategori=` pada
   `apply_filters()` (backward-compatible, tidak mengubah perilaku lama
   untuk pemanggilan `hanya_aksesoris=`) — hasil 117 baris, 15 nama produk
-  unik, total nilai persediaan Rp 180.799.915. Indikator dengan ambang
-  Parfum-spesifik (Merah≤1, Kuning 2–6, Hijau≥7) menghasilkan sebaran jauh
-  lebih seimbang (37,6% Merah) dibanding kalau memakai ambang Aksesoris
-  apa adanya (86% Merah, diverifikasi lalu sengaja TIDAK dipakai). Heatmap
-  Cabang×Produk (15×18), ringkasan per cabang dengan gradasi warna, dan
-  kotak Cabang Paling Perlu Perhatian semua diuji render tanpa error,
-  termasuk kasus tepi filter cabang kosong.
+  unik, total nilai persediaan Rp 180.799.915. Sudah diuji render tanpa
+  error, termasuk kasus tepi filter cabang kosong.
 - **Penjualan** (rincian satu cabang): 13.989 baris, 5.709 nota unik.
 - **Penjualan** (gabungan 17 cabang): 67.954 baris, 54.012 nota unik.
 - **Revenue Aksesoris** (gabungan 18 cabang): 72.776 baris, 58.550 nota
