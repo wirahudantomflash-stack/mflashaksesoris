@@ -45,27 +45,24 @@ Strukturnya SENGAJA disederhanakan dari Aksesoris, karena karakter data
 Parfum berbeda:
 
 - **Tidak ada pemisahan brand** (LUNA vs Selain LUNA) — kategori Parfum di
-  data MFlash hampir seluruhnya satu brand (UMAIR, ~99% dari 117 baris),
-  jadi perbandingan brand tidak relevan. Bagian 1 langsung menampilkan
-  **total nilai persediaan Parfum per cabang** (bukan perbandingan).
-- **Tidak ada "Produk Paling Diminati per Cabang"** — bagian ini butuh data
-  PENJUALAN untuk tahu produk mana yang laku, tapi berkas penjualan
-  aksesoris yang ada saat ini (`Penjualan_Aksesoris_Regional...`) HANYA
-  berisi transaksi kategori AKSESORIS, tidak ada transaksi Parfum sama
-  sekali (diverifikasi: 0 baris). Kalau nanti ada berkas penjualan yang
-  turut mencakup Parfum, bagian ini bisa ditambahkan dengan pola yang sama.
+  data MFlash hampir seluruhnya satu brand (UMAIR), jadi perbandingan brand
+  tidak relevan. Bagian 1 langsung menampilkan **total nilai persediaan
+  Parfum per cabang** (bukan perbandingan).
+- **"Produk Paling Diminati per Cabang" SEKARANG ADA** (per pembaruan
+  terbaru) — sebelumnya tidak bisa dibangun karena berkas penjualan yang
+  ada belum mencakup transaksi Parfum. Sejak berkas penjualan diperbarui
+  jadi cakupan SEMUA kategori (bukan cuma aksesoris), bagian ini otomatis
+  berfungsi dengan pola yang identik dengan tab Aksesoris — termasuk
+  "Kebutuhan Konsumen Belum Terpenuhi" (produk UMAIR favorit yang stoknya
+  kosong/rendah).
 - **Tidak ada peta lokasi cabang** — dianggap tidak perlu diulang di tab
   terpisah (sudah ada di tab Aksesoris).
 - **Tidak ada indikator stok 🔴🟡🟢, ringkasan indikator, maupun Peta Stok
-  (heatmap)** — dihapus atas permintaan. Tab Parfum sekarang hanya berisi
-  2 bagian: **Nilai Persediaan Parfum per Cabang** dan **Analisa & Tindak
-  Lanjut** (berbasis nilai persediaan saja). Fungsi-fungsi indikator di
-  `logic_persediaan.py` (`indikator_stok_luna`, `ringkasan_indikator_cabang`,
-  `pivot_heatmap_stok`, `styler_heatmap`, dst) TIDAK dihapus dari kode —
-  tetap dipakai di tab Persediaan Aksesoris, hanya sudah tidak dipanggil
-  dari tab Parfum. Ambang khusus Parfum yang sempat dikalibrasi (Merah≤1,
-  Kuning 2–6, Hijau≥7) juga sudah tidak dipakai di mana pun, tapi angkanya
-  dicatat di sini kalau suatu saat indikatornya mau dimunculkan lagi.
+  (heatmap)** — dihapus atas permintaan sebelumnya. Tab Parfum sekarang
+  berisi: **Nilai Persediaan per Cabang**, **Produk Paling Diminati per
+  Cabang (Stok vs Terjual)**, dan **Analisa & Tindak Lanjut**. Fungsi
+  indikator di `logic_persediaan.py` TIDAK dihapus dari kode — tetap
+  dipakai di tab Persediaan Aksesoris, hanya tidak dipanggil dari tab Parfum.
 
 ## Isi repo
 
@@ -301,15 +298,38 @@ ditranskrip dari `Aksesoris_Skema_Insentif_Tiering_Sales_Retail.xlsx`:
 > tampilan dashboard sesuai permintaan). Boleh dihapus dari berkas kalau
 > memang sudah tidak dibutuhkan sama sekali.
 
+## ⚠️ Perbaikan Bug Penting — Filter Kategori pada Berkas Penjualan Semua Kategori
+
+Sejak berkas penjualan yang diunggah berkembang cakupannya jadi **SEMUA
+kategori barang** (JASA, SPAREPART, AKSESORIS, PARFUM, dll — bukan cuma
+aksesoris seperti nama berkasnya), ditemukan bug penting: bagian **Revenue,
+HPP & Katalog LUNA** (dan "Produk Paling Diminati" di tab Persediaan
+Aksesoris) sebelumnya TIDAK memfilter ke kategori AKSESORIS saja — angka
+Omzet jadi ikut menjumlahkan JASA & SPAREPART, menghasilkan angka yang jauh
+lebih besar dari yang sebenarnya.
+
+**Contoh nyata dari pengujian**: dengan berkas penjualan 184.712 baris
+(semua kategori), Omzet TANPA filter menunjukkan **Rp 46.890.010.002**
+(salah), padahal Omzet AKSESORIS yang benar (setelah difilter) adalah
+**Rp 4.241.691.227** — selisih lebih dari 10×.
+
+**Perbaikan**: ditambahkan fungsi `hanya_kategori()` di `logic_aksesoris.py`,
+dipanggil di awal `render_aksesoris_tab()` (memfilter `df` ke AKSESORIS
+sebelum dipakai di seluruh bagian bawahnya) dan di bagian "Produk Paling
+Diminati" pada `render_persediaan_tab()`. Data lintas-kategori yang belum
+difilter tetap disimpan terpisah (`df_semua_kategori`) untuk keperluan yang
+memang butuh kategori lain, seperti target UMAIR Parfum.
+
 ## Target Pencapaian Penjualan LUNA
 
-- Default: **Rp 2.000.000.000** dalam **12 bulan mulai Agustus 2026**
-  (1 Agu 2026 – 31 Jul 2027) — ketiganya bisa diubah langsung dari
+- Default: **Rp 2.000.000.000** dalam **12 bulan mulai 20 Juli 2026**
+  (20 Jul 2026 – 19 Jul 2027) — ketiganya bisa diubah langsung dari
   dashboard (target, tanggal mulai, durasi bulan).
 - Produk LUNA diidentifikasi dari **nama barang mengandung kata "LUNA"**,
-  dihitung dari **seluruh data penjualan** (tidak terpengaruh filter
-  tahun/bulan/cabang di bagian atas tab), supaya progress tidak
-  "menghilang" cuma karena pengguna sedang menyaring tampilan lain.
+  dihitung dari **data yang sudah difilter ke kategori AKSESORIS** (tidak
+  terpengaruh filter tahun/bulan/cabang di bagian atas tab), supaya
+  progress tidak "menghilang" cuma karena pengguna sedang menyaring
+  tampilan lain.
 - **Tanggal acuan "hari berjalan" memakai tanggal faktur TERAKHIR pada
   data** (bukan tanggal hari ini) — prinsip yang sama dipakai di bagian
   Proyeksi 5–10 Tahun, supaya persentase tidak terlihat rendah cuma karena
@@ -319,6 +339,49 @@ ditranskrip dari `Aksesoris_Skema_Insentif_Tiering_Sales_Retail.xlsx`:
   hari program) dan **% dari Target Penuh** (dibanding target 12 bulan
   penuh) — supaya jelas mana yang jadi ukuran "on-track" dan mana yang
   ukuran progres keseluruhan.
+- **Baru: kotak "📍 Tahap 1" (checkpoint opsional)** — default tanggal
+  20 Juli 2026, nilai Rp 300.006.600. Menampilkan pencapaian AKTUAL sampai
+  tanggal checkpoint tsb dibandingkan dengan nilai acuannya. **Catatan
+  jujur**: makna persis "Tahap 1 senilai Rp300.006.600" agak ambigu dari
+  permintaan aslinya (bisa berarti target fase 1, atau baseline pencapaian
+  sebelum program dimulai) — diimplementasikan sebagai checkpoint yang bisa
+  diubah tanggal & nilainya, silakan sesuaikan lewat kotak input kalau
+  interpretasinya belum pas.
+
+## Target Pencapaian Penjualan Parfum UMAIR
+
+- **Fitur baru**, dibangun dengan fungsi generik yang sama dengan target
+  LUNA (`target_penjualan_brand()`, dulu bernama `target_penjualan_luna()`
+  — sekarang jadi alias tipis di atas fungsi generik ini).
+- Default: target Rp 100.000.000 (silakan ubah — tidak disebutkan nilai
+  spesifik di permintaan aslinya), **durasi maksimal 6 bulan**, mulai
+  1 Januari 2026 (bisa diubah).
+- Produk diidentifikasi dari **nama barang mengandung kata "UMAIR"**, DAN
+  kategori barangnya PARFUM (dua syarat sekaligus, supaya tidak salah
+  tangkap produk non-parfum yang kebetulan mengandung kata serupa).
+- Peringatan khusus **"⏰ Periode maksimal N bulan sudah/hampir habis"**
+  muncul kalau sisa hari program sudah 0 tapi pencapaian belum 100% dari
+  target penuh — sesuai sifat "maksimal 6 bulan" (bukan target waktu tetap
+  seperti LUNA, tapi batas atas).
+
+## Produk Paling Diminati per Cabang — Sekarang Ada di Tab Parfum Juga
+
+Fitur cross-reference Stok × Penjualan yang sebelumnya hanya ada di tab
+Aksesoris, sekarang direplikasi ke tab Parfum dengan fungsi yang PERSIS
+SAMA (`produk_favorit_per_cabang()`, `kebutuhan_belum_terpenuhi()` dari
+`logic_persediaan.py`) — cuma beda sumber data yang difilter ke kategori
+PARFUM. Ini yang dimaksud "saling berkaitan untuk kontrol barang tersedia
+dengan barang yang telah terjual": produk UMAIR yang laku tapi stoknya
+kosong/rendah langsung kelihatan di bagian "Kebutuhan Konsumen Belum
+Terpenuhi".
+
+## Upload Data — Sekarang Satu Tempat
+
+Kedua uploader (Persediaan & Penjualan) yang sebelumnya di dua bagian
+sidebar terpisah (dengan divider di antaranya), sekarang digabung di
+bawah satu header **"📁 Upload Data"** — tidak ada perubahan fungsional
+(masih dua tombol unggah terpisah, karena memang dua berkas berbeda),
+cuma disatukan secara visual sesuai permintaan.
 
 ## Pengujian
 
@@ -331,6 +394,22 @@ Modul-modul logika sudah diuji memakai data asli Anda:
   - **Produk Favorit & Kebutuhan Belum Terpenuhi**: diuji dengan cross-
     reference data penjualan (72.776 baris) × data stok — kecocokan nama
     produk 97,9%, ditemukan pola nyata 75,2% baris stok aksesoris berstok
+    kosong tapi laku — jadi fitur ini punya dasar nyata untuk digunakan.
+  - **Persediaan Parfum**: 106.313 baris persediaan semua kategori,
+    difilter ke PARFUM (`kategori="PARFUM"`) — 117 baris, 15 nama produk
+    unik, nilai persediaan Rp 180.799.915.
+  - **Produk Favorit Parfum** (baru): 219 baris penjualan Parfum ×
+    117 baris stok Parfum — 52 kombinasi cabang×produk, **26 di antaranya
+    (50%) berstatus "Wajib Direstock"** (stok kosong/rendah tapi laku).
+- **Revenue Aksesoris** (setelah perbaikan filter kategori): 74.346 baris
+  (dari 184.712 baris berkas mentah semua kategori), Omzet Rp 4.241.691.227
+  — dipastikan BEDA dan LEBIH KECIL dari angka tanpa filter (Rp 46,89 M),
+  membuktikan perbaikan bug berfungsi.
+- **Target LUNA** (mulai 20 Juli 2026): tercapai Rp 68.547.360 dari target
+  s/d hari ini Rp 197.260.274 (34,7%), Tahap 1 (20 Jul) tercapai
+  Rp 1.330.000 dari Rp 300.006.600 acuan.
+- **Target UMAIR** (6 bulan mulai 1 Jan 2026): tercapai Rp 40.065.000
+  dari target Rp 100.000.000 (40,1%), periode sudah habis (sisa hari 0).
     ≤ 0, dan produk terlaris justru paling sering termasuk di dalamnya
     (diverifikasi manual, bukan bug pencocokan nama). Kedua mode tampilan
     (Per Cabang: 90 baris; Semua Cabang Gabungan: diuji dengan 3 pilihan

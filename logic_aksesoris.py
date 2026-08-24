@@ -138,6 +138,16 @@ def apply_filters(df: pd.DataFrame, tahun=None, bulan=None, cabang=None, segmen=
     return out
 
 
+def hanya_kategori(df: pd.DataFrame, kategori: str = "AKSESORIS") -> pd.DataFrame:
+    """Filter ke satu kategori barang saja (KATEGORI_NORM) — PENTING dipakai
+    sebelum menghitung revenue/HPP/katalog aksesoris, supaya berkas penjualan
+    yang mencakup SEMUA kategori (JASA, SPAREPART, dll — bukan cuma
+    aksesoris) tidak ikut membesarkan angka Omzet Aksesoris."""
+    if "KATEGORI_NORM" not in df.columns:
+        return df
+    return df[df["KATEGORI_NORM"] == kategori.strip().upper()]
+
+
 # ---------------------------------------------------------------------------
 # 1. Revenue
 # ---------------------------------------------------------------------------
@@ -807,18 +817,33 @@ def target_individual_sales_retail(
     return pd.DataFrame(rows, columns=cols) if rows else pd.DataFrame(columns=cols)
 
 
-def target_penjualan_luna(
+def target_penjualan_brand(
     df: pd.DataFrame,
+    keyword: str = "LUNA",
     target: float = 2_000_000_000,
     tanggal_mulai=None,
     durasi_bulan: int = 12,
+    kategori_barang: str | None = None,
+    tahap_list=None,
 ) -> dict:
-    """Indikator pencapaian target penjualan produk LUNA (nama barang
-    mengandung kata "LUNA") dalam jangka waktu tertentu (default: 12 bulan
-    mulai Agustus 2026). Tanggal acuan "hari berjalan" memakai tanggal
-    faktur TERAKHIR pada data (bukan tanggal hari ini), supaya persentase
-    tidak terlihat rendah cuma karena data belum diperbarui — konsisten
-    dengan prinsip yang sama dipakai di proyeksi lain pada dashboard ini."""
+    """Indikator pencapaian target penjualan produk dengan brand/kata kunci
+    tertentu (nama barang mengandung `keyword`, case-insensitive) dalam
+    jangka waktu tertentu. Generik — dipakai untuk LUNA (aksesoris) maupun
+    UMAIR (parfum), tinggal ganti `keyword`, `kategori_barang`, `target`,
+    `tanggal_mulai`, `durasi_bulan`.
+
+    `kategori_barang` opsional: kalau diisi (mis. "PARFUM"), tambahan filter
+    KATEGORI_NORM == kategori_barang.upper() — supaya kata kunci brand yang
+    kebetulan sama tidak salah tangkap produk dari kategori lain.
+
+    `tahap_list` opsional: list of dict [{"nama": "Tahap 1", "tanggal": ...,
+    "target": ...}, ...] — checkpoint target per tahap (mis. milestone
+    tanggal tertentu dalam program), dibandingkan dengan pencapaian aktual
+    sampai tanggal checkpoint itu.
+
+    Tanggal acuan "hari berjalan" memakai tanggal faktur TERAKHIR pada data
+    (bukan tanggal hari ini), supaya persentase tidak terlihat rendah cuma
+    karena data belum diperbarui."""
     if tanggal_mulai is None:
         tanggal_mulai = pd.Timestamp("2026-08-01")
     else:
@@ -827,8 +852,10 @@ def target_penjualan_luna(
     total_hari_program = (tanggal_selesai - tanggal_mulai).days + 1
 
     df_periode = df[(df["TGL FAKTUR"] >= tanggal_mulai) & (df["TGL FAKTUR"] <= tanggal_selesai)]
-    df_luna = df_periode[df_periode["NAMA BARANG"].astype(str).str.upper().str.contains("LUNA", na=False)]
-    tercapai = df_luna["TOTAL HARGA"].sum()
+    if kategori_barang and "KATEGORI_NORM" in df_periode.columns:
+        df_periode = df_periode[df_periode["KATEGORI_NORM"] == kategori_barang.strip().upper()]
+    df_brand = df_periode[df_periode["NAMA BARANG"].astype(str).str.upper().str.contains(keyword.upper(), na=False)]
+    tercapai = df_brand["TOTAL HARGA"].sum()
 
     tgl_acuan = df["TGL FAKTUR"].max()
     if pd.isna(tgl_acuan) or tgl_acuan < tanggal_mulai:
@@ -843,6 +870,20 @@ def target_penjualan_luna(
     pct_dari_target_penuh = (tercapai / target * 100) if target else 0
     sisa_hari = max(total_hari_program - hari_berjalan, 0)
 
+    tahap_hasil = []
+    for tahap in (tahap_list or []):
+        tgl_tahap = pd.Timestamp(tahap["tanggal"])
+        df_sampai_tahap = df_brand[df_brand["TGL FAKTUR"] <= tgl_tahap]
+        tercapai_tahap = df_sampai_tahap["TOTAL HARGA"].sum()
+        target_tahap = tahap.get("target", 0)
+        tahap_hasil.append({
+            "nama": tahap.get("nama", ""),
+            "tanggal": tgl_tahap,
+            "target": target_tahap,
+            "tercapai": tercapai_tahap,
+            "pct": (tercapai_tahap / target_tahap * 100) if target_tahap else 0,
+        })
+
     return dict(
         tercapai=tercapai,
         target=target,
@@ -855,7 +896,23 @@ def target_penjualan_luna(
         total_hari_program=total_hari_program,
         sisa_hari=sisa_hari,
         tgl_acuan=tgl_acuan,
-        jumlah_transaksi=len(df_luna),
+        jumlah_transaksi=len(df_brand),
+        tahap=tahap_hasil,
+    )
+
+
+def target_penjualan_luna(
+    df: pd.DataFrame,
+    target: float = 2_000_000_000,
+    tanggal_mulai=None,
+    durasi_bulan: int = 12,
+    tahap_list=None,
+) -> dict:
+    """Alias khusus LUNA dari `target_penjualan_brand()` — dipertahankan
+    untuk kompatibilitas kode yang sudah ada."""
+    return target_penjualan_brand(
+        df, keyword="LUNA", target=target, tanggal_mulai=tanggal_mulai,
+        durasi_bulan=durasi_bulan, tahap_list=tahap_list,
     )
 
 
