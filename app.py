@@ -1299,28 +1299,31 @@ def render_aksesoris_tab():
 
 
 # ---------------------------------------------------------------------------
-# Tab layout
+# Layout — SATU HALAMAN (bukan tab terpisah), ketiga dashboard ditampilkan
+# berurutan dari atas ke bawah dengan pemisah jelas.
 # ---------------------------------------------------------------------------
-tab_persediaan, tab_persediaan_parfum, tab_penjualan_aksesoris = st.tabs([
-    "📊 Dashboard Persediaan Aksesoris", "🌸 Dashboard Persediaan Parfum", "🧾 Dashboard Penjualan Aksesoris",
-])
+st.markdown("# 📊 Dashboard Persediaan Aksesoris")
+render_persediaan_tab()
 
-with tab_persediaan:
-    render_persediaan_tab()
+st.markdown("---")
+st.markdown("---")
 
-with tab_persediaan_parfum:
-    render_persediaan_parfum_tab()
+st.markdown("# 🌸 Dashboard Persediaan Parfum")
+render_persediaan_parfum_tab()
 
-with tab_penjualan_aksesoris:
-    render_penjualan_tab()
+st.markdown("---")
+st.markdown("---")
 
-    st.divider()
-    st.divider()
-    st.markdown("## 💰 Revenue, HPP & Katalog LUNA")
-    st.caption(
-        "Bagian di bawah ini memakai berkas data penjualan aksesoris khusus "
-        "(unggah terpisah di panel kiri) untuk analisa revenue, HPP, katalog LUNA, "
-        "dan proyeksi 5–10 tahun."
-    )
+st.markdown("# 🧾 Dashboard Penjualan Aksesoris")
+render_penjualan_tab()
 
-    render_aksesoris_tab()
+st.divider()
+st.divider()
+st.markdown("## 💰 Revenue, HPP & Katalog LUNA")
+st.caption(
+    "Bagian di bawah ini memakai berkas data penjualan aksesoris khusus "
+    "(unggah terpisah di panel kiri) untuk analisa revenue, HPP, katalog LUNA, "
+    "dan proyeksi 5–10 tahun."
+)
+
+render_aksesoris_tab()

@@ -1,6 +1,7 @@
 # MFlash Dashboard Gadget dan Aksesoris (Persediaan LUNA + Parfum + Penjualan Aksesoris)
 
-Satu aplikasi Streamlit dengan tiga tab:
+**Satu halaman panjang** (bukan tab terpisah — digabung sesuai permintaan),
+berisi tiga dashboard berurutan dari atas ke bawah:
 
 1. **📊 Dashboard Persediaan Aksesoris** — versi ringkas, mudah dikontrol,
    berisi 4 bagian:
@@ -19,7 +20,7 @@ Satu aplikasi Streamlit dengan tiga tab:
    ≥100 Hijau) — dan kotak Analisa & Tindak Lanjut.
 2. **🌸 Dashboard Persediaan Parfum** — struktur serupa Aksesoris tapi
    disederhanakan sesuai karakter datanya (lihat bagian khusus di bawah).
-3. **🧾 Dashboard Penjualan Aksesoris** — satu tab gabungan berisi dua bagian:
+3. **🧾 Dashboard Penjualan Aksesoris** — berisi dua bagian:
    - **Ringkasan Cabang, Produk & Sales**: ranking Seluruh Cabang, Semua
      Produk Aksesoris (terlaris & profit), dan Seluruh Sales.
    - **Revenue, HPP & Katalog LUNA**: revenue & tren bulanan, Top 10 produk
@@ -27,17 +28,15 @@ Satu aplikasi Streamlit dengan tiga tab:
      referensi harga LUNA & potensi profit, **matrix insentif resmi &
      kalkulator THP Sales Retail** (dikalibrasi ke target Rp5-8jt/bulan),
      **target pencapaian penjualan LUNA** (default Rp 2 miliar / 12 bulan
-     mulai Agustus 2026), serta analisa + proyeksi 5–10 tahun.
+     mulai 20 Juli 2026) & **target penjualan Parfum UMAIR** (maksimal
+     6 bulan), serta analisa + proyeksi 5–10 tahun.
 
-Tab Persediaan Aksesoris & Persediaan Parfum memakai **satu berkas
-persediaan yang sama** (satu tombol unggah, panel kiri bagian "📊 Data
-Persediaan") — boleh berkas khusus aksesoris, atau berkas SEMUA kategori
-barang (mis. `Persediaan_Barang_Regional...xlsx`), tinggal difilter
-kategorinya masing-masing per tab. Tab Persediaan Aksesoris & Penjualan
-Aksesoris memakai **satu berkas data penjualan yang sama** (satu tombol
-unggah, bagian "🧾 Data Penjualan") — dibaca ulang secara independen oleh
-tab Persediaan (untuk bagian "Produk Paling Diminati") dan tab Penjualan
-Aksesoris, jadi tidak perlu unggah berkas terpisah.
+Ketiga dashboard memakai **satu tempat unggah data** di sidebar ("📁 Upload
+Data" — dua tombol: Persediaan & Penjualan) yang dipakai bersama oleh
+semuanya, tinggal difilter kategorinya masing-masing per bagian. Karena
+ini SATU HALAMAN (bukan tab), semua bagian langsung ter-render begitu data
+diunggah — tinggal scroll untuk berpindah antar dashboard, tidak perlu klik
+tab.
 
 ## Dashboard Persediaan Parfum — apa yang beda dari Aksesoris
 
@@ -107,11 +106,11 @@ requirements.txt      # dependensi untuk Streamlit Cloud
 
 ## Panel kiri (sidebar)
 
-Sidebar dipakai bersama oleh ketiga tab, berisi:
-- Unggah data persediaan — dipakai bersama untuk tab Persediaan Aksesoris
-  & tab Persediaan Parfum (tinggal difilter kategorinya masing-masing)
-- Unggah data penjualan — dipakai untuk tab Persediaan Aksesoris (bagian
-  "Produk Paling Diminati") dan **kedua bagian** di tab Penjualan Aksesoris
+Sidebar dipakai bersama oleh SELURUH bagian di halaman, berisi:
+- Unggah data persediaan — dipakai bersama untuk bagian Persediaan Aksesoris
+  & bagian Persediaan Parfum (tinggal difilter kategorinya masing-masing)
+- Unggah data penjualan — dipakai untuk bagian Persediaan Aksesoris/Parfum
+  ("Produk Paling Diminati") dan **kedua bagian** di bagian Penjualan Aksesoris
 
 > **Catatan:** kontrol ambang indikator stok (batas Merah/Kuning) dan angka
 > "Jumlah SKU" **sementara disembunyikan** dari sidebar & tampilan dashboard
