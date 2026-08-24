@@ -908,6 +908,67 @@ def render_aksesoris_tab():
     st.divider()
 
     # -----------------------------------------------------------------
+    # 3a2. Grafik Penjualan LUNA vs Selain LUNA vs Parfum & Kontribusi Cabang
+    # -----------------------------------------------------------------
+    st.header("📊 Penjualan Aksesoris LUNA vs Selain LUNA vs Parfum")
+    st.caption(
+        "Aksesoris LUNA/Selain LUNA dari data yang sudah difilter kategori AKSESORIS; "
+        "Parfum diambil terpisah dari kategori PARFUM pada berkas penjualan yang sama "
+        "(kedua kategori beda, sehingga dibandingkan berdampingan di sini)."
+    )
+
+    df_parfum_untuk_grafik = la.hanya_kategori(df_semua_kategori, "PARFUM")
+    if sel_cabang:
+        df_parfum_untuk_grafik = df_parfum_untuk_grafik[df_parfum_untuk_grafik["CABANG"].isin(sel_cabang)]
+    if sel_tahun:
+        df_parfum_untuk_grafik = df_parfum_untuk_grafik[df_parfum_untuk_grafik["TAHUN"].isin(sel_tahun)]
+    if sel_bulan:
+        df_parfum_untuk_grafik = df_parfum_untuk_grafik[df_parfum_untuk_grafik["BULAN"].isin(sel_bulan)]
+
+    opk = la.omzet_per_kelompok(dff, df_parfum_untuk_grafik, keyword_brand="LUNA")
+    if opk.empty or opk["Omzet"].sum() == 0:
+        st.info("Tidak ada data untuk grafik ini pada filter saat ini.")
+    else:
+        st.bar_chart(opk.set_index("Kelompok")["Omzet"])
+        tampil_opk = opk.copy()
+        tampil_opk["Omzet"] = opk["Omzet"].map(la.format_rupiah_id)
+        tampil_opk["Laba"] = opk["Laba"].map(la.format_rupiah_id)
+        tampil_opk["Jumlah Nota"] = opk["Jumlah Nota"].map(la.format_int_id)
+        tampil_opk["Jumlah Item Terjual"] = opk["Jumlah Item Terjual"].map(la.format_int_id)
+        st.dataframe(tampil_opk, use_container_width=True)
+        st.download_button(
+            "⬇️ Unduh CSV — Omzet per Kelompok (LUNA/Selain LUNA/Parfum)", opk.to_csv(index=False).encode("utf-8-sig"),
+            "omzet_per_kelompok.csv", "text/csv", key="ak_dl_kelompok",
+        )
+
+    st.subheader("📶 Indikator Kontribusi Cabang (Terendah → Tertinggi)")
+    st.caption(
+        "Total omzet Aksesoris + Parfum per cabang, diurutkan dari kontribusi PALING RENDAH "
+        "ke PALING BESAR — cabang di paling atas grafik yang paling perlu didorong."
+    )
+    kc = la.kontribusi_cabang_gabungan(dff, df_parfum_untuk_grafik)
+    if kc.empty:
+        st.info("Tidak ada data untuk diagram ini pada filter saat ini.")
+    else:
+        st.bar_chart(kc.set_index("Cabang")["Total Omzet"])
+        tampil_kc = kc.copy()
+        tampil_kc["Omzet Aksesoris"] = kc["Omzet Aksesoris"].map(la.format_rupiah_id)
+        tampil_kc["Omzet Parfum"] = kc["Omzet Parfum"].map(la.format_rupiah_id)
+        tampil_kc["Total Omzet"] = kc["Total Omzet"].map(la.format_rupiah_id)
+        tampil_kc["Porsi Kontribusi (%)"] = kc["Porsi Kontribusi (%)"].map(la.format_percent_id)
+        st.dataframe(tampil_kc, use_container_width=True, height=460)
+        st.caption(
+            f"Kontribusi terendah: **{kc.iloc[0]['Cabang']}** ({la.format_percent_id(kc.iloc[0]['Porsi Kontribusi (%)'])}) · "
+            f"tertinggi: **{kc.iloc[-1]['Cabang']}** ({la.format_percent_id(kc.iloc[-1]['Porsi Kontribusi (%)'])})."
+        )
+        st.download_button(
+            "⬇️ Unduh CSV — Kontribusi Cabang (Aksesoris + Parfum)", kc.to_csv(index=False).encode("utf-8-sig"),
+            "kontribusi_cabang.csv", "text/csv", key="ak_dl_kontribusi_cabang",
+        )
+
+    st.divider()
+
+    # -----------------------------------------------------------------
     # 3b. Katalog Referensi Harga LUNA & Potensi Profit
     # -----------------------------------------------------------------
     st.header("🧾 Katalog Referensi Harga LUNA & Potensi Profit")

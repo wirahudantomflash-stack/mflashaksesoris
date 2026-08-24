@@ -347,6 +347,27 @@ memang butuh kategori lain, seperti target UMAIR Parfum.
   diubah tanggal & nilainya, silakan sesuaikan lewat kotak input kalau
   interpretasinya belum pas.
 
+## Grafik Penjualan LUNA vs Selain LUNA vs Parfum & Kontribusi Cabang
+
+**Fitur baru**, ditempatkan di tab Penjualan Aksesoris setelah bagian
+"Omzet & HPP Seluruh Cabang":
+
+- **Grafik perbandingan Omzet 3 kelompok**: Aksesoris LUNA, Aksesoris
+  Selain LUNA, dan Parfum (kategori terpisah) — fungsi
+  `omzet_per_kelompok()` di `logic_aksesoris.py`, mengikuti filter
+  tahun/bulan/cabang yang sama dengan bagian atasnya (Parfum diambil dari
+  `df_semua_kategori` yang difilter manual dengan filter yang sama, karena
+  kategorinya beda dari data Aksesoris yang sudah difilter di awal fungsi).
+- **Diagram indikator kontribusi cabang**: total omzet Aksesoris + Parfum
+  digabung per cabang, **diurutkan dari kontribusi PALING RENDAH ke PALING
+  BESAR** (fungsi `kontribusi_cabang_gabungan()`) — supaya cabang yang
+  paling perlu didorong langsung terlihat di paling atas grafik/tabel.
+  Kolom "Porsi Kontribusi (%)" selalu berjumlah tepat 100% (diverifikasi).
+- **Diuji dengan data asli**: 3 kelompok (LUNA Rp223,5jt, Selain LUNA
+  Rp4,02 M, Parfum Rp45,9jt), 18 cabang terurut dari Cibubur (0,20%
+  kontribusi, terendah) sampai Dramaga (14,01%, tertinggi) — termasuk kasus
+  tepi filter ke satu cabang saja dan filter yang menghasilkan data kosong.
+
 ## Target Pencapaian Penjualan Parfum UMAIR
 
 - **Fitur baru**, dibangun dengan fungsi generik yang sama dengan target

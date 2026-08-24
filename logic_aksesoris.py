@@ -148,6 +148,63 @@ def hanya_kategori(df: pd.DataFrame, kategori: str = "AKSESORIS") -> pd.DataFram
     return df[df["KATEGORI_NORM"] == kategori.strip().upper()]
 
 
+def omzet_per_kelompok(df_aksesoris: pd.DataFrame, df_parfum: pd.DataFrame, keyword_brand: str = "LUNA") -> pd.DataFrame:
+    """Bandingkan omzet 3 kelompok: Aksesoris ber-brand `keyword_brand`
+    (mis. LUNA), Aksesoris SELAIN brand itu, dan Parfum (kelompok terpisah,
+    kategori beda) — untuk grafik perbandingan penjualan lintas kategori."""
+    cols = ["Kelompok", "Omzet", "Laba", "Jumlah Nota", "Jumlah Item Terjual"]
+    rows = []
+
+    if not df_aksesoris.empty:
+        mask_brand = df_aksesoris["NAMA BARANG"].astype(str).str.upper().str.contains(keyword_brand.upper(), na=False)
+        for label, sub in [
+            (f"Aksesoris {keyword_brand.upper()}", df_aksesoris[mask_brand]),
+            (f"Aksesoris Selain {keyword_brand.upper()}", df_aksesoris[~mask_brand]),
+        ]:
+            rows.append({
+                "Kelompok": label,
+                "Omzet": sub["TOTAL HARGA"].sum(),
+                "Laba": sub["LABA"].sum(),
+                "Jumlah Nota": sub["NOTA_ID"].nunique() if "NOTA_ID" in sub.columns else 0,
+                "Jumlah Item Terjual": sub["QTY"].sum(),
+            })
+
+    if not df_parfum.empty:
+        rows.append({
+            "Kelompok": "Parfum",
+            "Omzet": df_parfum["TOTAL HARGA"].sum(),
+            "Laba": df_parfum["LABA"].sum(),
+            "Jumlah Nota": df_parfum["NOTA_ID"].nunique() if "NOTA_ID" in df_parfum.columns else 0,
+            "Jumlah Item Terjual": df_parfum["QTY"].sum(),
+        })
+    else:
+        rows.append({"Kelompok": "Parfum", "Omzet": 0, "Laba": 0, "Jumlah Nota": 0, "Jumlah Item Terjual": 0})
+
+    return pd.DataFrame(rows, columns=cols) if rows else pd.DataFrame(columns=cols)
+
+
+def kontribusi_cabang_gabungan(df_aksesoris: pd.DataFrame, df_parfum: pd.DataFrame) -> pd.DataFrame:
+    """Total omzet per cabang, GABUNGAN Aksesoris (LUNA + selain LUNA) dan
+    Parfum, diurutkan dari yang PALING RENDAH ke PALING BESAR kontribusinya
+    — untuk diagram indikator cabang paling berkontribusi."""
+    cols = ["Cabang", "Omzet Aksesoris", "Omzet Parfum", "Total Omzet", "Porsi Kontribusi (%)"]
+    aks = df_aksesoris.groupby("CABANG")["TOTAL HARGA"].sum() if not df_aksesoris.empty else pd.Series(dtype=float)
+    prf = df_parfum.groupby("CABANG")["TOTAL HARGA"].sum() if not df_parfum.empty else pd.Series(dtype=float)
+
+    semua_cabang = sorted(set(aks.index) | set(prf.index))
+    if not semua_cabang:
+        return pd.DataFrame(columns=cols)
+
+    g = pd.DataFrame({"Cabang": semua_cabang})
+    g["Omzet Aksesoris"] = g["Cabang"].map(aks).fillna(0)
+    g["Omzet Parfum"] = g["Cabang"].map(prf).fillna(0)
+    g["Total Omzet"] = g["Omzet Aksesoris"] + g["Omzet Parfum"]
+    total_keseluruhan = g["Total Omzet"].sum()
+    g["Porsi Kontribusi (%)"] = np.where(total_keseluruhan != 0, g["Total Omzet"] / total_keseluruhan * 100, 0)
+    g = g.sort_values("Total Omzet", ascending=True).reset_index(drop=True)
+    return g[cols]
+
+
 # ---------------------------------------------------------------------------
 # 1. Revenue
 # ---------------------------------------------------------------------------
