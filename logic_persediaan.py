@@ -82,11 +82,16 @@ def load_persediaan(file_or_path, sheet_name: str = SHEET_NAME) -> pd.DataFrame:
     return df
 
 
-def apply_filters(df: pd.DataFrame, cabang=None, hanya_aksesoris: bool = True, filter_luna: bool | None = True) -> pd.DataFrame:
+def apply_filters(df: pd.DataFrame, cabang=None, hanya_aksesoris: bool = True, filter_luna: bool | None = True, kategori: str | None = None) -> pd.DataFrame:
     """filter_luna: True -> hanya nama barang mengandung LUNA,
-    False -> hanya SELAIN LUNA, None -> tidak difilter berdasarkan brand."""
+    False -> hanya SELAIN LUNA, None -> tidak difilter berdasarkan brand.
+    kategori: kalau diisi (mis. "PARFUM"), MENGGANTIKAN hanya_aksesoris —
+    filter ke KATEGORI_NORM == kategori.upper() (dipakai untuk dashboard
+    kategori lain seperti Parfum, di luar Aksesoris)."""
     out = df
-    if hanya_aksesoris:
+    if kategori is not None:
+        out = out[out["KATEGORI_NORM"] == kategori.strip().upper()]
+    elif hanya_aksesoris:
         out = out[out["KATEGORI_NORM"] == "AKSESORIS"]
     if filter_luna is True:
         out = out[out["ADALAH_LUNA"]]

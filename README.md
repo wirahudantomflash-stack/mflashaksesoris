@@ -1,6 +1,6 @@
-# MFlash Dashboard Aksesoris (Persediaan LUNA + Penjualan Aksesoris)
+# MFlash Dashboard Aksesoris (Persediaan LUNA + Parfum + Penjualan Aksesoris)
 
-Satu aplikasi Streamlit dengan dua tab:
+Satu aplikasi Streamlit dengan tiga tab:
 
 1. **📊 Dashboard Persediaan Aksesoris** — versi ringkas, mudah dikontrol,
    berisi 4 bagian:
@@ -15,9 +15,11 @@ Satu aplikasi Streamlit dengan dua tab:
       pencarian data lokasi), sebaran per wilayah, disandingkan dengan nilai
       persediaan.
    Ditutup dengan **Peta Stok (heatmap) Cabang × Produk** khusus LUNA —
-   **satu-satunya** bagian yang memakai indikator warna 🔴🟡🟢 — dan kotak
-   Analisa & Tindak Lanjut.
-2. **🧾 Dashboard Penjualan Aksesoris** — satu tab gabungan berisi dua bagian:
+   memakai indikator warna 🔴🟡🟢 (ambang stok ≤25 Merah, 26–99 Kuning,
+   ≥100 Hijau) — dan kotak Analisa & Tindak Lanjut.
+2. **🌸 Dashboard Persediaan Parfum** — struktur serupa Aksesoris tapi
+   disederhanakan sesuai karakter datanya (lihat bagian khusus di bawah).
+3. **🧾 Dashboard Penjualan Aksesoris** — satu tab gabungan berisi dua bagian:
    - **Ringkasan Cabang, Produk & Sales**: ranking Seluruh Cabang, Semua
      Produk Aksesoris (terlaris & profit), dan Seluruh Sales.
    - **Revenue, HPP & Katalog LUNA**: revenue & tren bulanan, Top 10 produk
@@ -27,17 +29,53 @@ Satu aplikasi Streamlit dengan dua tab:
      **target pencapaian penjualan LUNA** (default Rp 2 miliar / 12 bulan
      mulai Agustus 2026), serta analisa + proyeksi 5–10 tahun.
 
-Kedua tab memakai **satu berkas data penjualan yang sama** (satu tombol
-unggah saja di panel kiri, bagian "🧾 Data Penjualan") — dibaca ulang secara
-independen oleh tab Persediaan (untuk bagian "Produk Paling Diminati") dan
-tab Penjualan Aksesoris, jadi tidak perlu unggah berkas terpisah.
+Tab Persediaan Aksesoris & Persediaan Parfum memakai **satu berkas
+persediaan yang sama** (satu tombol unggah, panel kiri bagian "📊 Data
+Persediaan") — boleh berkas khusus aksesoris, atau berkas SEMUA kategori
+barang (mis. `Persediaan_Barang_Regional...xlsx`), tinggal difilter
+kategorinya masing-masing per tab. Tab Persediaan Aksesoris & Penjualan
+Aksesoris memakai **satu berkas data penjualan yang sama** (satu tombol
+unggah, bagian "🧾 Data Penjualan") — dibaca ulang secara independen oleh
+tab Persediaan (untuk bagian "Produk Paling Diminati") dan tab Penjualan
+Aksesoris, jadi tidak perlu unggah berkas terpisah.
+
+## Dashboard Persediaan Parfum — apa yang beda dari Aksesoris
+
+Strukturnya SENGAJA disederhanakan dari Aksesoris, karena karakter data
+Parfum berbeda:
+
+- **Tidak ada pemisahan brand** (LUNA vs Selain LUNA) — kategori Parfum di
+  data MFlash hampir seluruhnya satu brand (UMAIR, ~99% dari 117 baris),
+  jadi perbandingan brand tidak relevan. Bagian 1 langsung menampilkan
+  **total nilai persediaan Parfum per cabang** (bukan perbandingan).
+- **Tidak ada "Produk Paling Diminati per Cabang"** — bagian ini butuh data
+  PENJUALAN untuk tahu produk mana yang laku, tapi berkas penjualan
+  aksesoris yang ada saat ini (`Penjualan_Aksesoris_Regional...`) HANYA
+  berisi transaksi kategori AKSESORIS, tidak ada transaksi Parfum sama
+  sekali (diverifikasi: 0 baris). Kalau nanti ada berkas penjualan yang
+  turut mencakup Parfum, bagian ini bisa ditambahkan dengan pola yang sama.
+- **Tidak ada peta lokasi cabang** — dianggap tidak perlu diulang di tab
+  terpisah (sudah ada di tab Aksesoris).
+- **Ambang indikator BEDA dari Aksesoris** — skala stok Parfum jauh lebih
+  kecil (median 2 unit, kuartil-3 = 6 unit) dibanding Aksesoris (skala
+  ratusan). Memakai ambang Aksesoris (25/99) apa adanya akan membuat
+  **86% produk Parfum otomatis Merah** (diverifikasi: 101 dari 117 baris)
+  — kehilangan sinyal yang berguna. Dikalibrasi ulang khusus untuk Parfum:
+  - 🔴 **Merah**: stok ≤ 1
+  - 🟡 **Kuning**: stok 2–6
+  - 🟢 **Hijau**: stok ≥ 7
+  Hasilnya jauh lebih seimbang (37,6% Merah, bukan 86%) dan lebih berguna
+  untuk aksi nyata.
+- **Peta Stok (heatmap) Cabang × Produk tetap ada** — bahkan lebih ringkas
+  dari LUNA (15 nama produk saja vs 87 untuk LUNA), jadi tetap sepenuhnya
+  kebaca dalam satu grid.
 
 ## Isi repo
 
 ```
-app.py               # aplikasi utama (2 tab)
+app.py               # aplikasi utama (3 tab)
 flash_logo.png        # logo Flash — dipakai di judul halaman & sidebar (st.logo)
-logic_persediaan.py    # logika indikator stok LUNA per cabang
+logic_persediaan.py    # logika indikator stok (dipakai Aksesoris & Parfum)
 logic_penjualan.py    # logika olah data penjualan/cabang (umum)
 logic_aksesoris.py     # logika olah data revenue penjualan aksesoris
 logic_pembelian.py     # TIDAK dipakai app.py lagi — lihat catatan di bawah
@@ -63,8 +101,10 @@ requirements.txt      # dependensi untuk Streamlit Cloud
 2. **Opsional:** taruh berkas data langsung di root repo (sejajar `app.py`)
    supaya termuat otomatis tanpa upload manual tiap buka aplikasi:
    - `Persediaan_Aksesoris_Regional.xlsx` (harus punya sheet
-     **"Daftar Barang dan Jasa"**) untuk tab Persediaan Aksesoris.
-   - `penjualan.csv.gz` untuk **kedua bagian** di tab Penjualan Aksesoris —
+     **"Daftar Barang dan Jasa"**) untuk tab Persediaan Aksesoris & Parfum —
+     boleh juga berkas SEMUA kategori barang, bukan cuma aksesoris.
+   - `penjualan.csv.gz` untuk tab Persediaan Aksesoris (bagian "Produk
+     Paling Diminati") dan **kedua bagian** di tab Penjualan Aksesoris —
      boleh CSV/gz, atau Excel (`.xlsx`) dengan sheet **"Rincian Faktur Penjualan"**.
    Kalau tidak ada, tersedia tombol unggah manual di panel kiri untuk masing-masing
    (menerima `.csv`, `.gz`, `.xlsx`, `.xls`).
@@ -73,10 +113,11 @@ requirements.txt      # dependensi untuk Streamlit Cloud
 
 ## Panel kiri (sidebar)
 
-Sidebar dipakai bersama oleh kedua tab, berisi:
-- Unggah data persediaan — untuk tab Persediaan Aksesoris
-- Unggah data penjualan — dipakai untuk **kedua bagian** di tab Penjualan
-  Aksesoris (Ringkasan Cabang/Produk/Sales, maupun Revenue/HPP/Katalog LUNA)
+Sidebar dipakai bersama oleh ketiga tab, berisi:
+- Unggah data persediaan — dipakai bersama untuk tab Persediaan Aksesoris
+  & tab Persediaan Parfum (tinggal difilter kategorinya masing-masing)
+- Unggah data penjualan — dipakai untuk tab Persediaan Aksesoris (bagian
+  "Produk Paling Diminati") dan **kedua bagian** di tab Penjualan Aksesoris
 
 > **Catatan:** kontrol ambang indikator stok (batas Merah/Kuning) dan angka
 > "Jumlah SKU" **sementara disembunyikan** dari sidebar & tampilan dashboard
@@ -309,6 +350,19 @@ Modul-modul logika sudah diuji memakai data asli Anda:
   - Termasuk kasus tepi filter cabang kosong, data penjualan belum
     diunggah, dan berkas penjualan rincian satu cabang tanpa nama cabang
     terisi.
+- **Persediaan Parfum** (`render_persediaan_parfum_tab()` di `app.py`,
+  fungsi generik dari `logic_persediaan.py` yang sama dengan Aksesoris):
+  diuji dengan berkas persediaan SEMUA kategori (106.313 baris, 18 cabang),
+  difilter ke kategori PARFUM lewat parameter baru `kategori=` pada
+  `apply_filters()` (backward-compatible, tidak mengubah perilaku lama
+  untuk pemanggilan `hanya_aksesoris=`) — hasil 117 baris, 15 nama produk
+  unik, total nilai persediaan Rp 180.799.915. Indikator dengan ambang
+  Parfum-spesifik (Merah≤1, Kuning 2–6, Hijau≥7) menghasilkan sebaran jauh
+  lebih seimbang (37,6% Merah) dibanding kalau memakai ambang Aksesoris
+  apa adanya (86% Merah, diverifikasi lalu sengaja TIDAK dipakai). Heatmap
+  Cabang×Produk (15×18), ringkasan per cabang dengan gradasi warna, dan
+  kotak Cabang Paling Perlu Perhatian semua diuji render tanpa error,
+  termasuk kasus tepi filter cabang kosong.
 - **Penjualan** (rincian satu cabang): 13.989 baris, 5.709 nota unik.
 - **Penjualan** (gabungan 17 cabang): 67.954 baris, 54.012 nota unik.
 - **Revenue Aksesoris** (gabungan 18 cabang): 72.776 baris, 58.550 nota

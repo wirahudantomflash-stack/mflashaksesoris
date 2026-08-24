@@ -28,8 +28,12 @@ BULAN_NAMA = {
 # Sidebar — sumber data untuk KEDUA dashboard, supaya bisa dimuat sekali dan
 # tab tinggal berpindah tanpa perlu unggah ulang.
 # ---------------------------------------------------------------------------
-st.sidebar.header("📊 Data Persediaan Aksesoris")
-st.sidebar.caption("Sheet \"Daftar Barang dan Jasa\" — Excel atau CSV sepadan")
+st.sidebar.header("📊 Data Persediaan")
+st.sidebar.caption(
+    "Sheet \"Daftar Barang dan Jasa\" — boleh berkas khusus aksesoris, atau berkas "
+    "SEMUA kategori barang (dipakai bersama untuk tab Persediaan Aksesoris & "
+    "Persediaan Parfum, tinggal difilter kategorinya masing-masing)."
+)
 upl_persediaan = st.sidebar.file_uploader(
     "Unggah berkas persediaan", type=["xlsx", "xls", "csv"], key="upl_persediaan",
 )
@@ -423,6 +427,190 @@ def render_persediaan_tab():
         catatan.append("Tidak ada data untuk dianalisa pada filter saat ini.")
 
     for c in catatan:
+        st.markdown("- " + c)
+
+
+# ---------------------------------------------------------------------------
+# TAB 1b — Dashboard Persediaan Parfum
+# ---------------------------------------------------------------------------
+def render_persediaan_parfum_tab():
+    if err_persediaan:
+        st.error(f"Gagal membaca berkas persediaan: {err_persediaan}")
+        return
+    if df_persediaan is None:
+        st.info(
+            "Belum ada data. Unggah berkas Excel/CSV **Persediaan** (sheet **Daftar Barang dan "
+            "Jasa** — boleh berkas semua kategori) lewat panel kiri, atau taruh berkasnya di "
+            "root repo sebelum deploy."
+        )
+        return
+
+    st.subheader("Filter — Data Persediaan Parfum")
+    cabang_opsi_pf = sorted(df_persediaan["Cabang"].dropna().unique().tolist())
+    sel_cabang_pf = st.multiselect("Cabang", cabang_opsi_pf, default=cabang_opsi_pf, key="pf_cabang")
+
+    dff_parfum = lp.apply_filters(df_persediaan, cabang=sel_cabang_pf if sel_cabang_pf else None, kategori="PARFUM", filter_luna=None)
+
+    if dff_parfum.empty:
+        st.warning(
+            "Tidak ada baris berkategori **PARFUM** pada berkas/filter ini. Kalau berkas yang "
+            "diunggah khusus aksesoris saja (tanpa kategori Parfum), unggah berkas persediaan "
+            "SEMUA kategori barang di panel kiri."
+        )
+        return
+
+    st.caption(
+        f"Menampilkan {len(dff_parfum):,}".replace(",", ".") + " baris persediaan kategori PARFUM, "
+        f"{dff_parfum['Nama Barang'].nunique()} nama produk unik."
+    )
+    st.caption(
+        "ℹ️ Kategori Parfum di data MFlash hampir seluruhnya satu brand (UMAIR) — beda dari "
+        "Aksesoris yang perlu dipilah LUNA vs Selain LUNA, jadi bagian ini tidak dipisah per brand. "
+        "Cross-reference dengan data penjualan (\"Produk Paling Diminati\") juga belum tersedia "
+        "karena berkas penjualan aksesoris yang ada belum mencakup transaksi Parfum."
+    )
+    st.divider()
+
+    # -----------------------------------------------------------------
+    # 1. Nilai Persediaan Parfum per Cabang
+    # -----------------------------------------------------------------
+    st.header("💰 1. Nilai Persediaan Parfum per Cabang")
+    nv_parfum = lp.nilai_persediaan_cabang(dff_parfum)
+    if nv_parfum.empty:
+        st.info("Tidak ada data pada filter ini.")
+    else:
+        total_nilai_parfum = nv_parfum["Nilai Persediaan"].sum()
+        c1, c2 = st.columns(2)
+        c1.metric("Total Nilai Persediaan Parfum", lp.format_rupiah_id(total_nilai_parfum))
+        c2.metric("Total Qty", lp.format_int_id(nv_parfum["Total Qty"].sum()))
+
+        st.bar_chart(nv_parfum.set_index("Cabang")["Nilai Persediaan"])
+        tampil_nv_pf = nv_parfum.copy()
+        tampil_nv_pf["Total Qty"] = nv_parfum["Total Qty"].map(lp.format_int_id)
+        tampil_nv_pf["Nilai Persediaan"] = nv_parfum["Nilai Persediaan"].map(lp.format_rupiah_id)
+        st.dataframe(tampil_nv_pf.drop(columns=["Jumlah SKU"]), use_container_width=True, height=420)
+        st.download_button(
+            "⬇️ Unduh CSV — Nilai Persediaan Parfum per Cabang", nv_parfum.to_csv(index=False).encode("utf-8-sig"),
+            "nilai_persediaan_parfum_cabang.csv", "text/csv", key="pf_dl_nilai",
+        )
+
+    st.divider()
+
+    # -----------------------------------------------------------------
+    # 2. Indikator Stok & Peta Stok — Cabang × Produk (Parfum)
+    # -----------------------------------------------------------------
+    # Ambang khusus Parfum (BEDA dari Aksesoris) — skala stok Parfum jauh
+    # lebih kecil (median 2, kuartil-3 = 6) dibanding Aksesoris (skala
+    # ratusan), jadi memakai ambang 25/99 yang sama akan membuat hampir
+    # semua produk Parfum otomatis Merah (86% dari 117 baris, diverifikasi)
+    # dan menghilangkan sinyal yang berguna. Diturunkan dari sebaran data
+    # Parfum riil, bukan sekadar dipakai ulang dari Aksesoris.
+    batas_merah_pf, batas_kuning_pf = 1, 6
+
+    st.header("🚦 2. Indikator Stok Parfum")
+    st.caption(
+        f"🔴 Merah: stok ≤ {batas_merah_pf} · 🟡 Kuning: stok {batas_merah_pf+1}–{batas_kuning_pf} · "
+        f"🟢 Hijau: stok ≥ {batas_kuning_pf+1} (ambang dikalibrasi khusus untuk skala stok Parfum, "
+        "beda dari Aksesoris). Stok negatif (anomali sistem) otomatis masuk kategori Merah."
+    )
+
+    ind_parfum = lp.indikator_stok_luna(dff_parfum, batas_merah=batas_merah_pf, batas_kuning=batas_kuning_pf)
+    if ind_parfum.empty:
+        st.info("Tidak ada data produk Parfum pada filter ini.")
+    else:
+        total = len(ind_parfum)
+        n_merah = (ind_parfum["Indikator"] == lp.MERAH).sum()
+        n_kuning = (ind_parfum["Indikator"] == lp.KUNING).sum()
+        n_hijau = (ind_parfum["Indikator"] == lp.HIJAU).sum()
+        c1, c2, c3 = st.columns(3)
+        c1.metric("🔴 Merah", lp.format_int_id(n_merah), lp.format_percent_id(n_merah / total * 100 if total else 0))
+        c2.metric("🟡 Kuning", lp.format_int_id(n_kuning), lp.format_percent_id(n_kuning / total * 100 if total else 0))
+        c3.metric("🟢 Hijau", lp.format_int_id(n_hijau), lp.format_percent_id(n_hijau / total * 100 if total else 0))
+
+        rc_parfum = lp.ringkasan_indikator_cabang(ind_parfum)
+        prioritas_pf = lp.cabang_prioritas(rc_parfum, n=5)
+        if not prioritas_pf.empty:
+            st.markdown("##### 🚨 Cabang Paling Perlu Perhatian")
+            badge_cols = st.columns(len(prioritas_pf))
+            for col, (_, row) in zip(badge_cols, prioritas_pf.iterrows()):
+                with col:
+                    st.error(f"**{row['Cabang']}**\n\n{lp.format_percent_id(row['Porsi Merah (%)'])} Merah")
+
+        st.subheader("Ringkasan per Cabang")
+        rc_tampil_pf = rc_parfum.drop(columns=["Jumlah SKU LUNA"])
+        styled_rc_pf = lp.styler_gradasi_merah(rc_tampil_pf).format({"Porsi Merah (%)": lp.format_percent_id})
+        st.dataframe(styled_rc_pf, use_container_width=True, height=420)
+        st.download_button(
+            "⬇️ Unduh CSV — Ringkasan Indikator per Cabang (Parfum)", rc_parfum.to_csv(index=False).encode("utf-8-sig"),
+            "ringkasan_indikator_parfum_cabang.csv", "text/csv", key="pf_dl_ringkasan",
+        )
+
+        st.subheader("🗺️ Peta Stok — Cabang × Produk (Parfum)")
+        st.caption("Sel abu-abu \"-\" berarti produk itu tidak tercatat sama sekali di cabang tsb (bukan berarti stoknya 0).")
+        pivot_stok_pf, pivot_ind_pf = lp.pivot_heatmap_stok(ind_parfum)
+        if pivot_stok_pf.empty:
+            st.info("Tidak ada data untuk peta stok pada filter ini.")
+        else:
+            st.dataframe(lp.styler_heatmap(pivot_stok_pf, pivot_ind_pf), use_container_width=True, height=520)
+
+        st.subheader("Detail per SKU × Cabang")
+        filter_indikator_pf = st.multiselect(
+            "Filter indikator", [lp.MERAH, lp.KUNING, lp.HIJAU],
+            default=[lp.MERAH, lp.KUNING, lp.HIJAU], key="pf_filter_indikator",
+        )
+        cari_produk_pf = st.text_input("Cari nama produk", key="pf_cari_produk")
+        detail_pf = ind_parfum[ind_parfum["Indikator"].isin(filter_indikator_pf)] if filter_indikator_pf else ind_parfum.iloc[0:0]
+        if cari_produk_pf:
+            detail_pf = detail_pf[detail_pf["Nama Barang"].str.upper().str.contains(cari_produk_pf.upper(), na=False)]
+        if detail_pf.empty:
+            st.info("Tidak ada produk yang cocok dengan filter indikator/pencarian ini.")
+        else:
+            tampil_detail_pf = detail_pf.copy()
+            tampil_detail_pf["Nilai Stok"] = detail_pf["Nilai Stok"].map(lp.format_rupiah_id)
+            st.dataframe(tampil_detail_pf, use_container_width=True, height=420)
+            st.download_button(
+                "⬇️ Unduh CSV — Detail Indikator Stok Parfum", detail_pf.to_csv(index=False).encode("utf-8-sig"),
+                "detail_indikator_parfum.csv", "text/csv", key="pf_dl_detail",
+            )
+
+    st.divider()
+
+    # -----------------------------------------------------------------
+    # 3. Analisa & Tindak Lanjut
+    # -----------------------------------------------------------------
+    st.header("📌 Analisa & Tindak Lanjut")
+    catatan_pf = []
+
+    if not nv_parfum.empty:
+        top_nilai_pf = nv_parfum.iloc[0]
+        catatan_pf.append(
+            f"Cabang **{top_nilai_pf['Cabang']}** punya nilai persediaan Parfum terbesar "
+            f"({lp.format_rupiah_id(top_nilai_pf['Nilai Persediaan'])})."
+        )
+
+    if not ind_parfum.empty:
+        rc_pf2 = lp.ringkasan_indikator_cabang(ind_parfum)
+        if not rc_pf2.empty:
+            prioritas2 = rc_pf2.iloc[0]
+            if prioritas2["Porsi Merah (%)"] > 0:
+                catatan_pf.append(
+                    f"Cabang **{prioritas2['Cabang']}** paling perlu segera direstock Parfum — "
+                    f"{lp.format_percent_id(prioritas2['Porsi Merah (%)'])} dari SKU-nya berstatus 🔴 Merah."
+                )
+        rp_pf2 = lp.ringkasan_indikator_produk(ind_parfum)
+        if not rp_pf2.empty:
+            produk_kritis_pf = rp_pf2.iloc[0]
+            if produk_kritis_pf["Porsi Merah (%)"] >= 50:
+                catatan_pf.append(
+                    f"Produk **{produk_kritis_pf['Nama Barang']}** berstatus Merah di "
+                    f"{lp.format_percent_id(produk_kritis_pf['Porsi Merah (%)'])} dari cabang yang mencatatnya "
+                    "— kemungkinan masalah pasokan, bukan cuma satu cabang."
+                )
+
+    if not catatan_pf:
+        catatan_pf.append("Tidak ada data Parfum untuk dianalisa pada filter saat ini.")
+
+    for c in catatan_pf:
         st.markdown("- " + c)
 
 
@@ -1037,12 +1225,15 @@ def render_aksesoris_tab():
 # ---------------------------------------------------------------------------
 # Tab layout
 # ---------------------------------------------------------------------------
-tab_persediaan, tab_penjualan_aksesoris = st.tabs([
-    "📊 Dashboard Persediaan Aksesoris", "🧾 Dashboard Penjualan Aksesoris",
+tab_persediaan, tab_persediaan_parfum, tab_penjualan_aksesoris = st.tabs([
+    "📊 Dashboard Persediaan Aksesoris", "🌸 Dashboard Persediaan Parfum", "🧾 Dashboard Penjualan Aksesoris",
 ])
 
 with tab_persediaan:
     render_persediaan_tab()
+
+with tab_persediaan_parfum:
+    render_persediaan_parfum_tab()
 
 with tab_penjualan_aksesoris:
     render_penjualan_tab()
