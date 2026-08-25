@@ -908,6 +908,126 @@ def render_aksesoris_tab():
     st.divider()
 
     # -----------------------------------------------------------------
+    # 3a1. Analisa Mendalam: LUNA, Selain LUNA & Parfum UMAIR
+    # -----------------------------------------------------------------
+    st.header("🔍 Analisa Mendalam: LUNA, Selain LUNA & Parfum UMAIR")
+    st.caption(
+        "Menyandingkan data STOK (persediaan) dan PENJUALAN untuk tiga kelompok, plus deteksi "
+        "kepatuhan program Bundling Aksesoris (Surat Edaran SE/001/IN-MF/IV/2026) pada transaksi Service."
+    )
+
+    if df_persediaan is None:
+        st.info("Unggah data Persediaan di panel kiri untuk melihat bagian Stok pada analisa ini.")
+        aks_stok_dasar = pd.DataFrame()
+    else:
+        aks_stok_dasar = lp.apply_filters(df_persediaan, hanya_aksesoris=True, filter_luna=None)
+        if sel_cabang:
+            aks_stok_dasar = aks_stok_dasar[aks_stok_dasar["Cabang"].isin(sel_cabang)]
+
+    # df_semua_kategori DIFILTER dulu (tahun/bulan/cabang) supaya deteksi bundling
+    # konsisten dengan filter yang dipilih pengguna di atas — bukan selalu semua data.
+    df_semua_kategori_f = df_semua_kategori
+    if sel_cabang:
+        df_semua_kategori_f = df_semua_kategori_f[df_semua_kategori_f["CABANG"].isin(sel_cabang)]
+    if sel_tahun:
+        df_semua_kategori_f = df_semua_kategori_f[df_semua_kategori_f["TAHUN"].isin(sel_tahun)]
+    if sel_bulan:
+        df_semua_kategori_f = df_semua_kategori_f[df_semua_kategori_f["BULAN"].isin(sel_bulan)]
+
+    def _render_analisa_brand(nama_kelompok: str, df_stok_kelompok: pd.DataFrame, df_jual_kelompok: pd.DataFrame, keyword_bundling: str, key_prefix: str):
+        rs = la.ringkasan_stok_dan_terjual_brand(df_stok_kelompok, df_jual_kelompok)
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Nilai Stok", la.format_rupiah_id(rs["nilai_stok"]))
+        c2.metric("Qty Stok", la.format_int_id(rs["qty_stok"]))
+        c3.metric("Omzet Terjual", la.format_rupiah_id(rs["omzet_terjual"]))
+        c4.metric("Qty Terjual", la.format_int_id(rs["qty_terjual"]))
+        c5, c6 = st.columns(2)
+        c5.metric("Rata-rata Qty Terjual / Hari", la.format_decimal_id(rs["rata2_qty_per_hari"], 1))
+        c6.metric("Rata-rata Omzet Terjual / Hari", la.format_rupiah_id(rs["rata2_omzet_per_hari"]))
+        st.caption(f"Dihitung dari {la.format_int_id(rs['jumlah_hari_data'])} hari dengan transaksi tercatat.")
+
+        bund, temuan = la.analisa_bundling_brand(df_jual_kelompok, df_semua_kategori_f, keyword=keyword_bundling)
+        st.markdown(f"##### 🎁 Bundling {keyword_bundling} pada Transaksi Service")
+        b1, b2, b3 = st.columns(3)
+        b1.metric(f"Qty {keyword_bundling} Terbundling", la.format_int_id(bund["qty_terbundling"]))
+        b2.metric(f"Nota Service dgn {keyword_bundling}", la.format_int_id(bund["jumlah_service_dgn_brand"]), la.format_percent_id(bund["pct_bundling_brand"]))
+        b3.metric("Nota Service TANPA Aksesoris", la.format_int_id(bund["jumlah_service_tanpa_aksesoris"]), la.format_percent_id(bund["pct_tanpa_aksesoris"]), delta_color="inverse")
+        st.caption(
+            f"Dari {la.format_int_id(bund['jumlah_nota_service'])} nota Service: "
+            f"{la.format_int_id(bund['jumlah_service_dgn_brand'])} pakai {keyword_bundling}, "
+            f"{la.format_int_id(bund['jumlah_service_dgn_aksesoris_lain'])} pakai aksesoris brand LAIN "
+            "(sesuai pengecualian SE kalau brand target kosong — bukan pelanggaran), dan "
+            f"**{la.format_int_id(bund['jumlah_service_tanpa_aksesoris'])} SAMA SEKALI TIDAK ADA "
+            "aksesoris** (temuan pelanggaran murni terhadap kebijakan bundling)."
+        )
+
+        if not temuan.empty:
+            with st.expander(f"📋 Temuan: {len(temuan):,}".replace(",", ".") + " Nota Service Tanpa Bundling Aksesoris (Cabang & No. Nota)"):
+                cabang_temuan_opsi = sorted(temuan["Cabang"].unique().tolist())
+                cabang_temuan_pilih = st.multiselect("Filter cabang", cabang_temuan_opsi, default=cabang_temuan_opsi, key=f"{key_prefix}_temuan_cabang")
+                temuan_tampil = temuan[temuan["Cabang"].isin(cabang_temuan_pilih)] if cabang_temuan_pilih else temuan.iloc[0:0]
+                ringkasan_per_cabang_temuan = temuan_tampil.groupby("Cabang").size().reset_index(name="Jumlah Nota Tanpa Bundling").sort_values("Jumlah Nota Tanpa Bundling", ascending=False)
+                st.dataframe(ringkasan_per_cabang_temuan, use_container_width=True, height=200)
+                st.dataframe(temuan_tampil[["Cabang", "NO FAKTUR", "TGL FAKTUR"]], use_container_width=True, height=350)
+                st.download_button(
+                    f"⬇️ Unduh CSV — Temuan Nota Tanpa Bundling ({keyword_bundling})",
+                    temuan.to_csv(index=False).encode("utf-8-sig"),
+                    f"temuan_tanpa_bundling_{key_prefix}.csv", "text/csv", key=f"{key_prefix}_dl_temuan",
+                )
+
+    st.subheader("1️⃣ Aksesoris LUNA")
+    luna_stok = aks_stok_dasar[aks_stok_dasar["ADALAH_LUNA"]] if not aks_stok_dasar.empty else aks_stok_dasar
+    luna_jual = dff[dff["NAMA BARANG"].astype(str).str.upper().str.contains("LUNA", na=False)]
+    _render_analisa_brand("Aksesoris LUNA", luna_stok, luna_jual, "LUNA", "an_luna")
+
+    st.divider()
+    st.subheader("2️⃣ Aksesoris Selain LUNA (Vivan, Robot, Anker, dll)")
+    selain_luna_stok = aks_stok_dasar[~aks_stok_dasar["ADALAH_LUNA"]] if not aks_stok_dasar.empty else aks_stok_dasar
+    st.caption(f"{selain_luna_stok['Nama Barang'].nunique() if not selain_luna_stok.empty else 0} nama produk unik di luar brand LUNA.")
+    rincian_selain_luna = la.rincian_produk_brand(selain_luna_stok)
+    if rincian_selain_luna.empty:
+        st.info("Tidak ada data stok aksesoris selain LUNA pada filter ini.")
+    else:
+        cari_produk_sl = st.text_input("Cari nama produk / brand (mis. \"VIVAN\", \"ROBOT\", \"ANKER\")", key="an_selain_luna_cari")
+        rincian_tampil = rincian_selain_luna
+        if cari_produk_sl:
+            rincian_tampil = rincian_selain_luna[rincian_selain_luna["Nama Barang"].str.upper().str.contains(cari_produk_sl.upper(), na=False)]
+        st.caption(f"Menampilkan {len(rincian_tampil):,}".replace(",", ".") + f" dari {len(rincian_selain_luna):,}".replace(",", ".") + " baris (Cabang × Produk).")
+        tampil_rsl = rincian_tampil.copy()
+        tampil_rsl["Nilai Stok"] = rincian_tampil["Nilai Stok"].map(la.format_rupiah_id)
+        st.dataframe(tampil_rsl, use_container_width=True, height=460)
+        st.download_button(
+            "⬇️ Unduh CSV — Rincian Semua Barang Aksesoris Selain LUNA (lengkap)",
+            rincian_selain_luna.to_csv(index=False).encode("utf-8-sig"),
+            "rincian_aksesoris_selain_luna.csv", "text/csv", key="an_dl_selain_luna",
+        )
+
+    st.divider()
+    st.subheader("3️⃣ Parfum UMAIR")
+    st.caption(
+        "Kategori PARFUM (terpisah dari AKSESORIS) — mencakup seluruh varian UMAIR "
+        "(mis. Quantum, ADN, Firdaus, dll), bukan cuma satu varian."
+    )
+    if df_persediaan is None:
+        parfum_umair_stok = pd.DataFrame()
+    else:
+        parfum_stok_dasar = lp.apply_filters(df_persediaan, kategori="PARFUM", filter_luna=None)
+        if sel_cabang:
+            parfum_stok_dasar = parfum_stok_dasar[parfum_stok_dasar["Cabang"].isin(sel_cabang)]
+        parfum_umair_stok = parfum_stok_dasar[parfum_stok_dasar["Nama Barang"].astype(str).str.upper().str.contains("UMAIR", na=False)]
+    df_parfum_jual_an = la.hanya_kategori(df_semua_kategori, "PARFUM")
+    if sel_cabang:
+        df_parfum_jual_an = df_parfum_jual_an[df_parfum_jual_an["CABANG"].isin(sel_cabang)]
+    if sel_tahun:
+        df_parfum_jual_an = df_parfum_jual_an[df_parfum_jual_an["TAHUN"].isin(sel_tahun)]
+    if sel_bulan:
+        df_parfum_jual_an = df_parfum_jual_an[df_parfum_jual_an["BULAN"].isin(sel_bulan)]
+    umair_jual = df_parfum_jual_an[df_parfum_jual_an["NAMA BARANG"].astype(str).str.upper().str.contains("UMAIR", na=False)]
+    _render_analisa_brand("Parfum UMAIR", parfum_umair_stok, umair_jual, "UMAIR", "an_umair")
+
+    st.divider()
+
+    # -----------------------------------------------------------------
     # 3a2. Grafik Penjualan LUNA vs Selain LUNA vs Parfum & Kontribusi Cabang
     # -----------------------------------------------------------------
     st.header("📊 Penjualan Aksesoris LUNA vs Selain LUNA vs Parfum")

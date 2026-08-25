@@ -347,6 +347,62 @@ memang butuh kategori lain, seperti target UMAIR Parfum.
   diubah tanggal & nilainya, silakan sesuaikan lewat kotak input kalau
   interpretasinya belum pas.
 
+## Analisa Mendalam: LUNA, Selain LUNA & Parfum UMAIR
+
+**Fitur baru**, ditempatkan di tab Penjualan Aksesoris sebelum bagian
+grafik perbandingan — tiga sub-bagian dengan struktur yang mirip:
+
+**1️⃣ Aksesoris LUNA** dan **3️⃣ Parfum UMAIR** (struktur identik, beda sumber
+data): masing-masing menampilkan
+- **Stok**: Nilai Stok, Qty Stok (dari data Persediaan, difilter kategori
+  & brand yang sesuai)
+- **Sudah Terjual**: Omzet Terjual, Qty Terjual, Rata-rata Qty/Omzet
+  Terjual per Hari (dihitung dari jumlah HARI yang punya transaksi
+  tercatat, bukan dibagi rata sepanjang kalender)
+- **Bundling pada Transaksi Service**: Qty yang terbundling (nota-nya juga
+  berisi kategori lain), dan breakdown 3 kelompok nota Service — (a) pakai
+  brand target, (b) pakai brand aksesoris LAIN (sesuai pengecualian SE
+  Bundling kalau brand target kosong — BUKAN pelanggaran), (c) **SAMA
+  SEKALI TIDAK ADA aksesoris** (temuan pelanggaran murni)
+- **Temuan**: tabel Cabang + Nomor Nota untuk kelompok (c), bisa difilter
+  per cabang, dengan ringkasan jumlah per cabang di atasnya, dan tombol
+  unduh CSV lengkap.
+
+**2️⃣ Aksesoris Selain LUNA** (Vivan, Robot, Anker, dll): rincian LENGKAP
+semua barang (per Cabang × Nama Barang) dengan kotak pencarian nama
+produk/brand, diurutkan dari nilai stok terbesar, plus unduh CSV lengkap
+(tidak dipotong oleh pencarian).
+
+**Fungsi baru di `logic_aksesoris.py`**: `ringkasan_stok_dan_terjual_brand()`,
+`analisa_bundling_brand()`, `rincian_produk_brand()`.
+
+**Catatan penting soal "bundling"**: definisi "nota terbundling" mengikuti
+`prompt_dashboard_bundling.md` — satu nota dianggap bundling kalau memuat
+minimal satu item AKSESORIS dan minimal satu item kategori lain. Dashboard
+SENGAJA memisahkan "nota Service tanpa brand target tapi pakai brand lain"
+dari "nota Service tanpa aksesoris sama sekali", karena Surat Edaran SE
+mengizinkan penggantian brand kalau brand target kosong — mencampur
+keduanya sebagai satu angka "pelanggaran" akan menyesatkan.
+
+**Diuji dengan data asli** (184.712 baris penjualan semua kategori,
+59.184 nota Service):
+- LUNA: Nilai Stok Rp 285.094.168, Omzet Terjual Rp 223.513.860 (rata-rata
+  54 unit/hari dari 159 hari data). Bundling: 7.771 nota pakai LUNA
+  (13,1%), 38.551 pakai brand lain (65,1%, sesuai pengecualian),
+  **12.867 nota (21,7%) SAMA SEKALI TIDAK ADA aksesoris** (temuan).
+- Selain LUNA: 20.915 baris rincian (Cabang × Produk), termasuk brand
+  Vivan, Robot, Anker, dll — diuji filter pencarian ("VIVAN" → 765 baris).
+- Parfum UMAIR: Nilai Stok Rp 175.717.670, Omzet Terjual Rp 45.185.000
+  (rata-rata 1,9 unit/hari). Bundling UMAIR sangat rendah (22 nota, 0,04%)
+  — wajar karena UMAIR kategori terpisah (Parfum), bukan bagian dari
+  program bundling aksesoris yang sama.
+- **Bug ditemukan & diperbaiki**: filter cabang di panel atas awalnya
+  belum diterapkan ke deteksi bundling (`df_semua_kategori` belum
+  difilter) — temuan selalu menampilkan SEMUA cabang meski sudah difilter
+  ke satu cabang. Sudah diperbaiki (`df_semua_kategori_f`) dan
+  diverifikasi: filter ke cabang Bintara saja menghasilkan 709 nota temuan
+  (bukan lagi 12.867 semua cabang), seluruhnya benar dari Bintara.
+
 ## Grafik Penjualan LUNA vs Selain LUNA vs Parfum & Kontribusi Cabang
 
 **Fitur baru**, ditempatkan di tab Penjualan Aksesoris setelah bagian

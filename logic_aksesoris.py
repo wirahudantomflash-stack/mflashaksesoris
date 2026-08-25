@@ -206,6 +206,102 @@ def kontribusi_cabang_gabungan(df_aksesoris: pd.DataFrame, df_parfum: pd.DataFra
 
 
 # ---------------------------------------------------------------------------
+# 7. Analisa mendalam per brand: Stok + Terjual + Bundling + Temuan
+# ---------------------------------------------------------------------------
+
+def ringkasan_stok_dan_terjual_brand(df_persediaan_brand: pd.DataFrame, df_jual_brand: pd.DataFrame) -> dict:
+    """Ringkasan Stok (nilai & qty) + Sudah Terjual (omzet & qty) + rata-rata
+    per hari untuk satu brand/kelompok produk. `df_persediaan_brand` pakai
+    skema kolom persediaan (Nilai Total, Kts (Semua Gdng)); `df_jual_brand`
+    pakai skema kolom penjualan (TOTAL HARGA, QTY, TGL FAKTUR)."""
+    nilai_stok = df_persediaan_brand["Nilai Total"].sum() if not df_persediaan_brand.empty else 0
+    qty_stok = df_persediaan_brand["Kts (Semua Gdng)"].sum() if not df_persediaan_brand.empty else 0
+
+    omzet_terjual = df_jual_brand["TOTAL HARGA"].sum() if not df_jual_brand.empty else 0
+    qty_terjual = df_jual_brand["QTY"].sum() if not df_jual_brand.empty else 0
+    jumlah_hari_data = df_jual_brand["TGL FAKTUR"].dt.date.nunique() if not df_jual_brand.empty else 0
+    rata2_qty_per_hari = (qty_terjual / jumlah_hari_data) if jumlah_hari_data else 0
+    rata2_omzet_per_hari = (omzet_terjual / jumlah_hari_data) if jumlah_hari_data else 0
+
+    return dict(
+        nilai_stok=nilai_stok,
+        qty_stok=qty_stok,
+        omzet_terjual=omzet_terjual,
+        qty_terjual=qty_terjual,
+        jumlah_hari_data=jumlah_hari_data,
+        rata2_qty_per_hari=rata2_qty_per_hari,
+        rata2_omzet_per_hari=rata2_omzet_per_hari,
+    )
+
+
+def analisa_bundling_brand(df_jual_brand: pd.DataFrame, df_jual_semua_kategori: pd.DataFrame, keyword: str = "LUNA"):
+    """Analisa bundling untuk satu brand pada transaksi Service:
+    1. Jumlah unit/transaksi brand tsb yang notanya juga berisi kategori
+       lain (indikasi terbundling dengan Service/Sparepart/dll).
+    2. Breakdown nota Service jadi 3 kelompok: (a) sudah bundling dengan
+       brand target, (b) bundling tapi pakai brand LAIN (sesuai pengecualian
+       SE kalau brand target kosong), (c) TIDAK ADA aksesoris sama sekali
+       (pelanggaran murni terhadap kebijakan bundling).
+    3. Detail nota kelompok (c) — Cabang & Nomor Nota — sebagai temuan.
+
+    Mengembalikan (ringkasan: dict, detail_temuan: DataFrame)."""
+    ringkasan = dict(
+        qty_terbundling=0, jumlah_transaksi_terbundling=0, jumlah_nota_service=0,
+        jumlah_service_dgn_brand=0, jumlah_service_dgn_aksesoris_lain=0,
+        jumlah_service_tanpa_aksesoris=0, pct_bundling_brand=0, pct_tanpa_aksesoris=0,
+    )
+    cols_temuan = ["Cabang", "NO FAKTUR", "TGL FAKTUR", "NOTA_ID"]
+    if df_jual_semua_kategori.empty:
+        return ringkasan, pd.DataFrame(columns=cols_temuan)
+
+    # 1. Qty brand yang terbundling (nota-nya lintas kategori)
+    if not df_jual_brand.empty:
+        nota_kategori_count = df_jual_semua_kategori.groupby("NOTA_ID")["KATEGORI_NORM"].nunique()
+        nota_multi = set(nota_kategori_count[nota_kategori_count > 1].index)
+        mask_bundling = df_jual_brand["NOTA_ID"].isin(nota_multi)
+        ringkasan["qty_terbundling"] = df_jual_brand[mask_bundling]["QTY"].sum()
+        ringkasan["jumlah_transaksi_terbundling"] = int(mask_bundling.sum())
+
+    # 2. Breakdown nota Service
+    service_notas = set(df_jual_semua_kategori[df_jual_semua_kategori["SEGMEN"] == "Service"]["NOTA_ID"].unique())
+    notas_dgn_aksesoris = set(df_jual_semua_kategori[df_jual_semua_kategori["KATEGORI_NORM"] == "AKSESORIS"]["NOTA_ID"].unique())
+    mask_keyword_all = df_jual_semua_kategori["NAMA BARANG"].astype(str).str.upper().str.contains(keyword.upper(), na=False)
+    notas_dgn_keyword = set(df_jual_semua_kategori[mask_keyword_all]["NOTA_ID"].unique())
+
+    service_tanpa_aksesoris = service_notas - notas_dgn_aksesoris
+    service_dgn_brand = service_notas & notas_dgn_keyword
+    service_dgn_aksesoris_lain = (service_notas & notas_dgn_aksesoris) - notas_dgn_keyword
+
+    n_service = len(service_notas)
+    ringkasan["jumlah_nota_service"] = n_service
+    ringkasan["jumlah_service_dgn_brand"] = len(service_dgn_brand)
+    ringkasan["jumlah_service_dgn_aksesoris_lain"] = len(service_dgn_aksesoris_lain)
+    ringkasan["jumlah_service_tanpa_aksesoris"] = len(service_tanpa_aksesoris)
+    ringkasan["pct_bundling_brand"] = (len(service_dgn_brand) / n_service * 100) if n_service else 0
+    ringkasan["pct_tanpa_aksesoris"] = (len(service_tanpa_aksesoris) / n_service * 100) if n_service else 0
+
+    # 3. Detail temuan: nota Service TANPA aksesoris sama sekali
+    detail = df_jual_semua_kategori[df_jual_semua_kategori["NOTA_ID"].isin(service_tanpa_aksesoris)][
+        ["CABANG", "NO FAKTUR", "TGL FAKTUR", "NOTA_ID"]
+    ].drop_duplicates(subset=["NOTA_ID"]).rename(columns={"CABANG": "Cabang"}).sort_values(["Cabang", "TGL FAKTUR"]).reset_index(drop=True)
+
+    return ringkasan, detail[cols_temuan]
+
+
+def rincian_produk_brand(df_persediaan_brand: pd.DataFrame) -> pd.DataFrame:
+    """Rincian SEMUA barang (per Cabang x Nama Barang) untuk satu kelompok
+    brand — dari data persediaan, diurutkan dari nilai stok terbesar."""
+    cols = ["Cabang", "Kode Barang", "Nama Barang", "Stok", "Nilai Stok"]
+    if df_persediaan_brand.empty:
+        return pd.DataFrame(columns=cols)
+    g = df_persediaan_brand.groupby(["Cabang", "Kode Barang", "Nama Barang"]).agg(
+        Stok=("Kts (Semua Gdng)", "sum"), **{"Nilai Stok": ("Nilai Total", "sum")},
+    ).reset_index()
+    g = g.sort_values("Nilai Stok", ascending=False).reset_index(drop=True)
+    return g[cols]
+
+
+# ---------------------------------------------------------------------------
 # 1. Revenue
 # ---------------------------------------------------------------------------
 
