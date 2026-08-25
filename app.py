@@ -122,6 +122,89 @@ except Exception as e:
 
 
 # ---------------------------------------------------------------------------
+# Ringkasan Eksekutif — versi ringkas gaya kartu di paling atas halaman,
+# merangkum data yang detailnya ada di ketiga dashboard di bawah. Memakai
+# fungsi logic_aksesoris.py yang sama (omzet_per_kelompok, kontribusi_cabang_
+# gabungan, analisa_bundling_brand, target_penjualan_brand) — bukan hitungan
+# terpisah, supaya angkanya selalu konsisten dengan bagian detail di bawahnya.
+# ---------------------------------------------------------------------------
+def render_ringkasan_eksekutif():
+    st.markdown("## 📌 Ringkasan Eksekutif")
+
+    if raw_aksesoris is None:
+        st.info("Unggah data Persediaan & Penjualan di panel kiri untuk melihat ringkasan ini.")
+        return
+
+    df_re = None
+    if "CABANG" in raw_aksesoris.columns:
+        df_re = la.finalize_data(raw_aksesoris)
+    else:
+        nama_bersama_re = st.session_state.get("nama_cabang_bersama")
+        if nama_bersama_re:
+            df_re = la.finalize_data(raw_aksesoris, cabang_default=nama_bersama_re)
+        else:
+            st.info(
+                "Berkas penjualan rincian satu cabang saja — isi dulu nama cabangnya di bagian "
+                "\"Dashboard Penjualan Aksesoris\" di bawah, ringkasan ini akan otomatis terisi."
+            )
+            return
+
+    df_aks_re = la.hanya_kategori(df_re, "AKSESORIS")
+    df_parfum_re = la.hanya_kategori(df_re, "PARFUM")
+
+    aks_stok_re = lp.apply_filters(df_persediaan, hanya_aksesoris=True, filter_luna=None) if df_persediaan is not None else pd.DataFrame()
+    parfum_stok_re = lp.apply_filters(df_persediaan, kategori="PARFUM", filter_luna=None) if df_persediaan is not None else pd.DataFrame()
+
+    opk_re = la.omzet_per_kelompok(df_aks_re, df_parfum_re, keyword_brand="LUNA")
+    kc_re = la.kontribusi_cabang_gabungan(df_aks_re, df_parfum_re)
+
+    c1, c2, c3 = st.columns(3)
+    warna = {"c1": "#378ADD", "c2": "#888780", "c3": "#D4537E"}
+    if not opk_re.empty:
+        for col, (_, row) in zip([c1, c2, c3], opk_re.iterrows()):
+            with col:
+                st.metric(row["Kelompok"], la.format_rupiah_id(row["Omzet"]))
+                st.caption(f"{la.format_int_id(row['Jumlah Item Terjual'])} pcs terjual")
+
+    st.markdown("&nbsp;", unsafe_allow_html=True)
+    g1, g2 = st.columns(2)
+    with g1:
+        st.caption("Omzet per kelompok")
+        if not opk_re.empty:
+            st.bar_chart(opk_re.set_index("Kelompok")["Omzet"], height=220)
+    with g2:
+        st.caption("Kontribusi cabang (terendah → tertinggi)")
+        if not kc_re.empty:
+            st.bar_chart(kc_re.set_index("Cabang")["Total Omzet"], height=220)
+
+    b1, b2 = st.columns(2)
+    with b1:
+        st.caption("Bundling LUNA pada transaksi Service")
+        bund_re, _ = la.analisa_bundling_brand(
+            df_aks_re[df_aks_re["NAMA BARANG"].astype(str).str.upper().str.contains("LUNA", na=False)],
+            df_re, keyword="LUNA",
+        )
+        if bund_re["jumlah_nota_service"]:
+            m1, m2, m3 = st.columns(3)
+            m1.metric("Pakai LUNA", la.format_percent_id(bund_re["pct_bundling_brand"]))
+            m2.metric("Brand lain", la.format_percent_id(100 - bund_re["pct_bundling_brand"] - bund_re["pct_tanpa_aksesoris"]))
+            m3.metric("Tanpa aksesoris", la.format_percent_id(bund_re["pct_tanpa_aksesoris"]))
+    with b2:
+        st.caption("Target pencapaian")
+        target_luna_re = la.target_penjualan_luna(df_aks_re, target=2_000_000_000, tanggal_mulai="2026-07-20", durasi_bulan=12)
+        target_umair_re = la.target_penjualan_brand(df_parfum_re, keyword="UMAIR", target=100_000_000, tanggal_mulai="2026-01-01", durasi_bulan=6)
+        st.caption(f"LUNA · Rp 2 M / 12 bln — {la.format_percent_id(target_luna_re['pct_pencapaian'])}")
+        st.progress(min(target_luna_re["pct_pencapaian"] / 100, 1.0) if target_luna_re["pct_pencapaian"] else 0)
+        st.caption(f"UMAIR · Rp 100 jt / 6 bln — {la.format_percent_id(target_umair_re['pct_pencapaian'])}")
+        st.progress(min(target_umair_re["pct_pencapaian"] / 100, 1.0) if target_umair_re["pct_pencapaian"] else 0)
+
+    st.caption(
+        "Detail lengkap tiap angka di atas ada di bagian \"🔍 Analisa Mendalam\" dan \"🎯 Target Pencapaian\" "
+        "pada Dashboard Penjualan Aksesoris di bawah."
+    )
+
+
+# ---------------------------------------------------------------------------
 # TAB 1 — Dashboard Stok Semua Cabang (fokus buffer stok LUNA)
 # ---------------------------------------------------------------------------
 # ---------------------------------------------------------------------------
@@ -1483,6 +1566,11 @@ def render_aksesoris_tab():
 # Layout — SATU HALAMAN (bukan tab terpisah), ketiga dashboard ditampilkan
 # berurutan dari atas ke bawah dengan pemisah jelas.
 # ---------------------------------------------------------------------------
+render_ringkasan_eksekutif()
+
+st.markdown("---")
+st.markdown("---")
+
 st.markdown("# 📊 Dashboard Persediaan Aksesoris")
 render_persediaan_tab()
 

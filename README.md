@@ -38,6 +38,33 @@ ini SATU HALAMAN (bukan tab), semua bagian langsung ter-render begitu data
 diunggah — tinggal scroll untuk berpindah antar dashboard, tidak perlu klik
 tab.
 
+## 📌 Ringkasan Eksekutif (paling atas halaman)
+
+Bagian ringkas gaya kartu di paling atas halaman, sebelum ketiga dashboard
+detail — untuk gambaran cepat tanpa perlu scroll jauh:
+
+- 3 kartu metrik (Omzet Aksesoris LUNA, Selain LUNA, Parfum) + jumlah pcs terjual
+- Grafik batang Omzet per kelompok, dan Kontribusi Cabang (terendah→tertinggi)
+- Breakdown bundling LUNA pada transaksi Service (3 metrik: pakai LUNA /
+  brand lain / tanpa aksesoris)
+- Progress bar target LUNA dan target UMAIR
+
+**Penting**: bagian ini TIDAK menghitung ulang dari nol — memanggil fungsi
+yang PERSIS SAMA (`omzet_per_kelompok()`, `kontribusi_cabang_gabungan()`,
+`analisa_bundling_brand()`, `target_penjualan_luna()`,
+`target_penjualan_brand()`) yang juga dipakai di bagian detail Dashboard
+Penjualan Aksesoris — jadi angkanya dijamin selalu konsisten, tidak bisa
+"berbeda" dari detailnya. Fungsi `render_ringkasan_eksekutif()` di `app.py`,
+dipanggil pertama kali sebelum ketiga dashboard lainnya.
+
+**Diuji dengan data asli** — hasilnya identik dengan angka yang sudah
+diverifikasi di bagian "Analisa Mendalam" sebelumnya (LUNA Rp223,5jt,
+Selain LUNA Rp4,02M, Parfum Rp45,9jt, bundling 13,1%/65,1%/21,7%, target
+LUNA 34,7%, target UMAIR 40,1%) — termasuk kasus tepi data Persediaan belum
+diunggah (bagian stok dilewati dengan pesan info, bukan error) dan berkas
+Penjualan rincian satu cabang tanpa nama cabang terisi (`MissingCabangColumn`
+tertangani dengan pesan yang mengarahkan ke bagian pengisian nama cabang).
+
 ## Dashboard Persediaan Parfum — apa yang beda dari Aksesoris
 
 Strukturnya SENGAJA disederhanakan dari Aksesoris, karena karakter data
