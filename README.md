@@ -425,14 +425,16 @@ rasio total, cocok dengan Result total ÷ Target total). Termasuk kasus
 tepi: periode masa depan tanpa data (Result=0 di semua cabang, bukan
 error), dan data kosong total (tabel kosong dengan aman).
 
-### 📍 Monitoring Pencapaian Cabang — Tahap 1 (BARU)
+### 📍 Monitoring Pencapaian Cabang — Bertahap, menuju Rp 2 Miliar
 
-Bagian baru terpisah, khusus untuk milestone Tahap 1 (target tetap Rp
-300.006.600, **dengan distribusi TIDAK RATA per cabang** — bukan dibagi
-rata seperti tabel di atas). Kolom: Cabang, Target, Result, % Actual, GAP
-(lebih ringkas dari tabel utama — tanpa Expected/Target Kejar Per Hari/
-Sisa Hari, karena Tahap 1 adalah milestone kumulatif dengan tanggal
-evaluasi fleksibel, bukan program dengan tanggal akhir & laju harian tetap).
+Bagian khusus untuk milestone bertahap (Tahap 1, 2, 3, dst) menuju target
+jaringan LUNA total **Rp 2.000.000.000** — Tahap 1 adalah tahap PERTAMA
+dari rangkaian ini (target tetap Rp 300.006.600, **dengan distribusi TIDAK
+RATA per cabang**). Kolom tiap tahap: Cabang, Target, Result, % Actual, GAP
+(lebih ringkas dari tabel "Monitoring Pencapaian per Cabang" di atasnya —
+tanpa Expected/Target Kejar Per Hari/Sisa Hari, karena tiap tahap adalah
+milestone kumulatif dengan tanggal evaluasi fleksibel, bukan program
+dengan tanggal akhir & laju harian tetap).
 
 - **`TARGET_TAHAP1_LUNA_PER_CABANG`** di `logic_aksesoris.py`: dict 18
   cabang dengan nilai spesifik (Klender Rp16.690.500, Bintara
@@ -447,38 +449,74 @@ evaluasi fleksibel, bukan program dengan tanggal akhir & laju harian tetap).
   **KUMULATIF sejak 20 Juli sampai tanggal evaluasi**.
 - **Koreksi konsep #2 — pengecualian Hydrogel**: target Rp 300.006.600
   ini khusus untuk LUNA **SELAIN varian Hydrogel** (LUNA Hydrogel punya
-  skema/target tersendiri, terpisah dari Tahap 1 ini). Parameter baru
+  skema/target tersendiri, terpisah dari Tahap 1 ini). Parameter
   `keyword_kecuali="HYDROGEL"` pada `monitoring_tahap_per_cabang()` —
   nama barang yang mengandung "LUNA" DAN "HYDROGEL" sekaligus (mis.
   "LUNA HYDROGEL MATERIAL CLEAR") dikeluarkan dari Result. Parameter
   bersifat opsional & backward-compatible (default `None` = tidak
-  mengecualikan apa pun, perilaku lama tetap jalan untuk pemanggilan lain).
-  **Dampak nyata**: koreksi ini mengubah urutan cabang secara signifikan
-  — Radjiman yang SEBELUM koreksi terlihat memimpin (96,2%, ternyata
-  sebagian besar dari penjualan Hydrogel, bukan LUNA reguler) turun jadi
-  cuma 5,4% setelah dikoreksi; Cilangkap yang sekarang benar-benar
-  memimpin (54,3%).
-- **Tanggal Mulai tetap** (20 Juli 2026, tidak bisa diubah dari UI —
-  sesuai konteks bisnisnya sebagai tanggal drop produk).
-- **Tanggal Evaluasi fleksibel** — default otomatis memakai **tanggal
-  faktur TERAKHIR pada data** (bukan tanggal hari ini), tapi bisa diubah
-  manual lewat date picker kalau ingin evaluasi di tanggal lain (mis. akhir
-  bulan tertentu untuk laporan resmi).
+  mengecualikan apa pun). **Dampak nyata**: koreksi ini mengubah urutan
+  cabang secara signifikan — Radjiman yang SEBELUM koreksi terlihat
+  memimpin (96,2%, ternyata sebagian besar dari penjualan Hydrogel, bukan
+  LUNA reguler) turun jadi cuma 5,4% setelah dikoreksi; Cilangkap yang
+  sekarang benar-benar memimpin (54,3%). Semua tahap (bukan cuma Tahap 1)
+  memakai pengecualian ini secara konsisten.
+- **Tanggal Mulai tahap 1 tetap** (20 Juli 2026, tidak bisa diubah dari
+  UI — sesuai konteks bisnisnya sebagai tanggal drop produk). Tahap
+  berikutnya boleh punya tanggal mulai sendiri (diatur saat menambahkan).
+- **Tanggal Evaluasi fleksibel, dipakai bersama SELURUH tahap** — default
+  otomatis memakai **tanggal faktur TERAKHIR pada data** (bukan tanggal
+  hari ini), tapi bisa diubah manual lewat satu date picker di atas
+  (berlaku untuk Tahap 1 maupun tahap tambahan sekaligus, supaya semua
+  tahap dievaluasi "sampai tanggal yang sama").
 - Baris **TOTAL JARINGAN** dan **warna indikator ambang batas** (sama
-  seperti tabel utama: 🔴<85% · 🟡85–99% · 🟢≥100%) juga diterapkan di sini,
-  memakai fungsi generik yang sama (`tambah_baris_total()`,
+  seperti tabel utama: 🔴<85% · 🟡85–99% · 🟢≥100%) diterapkan di SETIAP
+  tahap, memakai fungsi generik yang sama (`tambah_baris_total()`,
   `warna_indikator_pencapaian()`).
 
-**Diuji dengan data asli** (evaluasi 20 Jul–26 Agu 2026, default tanggal
-data terakhir, SUDAH mengecualikan Hydrogel): Total Result Rp 59.534.860
-dari target Rp 300.006.600 (19,8%) — selisih Rp 15.125.000 dari versi
-yang masih menghitung Hydrogel (Rp 74.659.860), sesuai omzet LUNA Hydrogel
-pada periode tsb. **Cilangkap** paling unggul (54,3% actual), **Karawang**
-belum ada penjualan LUNA (selain Hydrogel) sama sekali (0%). Termasuk
-kasus tepi: tanggal evaluasi diset SEBELUM tanggal mulai (hasil 0 di semua
-cabang, tidak error/negatif palsu), dan verifikasi backward-compatibility
-(`keyword_kecuali=None` menghasilkan angka identik dengan versi sebelum
-perbaikan ini).
+**➕ Tahap Berikutnya (BARU) — sistem dinamis, bukan terbatas Tahap 1 saja**
+
+- Kotak angka "Jumlah tahap tambahan" (0–6) — menambah *expander* baru
+  per tahap (Tahap 2, Tahap 3, dst).
+- Tiap tahap tambahan punya input sendiri: **Nama Tahap** (bisa diganti,
+  mis. "Tahap 2 - Q4 2026"), **Tanggal Mulai** (bebas, tidak harus 20 Juli),
+  **Target Total (Rp)**.
+- **Target per cabang untuk tahap tambahan bisa diedit langsung**
+  (`st.data_editor`) — default dibagi rata (Target Total ÷ 18 cabang),
+  tapi bisa disesuaikan tidak rata seperti Tahap 1 kalau perlu.
+- Setiap tahap tambahan otomatis dapat tabel monitoring + rincian produk
+  yang sama persis dengan Tahap 1 (fungsi `_render_tahap_block()` di
+  `app.py` — satu fungsi dipakai ulang untuk semua tahap, supaya
+  konsisten & tidak duplikasi kode).
+
+**📊 Ringkasan Kumulatif Seluruh Tahap (BARU)**
+
+- 4 kartu metrik: **Target Kumulatif** (jumlah target SEMUA tahap yang
+  didefinisikan), **Result Kumulatif**, **% Pencapaian Kumulatif**, dan
+  **Sisa Ruang Target** (Rp 2.000.000.000 dikurangi Target Kumulatif).
+- Progress bar visual terhadap batas Rp 2 Miliar.
+- **Peringatan otomatis** kalau Target Kumulatif seluruh tahap sudah
+  MELEBIHI Rp 2.000.000.000 — supaya tidak kebablasan saat menambah
+  tahap baru.
+
+**🔍 Rincian Produk per Cabang (BARU)** — di setiap blok tahap:
+
+- Dropdown pilih SATU cabang (dari 18 cabang) → tabel rincian **jenis
+  barang LUNA (selain Hydrogel) apa saja yang terjual dan berapa
+  kuantitasnya**, diurutkan dari omzet terbesar, memakai fungsi baru
+  `detail_produk_brand_cabang()` di `logic_aksesoris.py`.
+- Contoh hasil nyata (Cilangkap, Tahap 1): 5 jenis produk — LUNA DATA
+  CABLE TYPE-C CB-2E terlaris (229 pcs, Rp4.609.000), diikuti LUNA DATA
+  CABLE MICRO CB-2E (166 pcs), dst — total 430 pcs dari 5 jenis produk.
+- Cabang tanpa penjualan pada periode tsb (mis. Karawang) menampilkan
+  pesan info yang jelas, bukan tabel kosong yang membingungkan.
+
+**Diuji dengan data asli**: simulasi 3 tahap sekaligus (Tahap 1 asli +
+2 tahap tambahan contoh Rp300jt & Rp500jt) — Target Kumulatif terhitung
+benar Rp1.100.006.600 (55% dari batas Rp2M), Result Kumulatif
+Rp59.534.860, sisa ruang Rp899.993.400 — semua angka terverifikasi manual.
+Peringatan "melebihi Rp2M" juga diuji terpicu dengan benar saat target
+kumulatif disimulasikan melebihi batas. Tidak ada bentrok kunci widget
+sampai 6 tahap tambahan sekaligus (38 kunci unik diverifikasi).
 
 ## Analisa Mendalam: LUNA, Selain LUNA & Parfum UMAIR
 

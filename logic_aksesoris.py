@@ -1307,6 +1307,44 @@ def monitoring_tahap_per_cabang(
     return pd.DataFrame(rows, columns=cols)
 
 
+def detail_produk_brand_cabang(
+    df_aksesoris: pd.DataFrame,
+    cabang: str,
+    tanggal_mulai,
+    tanggal_evaluasi,
+    keyword: str = "LUNA",
+    keyword_kecuali: str | None = None,
+) -> pd.DataFrame:
+    """Rincian PER JENIS PRODUK (Nama Barang) untuk satu cabang, dalam
+    rentang tanggal tertentu — dipakai untuk "drill-down" dari tabel
+    monitoring per cabang: pilih satu cabang, lihat barang apa saja
+    yang terjual dan berapa kuantitasnya yang menyusun angka Result-nya."""
+    cols = ["Nama Barang", "Qty", "Omzet"]
+    if df_aksesoris.empty:
+        return pd.DataFrame(columns=cols)
+
+    tanggal_mulai = pd.Timestamp(tanggal_mulai)
+    tanggal_evaluasi = pd.Timestamp(tanggal_evaluasi)
+    df_periode = df_aksesoris[
+        (df_aksesoris["TGL FAKTUR"] >= tanggal_mulai) &
+        (df_aksesoris["TGL FAKTUR"] <= tanggal_evaluasi) &
+        (df_aksesoris["CABANG"] == cabang)
+    ]
+    nama_upper = df_periode["NAMA BARANG"].astype(str).str.upper()
+    mask = nama_upper.str.contains(keyword.upper(), na=False)
+    if keyword_kecuali:
+        mask = mask & ~nama_upper.str.contains(keyword_kecuali.upper(), na=False)
+    df_brand = df_periode[mask]
+    if df_brand.empty:
+        return pd.DataFrame(columns=cols)
+
+    g = df_brand.groupby("NAMA BARANG").agg(
+        Qty=("QTY", "sum"), Omzet=("TOTAL HARGA", "sum"),
+    ).reset_index().rename(columns={"NAMA BARANG": "Nama Barang"})
+    g = g.sort_values("Omzet", ascending=False).reset_index(drop=True)
+    return g[cols]
+
+
 def warna_indikator_pencapaian(pct):
     """Warna indikator ambang batas: <85% Merah, 85–99% Kuning, ≥100% Hijau.
     Dipakai lewat pandas Styler (`.map(warna_indikator_pencapaian, subset=[...])`)
