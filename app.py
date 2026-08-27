@@ -1446,22 +1446,9 @@ def render_aksesoris_tab():
         with t3:
             durasi_bulan_target = st.number_input("Durasi (bulan)", min_value=1, max_value=60, value=12, step=1, key="target_luna_durasi")
 
-    with st.expander("📍 Tahap 1 (checkpoint opsional)", expanded=False):
-        st.caption(
-            "Titik pemeriksaan (checkpoint) di tengah program — dibandingkan dengan pencapaian "
-            "AKTUAL sampai tanggal tsb. Kosongkan / set target Rp0 kalau tidak dipakai."
-        )
-        th1, th2 = st.columns(2)
-        with th1:
-            tahap1_tanggal = st.date_input("Tanggal Tahap 1", value=pd.Timestamp("2026-07-20"), key="target_luna_tahap1_tgl")
-        with th2:
-            tahap1_target = st.number_input("Target/Nilai Tahap 1 (Rp)", min_value=0, value=300_006_600, step=100_000, format="%d", key="target_luna_tahap1_nilai")
-
-    tahap_list = [{"nama": "Tahap 1", "tanggal": tahap1_tanggal, "target": tahap1_target}] if tahap1_target else []
-
     tprog = la.target_penjualan_luna(
         df, target=target_rp, tanggal_mulai=tanggal_mulai_target, durasi_bulan=int(durasi_bulan_target),
-        tahap_list=tahap_list,
+        tahap_list=[],
     )
 
     st.caption(
@@ -1488,13 +1475,6 @@ def render_aksesoris_tab():
             f"{la.format_int_id(tprog['jumlah_transaksi'])} baris transaksi LUNA tercatat dalam periode ini."
         )
 
-        for th in tprog["tahap"]:
-            st.info(
-                f"📍 **{th['nama']}** ({th['tanggal'].strftime('%d %b %Y')}): tercapai "
-                f"{la.format_rupiah_id(th['tercapai'])} dari target/nilai acuan "
-                f"{la.format_rupiah_id(th['target'])} ({la.format_percent_id(th['pct'])})."
-            )
-
         if tprog["pct_pencapaian"] < 80:
             st.warning(
                 f"⚠️ Pencapaian baru **{la.format_percent_id(tprog['pct_pencapaian'])}** dari target yang "
@@ -1510,7 +1490,8 @@ def render_aksesoris_tab():
     st.subheader("📋 Monitoring Pencapaian per Cabang")
     st.caption(
         "Target dibagi RATA ke seluruh cabang secara default (Target Total ÷ jumlah cabang). "
-        "Kolom \"Result\" dihitung otomatis dari data penjualan LUNA aktual tiap cabang pada periode ini."
+        "Kolom \"Result\" dihitung otomatis dari data penjualan LUNA aktual tiap cabang pada periode ini. "
+        "Warna: 🔴 <85% · 🟡 85–99% · 🟢 ≥100%."
     )
     per_cabang_luna = la.target_brand_per_cabang(
         df, target_total=target_rp, tanggal_mulai=tanggal_mulai_target,
@@ -1520,14 +1501,15 @@ def render_aksesoris_tab():
         st.info("Tidak ada data cabang untuk periode ini.")
     else:
         per_cabang_luna = per_cabang_luna.sort_values("% Actual", ascending=True).reset_index(drop=True)
-        styled_pcl = per_cabang_luna.style.background_gradient(
-            subset=["% Actual"], cmap="RdYlGn", vmin=0, vmax=max(per_cabang_luna["% Expected"].max(), 1),
+        pcl_dgn_total = la.tambah_baris_total(per_cabang_luna)
+        styled_pcl = pcl_dgn_total.style.map(
+            la.warna_indikator_pencapaian, subset=["% Actual"],
         ).format({
             "Target": la.format_rupiah_id, "Result": la.format_rupiah_id, "Expected": la.format_rupiah_id,
             "% Actual": la.format_percent_id, "% Expected": la.format_percent_id, "GAP": la.format_rupiah_id,
             "Target Kejar Per Hari": la.format_rupiah_id, "Sisa Hari": la.format_int_id,
         })
-        st.dataframe(styled_pcl, use_container_width=True, height=500)
+        st.dataframe(styled_pcl, use_container_width=True, height=530)
         st.caption(
             f"Cabang paling tertinggal: **{per_cabang_luna.iloc[0]['Cabang']}** "
             f"({la.format_percent_id(per_cabang_luna.iloc[0]['% Actual'])} actual) · "
@@ -1535,8 +1517,61 @@ def render_aksesoris_tab():
             f"({la.format_percent_id(per_cabang_luna.iloc[-1]['% Actual'])} actual)."
         )
         st.download_button(
-            "⬇️ Unduh CSV — Monitoring Pencapaian LUNA per Cabang", per_cabang_luna.to_csv(index=False).encode("utf-8-sig"),
+            "⬇️ Unduh CSV — Monitoring Pencapaian LUNA per Cabang", pcl_dgn_total.to_csv(index=False).encode("utf-8-sig"),
             "monitoring_target_luna_per_cabang.csv", "text/csv", key="ak_dl_target_per_cabang",
+        )
+
+    st.divider()
+
+    # -----------------------------------------------------------------
+    # 3c2. Monitoring Pencapaian Cabang — Tahap 1
+    # -----------------------------------------------------------------
+    st.subheader("📍 Monitoring Pencapaian Cabang — Tahap 1")
+    st.caption(
+        "Tanggal 20 Juli 2026 adalah tanggal produk LUNA mulai didistribusikan ke seluruh cabang "
+        "(bukan tanggal checkpoint tunggal). Pencapaian dihitung KUMULATIF dari tanggal itu sampai "
+        "tanggal evaluasi — default memakai tanggal faktur TERAKHIR pada data, atau bisa diisi manual "
+        "kalau ingin evaluasi di tanggal lain. Target per cabang sudah ditentukan (total Rp 300.006.600, "
+        "tidak dibagi rata). Warna: 🔴 <85% · 🟡 85–99% · 🟢 ≥100%."
+    )
+
+    tgl_data_terakhir = df["TGL FAKTUR"].max()
+    default_tgl_evaluasi = tgl_data_terakhir if pd.notna(tgl_data_terakhir) else pd.Timestamp("2026-07-20")
+
+    e1, e2 = st.columns(2)
+    with e1:
+        st.text_input("Tanggal Mulai (tetap)", value="20 Juli 2026", disabled=True, key="tahap1_mulai_display")
+    with e2:
+        tahap1_tgl_evaluasi = st.date_input(
+            "Tanggal Evaluasi (default: tanggal data terakhir)",
+            value=default_tgl_evaluasi, key="tahap1_tgl_evaluasi",
+        )
+
+    tahap1_hasil = la.monitoring_tahap_per_cabang(
+        df, la.TARGET_TAHAP1_LUNA_PER_CABANG, tanggal_mulai="2026-07-20",
+        tanggal_evaluasi=tahap1_tgl_evaluasi, keyword="LUNA",
+    )
+    if tahap1_hasil.empty:
+        st.info("Tidak ada data untuk periode Tahap 1 ini.")
+    else:
+        tahap1_hasil = tahap1_hasil.sort_values("% Actual", ascending=True).reset_index(drop=True)
+        tahap1_dgn_total = la.tambah_baris_total(tahap1_hasil)
+        styled_t1 = tahap1_dgn_total.style.map(
+            la.warna_indikator_pencapaian, subset=["% Actual"],
+        ).format({
+            "Target": la.format_rupiah_id, "Result": la.format_rupiah_id,
+            "% Actual": la.format_percent_id, "GAP": la.format_rupiah_id,
+        })
+        st.dataframe(styled_t1, use_container_width=True, height=530)
+        total_row = tahap1_dgn_total.iloc[-1]
+        st.caption(
+            f"Total jaringan: {la.format_rupiah_id(total_row['Result'])} dari "
+            f"{la.format_rupiah_id(total_row['Target'])} target Tahap 1 "
+            f"({la.format_percent_id(total_row['% Actual'])})."
+        )
+        st.download_button(
+            "⬇️ Unduh CSV — Monitoring Tahap 1 per Cabang", tahap1_dgn_total.to_csv(index=False).encode("utf-8-sig"),
+            "monitoring_tahap1_luna_per_cabang.csv", "text/csv", key="ak_dl_tahap1",
         )
 
     st.divider()

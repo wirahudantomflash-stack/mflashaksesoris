@@ -1214,6 +1214,105 @@ def target_brand_per_cabang(
     return pd.DataFrame(rows, columns=cols)
 
 
+def tambah_baris_total(df_per_cabang: pd.DataFrame, label: str = "TOTAL JARINGAN") -> pd.DataFrame:
+    """Tambahkan baris rekapan TOTAL di paling bawah tabel monitoring per
+    cabang — kolom Rp dijumlahkan, kolom % dihitung ulang dari rasio total
+    (bukan dijumlah/dirata begitu saja, supaya tetap akurat secara
+    matematis), "Sisa Hari" diambil dari baris pertama (sama untuk semua
+    cabang dalam satu periode). Berlaku untuk skema kolom
+    `target_brand_per_cabang()` (9 kolom) maupun skema Tahap 1 yang lebih
+    ringkas (Cabang, Target, Result, % Actual, GAP)."""
+    if df_per_cabang.empty:
+        return df_per_cabang
+
+    total = {"Cabang": label}
+    kolom_rp_jumlah = [c for c in ["Target", "Result", "Expected", "GAP", "Target Kejar Per Hari"] if c in df_per_cabang.columns]
+    for c in kolom_rp_jumlah:
+        total[c] = df_per_cabang[c].sum()
+
+    target_total = total.get("Target", 0)
+    if "% Actual" in df_per_cabang.columns:
+        total["% Actual"] = (total.get("Result", 0) / target_total * 100) if target_total else 0
+    if "% Expected" in df_per_cabang.columns:
+        total["% Expected"] = (total.get("Expected", 0) / target_total * 100) if target_total else 0
+    if "Sisa Hari" in df_per_cabang.columns:
+        total["Sisa Hari"] = df_per_cabang["Sisa Hari"].iloc[0]
+
+    baris_total = pd.DataFrame([total])[df_per_cabang.columns]
+    return pd.concat([df_per_cabang, baris_total], ignore_index=True)
+
+
+# Target Tahap 1 per cabang (referensi resmi) — total persis Rp 300.006.600.
+TARGET_TAHAP1_LUNA_PER_CABANG = {
+    "Klender": 16_690_500, "Ceger": 16_651_500, "Bintara": 16_892_100,
+    "Radjiman": 16_651_500, "Jatimulya": 16_651_500, "Dramaga": 16_651_500,
+    "Condet": 16_651_500, "Jatibening": 16_651_500, "Sawangan": 16_651_500,
+    "Warbong": 16_651_500, "Cinere": 16_651_500, "Cibinong": 16_651_500,
+    "Karawang": 16_651_500, "Jatiwaringin": 16_651_500, "Cikampek": 16_651_500,
+    "Cilangkap": 16_651_500, "Pejaten": 16_651_500, "Cibubur": 16_651_500,
+}
+
+
+def monitoring_tahap_per_cabang(
+    df_aksesoris: pd.DataFrame,
+    target_per_cabang: dict,
+    tanggal_mulai,
+    tanggal_evaluasi=None,
+    keyword: str = "LUNA",
+) -> pd.DataFrame:
+    """Monitoring pencapaian MILESTONE/TAHAP tetap per cabang (bukan target
+    rate-per-hari seperti `target_brand_per_cabang()`) — dipakai untuk
+    Tahap 1: target per cabang sudah ditentukan di muka (`target_per_cabang`),
+    dihitung KUMULATIF sejak `tanggal_mulai` (tanggal produk mulai
+    didistribusikan/bisa mulai transaksi) sampai `tanggal_evaluasi`.
+
+    `tanggal_evaluasi` opsional: kalau tidak diisi, otomatis memakai tanggal
+    faktur TERAKHIR pada data (bukan tanggal hari ini) — supaya pencapaian
+    tidak terlihat rendah cuma karena dievaluasi persis di tanggal_mulai
+    (kesalahan yang sempat terjadi di versi sebelumnya). Bisa juga diisi
+    manual kalau ingin evaluasi di tanggal tertentu."""
+    cols = ["Cabang", "Target", "Result", "% Actual", "GAP"]
+    if df_aksesoris.empty or not target_per_cabang:
+        return pd.DataFrame(columns=cols)
+
+    tanggal_mulai = pd.Timestamp(tanggal_mulai)
+    if tanggal_evaluasi is None:
+        tanggal_evaluasi = df_aksesoris["TGL FAKTUR"].max()
+        if pd.isna(tanggal_evaluasi):
+            tanggal_evaluasi = tanggal_mulai
+    else:
+        tanggal_evaluasi = pd.Timestamp(tanggal_evaluasi)
+
+    df_periode = df_aksesoris[(df_aksesoris["TGL FAKTUR"] >= tanggal_mulai) & (df_aksesoris["TGL FAKTUR"] <= tanggal_evaluasi)]
+    mask_brand = df_periode["NAMA BARANG"].astype(str).str.upper().str.contains(keyword.upper(), na=False)
+    result_per_cabang = df_periode[mask_brand].groupby("CABANG")["TOTAL HARGA"].sum()
+
+    rows = []
+    for cabang, target_cabang in target_per_cabang.items():
+        result = float(result_per_cabang.get(cabang, 0))
+        pct_actual = (result / target_cabang * 100) if target_cabang else 0
+        gap = result - target_cabang
+        rows.append({"Cabang": cabang, "Target": target_cabang, "Result": result, "% Actual": pct_actual, "GAP": gap})
+
+    return pd.DataFrame(rows, columns=cols)
+
+
+def warna_indikator_pencapaian(pct):
+    """Warna indikator ambang batas: <85% Merah, 85–99% Kuning, ≥100% Hijau.
+    Dipakai lewat pandas Styler (`.map(warna_indikator_pencapaian, subset=[...])`)
+    pada kolom persentase pencapaian."""
+    try:
+        v = float(pct)
+    except (TypeError, ValueError):
+        return ""
+    if v < 85:
+        return "background-color: #f5c6cb; color: #58151c;"
+    elif v < 100:
+        return "background-color: #ffe69c; color: #664d03;"
+    else:
+        return "background-color: #c3e6cb; color: #0f5132;"
+
+
 # ---------------------------------------------------------------------------
 # Format angka gaya Indonesia
 # ---------------------------------------------------------------------------

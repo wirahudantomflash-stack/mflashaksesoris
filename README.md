@@ -379,20 +379,17 @@ memang butuh kategori lain, seperti target UMAIR Parfum.
   hari program) dan **% dari Target Penuh** (dibanding target 12 bulan
   penuh) — supaya jelas mana yang jadi ukuran "on-track" dan mana yang
   ukuran progres keseluruhan.
-- Kotak **"📍 Tahap 1" (checkpoint opsional)** — default tanggal
-  20 Juli 2026, nilai Rp 300.006.600. Menampilkan pencapaian AKTUAL sampai
-  tanggal checkpoint tsb dibandingkan dengan nilai acuannya. **Catatan
-  jujur**: makna persis "Tahap 1 senilai Rp300.006.600" agak ambigu dari
-  permintaan aslinya (bisa berarti target fase 1, atau baseline pencapaian
-  sebelum program dimulai) — diimplementasikan sebagai checkpoint yang bisa
-  diubah tanggal & nilainya, silakan sesuaikan lewat kotak input kalau
-  interpretasinya belum pas.
 
-### 📋 Monitoring Pencapaian per Cabang (BARU)
+> **Perubahan dari versi sebelumnya**: kotak checkpoint "📍 Tahap 1"
+> generik (yang dulu ada di sini, mengevaluasi pencapaian PERSIS di satu
+> tanggal saja) **dihapus** dan digantikan bagian
+> "📍 Monitoring Pencapaian Cabang — Tahap 1" di bawah, yang lebih akurat
+> secara konsep — lihat penjelasannya di bagian tersendiri.
 
-Tabel baru langsung di bawah ringkasan jaringan, dengan **9 kolom persis
-sesuai spesifikasi**: Cabang, Target, Result, Expected, % Actual,
-% Expected, GAP, Target Kejar Per Hari, Sisa Hari.
+### 📋 Monitoring Pencapaian per Cabang
+
+Tabel dengan **9 kolom persis sesuai spesifikasi**: Cabang, Target, Result,
+Expected, % Actual, % Expected, GAP, Target Kejar Per Hari, Sisa Hari.
 
 - Fungsi `target_brand_per_cabang()` di `logic_aksesoris.py` — generik
   (bisa dipakai untuk brand apa saja lewat parameter `keyword`, tidak
@@ -400,25 +397,72 @@ sesuai spesifikasi**: Cabang, Target, Result, Expected, % Actual,
   atasnya (Samurai atau manual).
 - **Target dibagi RATA** ke seluruh cabang secara default (Target Total ÷
   jumlah cabang) — parameter `target_per_cabang` (dict) tersedia di fungsi
-  kalau nanti perlu distribusi tidak rata per cabang, belum diekspos ke UI.
+  kalau nanti perlu distribusi tidak rata per cabang, belum diekspos ke UI
+  untuk tabel ini (tapi SUDAH dipakai untuk tabel Tahap 1 di bawah).
 - **Result dihitung OTOMATIS** dari data penjualan LUNA aktual per cabang
   pada periode terpilih — bukan input manual seperti versi Excel
   sebelumnya, jadi selalu real-time mengikuti data yang diunggah.
 - **GAP** = Result − Expected (positif = di atas target seharusnya,
   negatif = di bawah/tertinggal).
 - Tabel diurutkan dari **% Actual TERENDAH** (cabang paling tertinggal di
-  atas), dengan gradasi warna merah→hijau pada kolom % Actual untuk
-  pemindaian cepat.
-- Baris "Sisa Hari" dan "Expected" SAMA untuk semua cabang dalam satu
-  tabel (karena satu periode yang sama), hanya "Target"/"Result"/turunannya
-  yang beda per cabang.
+  atas).
+- **Baru: baris rekapan "TOTAL JARINGAN"** di paling bawah (fungsi
+  `tambah_baris_total()`) — kolom Rp dijumlahkan langsung, tapi kolom %
+  DIHITUNG ULANG dari rasio total (Result total ÷ Target total), BUKAN
+  dijumlah atau dirata-rata mentah, supaya tetap akurat secara matematis
+  (rata-rata dari beberapa persentase tidak selalu sama dengan persentase
+  dari totalnya). "Sisa Hari" di baris total diambil dari baris pertama
+  (sama untuk semua cabang dalam satu periode).
+- **Baru: warna indikator berbasis AMBANG BATAS** (bukan gradasi kontinu
+  seperti sebelumnya) — fungsi `warna_indikator_pencapaian()`: 🔴 Merah
+  jika % Actual < 85%, 🟡 Kuning jika 85–99%, 🟢 Hijau jika ≥ 100%.
 
 **Diuji dengan data asli** (Samurai 39, Target Rp2M dibagi 18 cabang =
 Rp111,1jt/cabang): cabang paling tertinggal **Warbong** (0,8% actual),
-paling unggul **Radjiman** (22,5% actual) — keduanya masih di bawah
-% Expected jaringan (62%), menunjukkan seluruh jaringan perlu percepatan.
-Termasuk kasus tepi: periode masa depan tanpa data (Result=0 di semua
-cabang, bukan error), dan data kosong total (tabel kosong dengan aman).
+paling unggul **Radjiman** (22,5% actual), baris TOTAL JARINGAN terverifikasi
+Target = Rp 2.000.000.000 (sum benar) dan % Actual = 5,2% (dihitung dari
+rasio total, cocok dengan Result total ÷ Target total). Termasuk kasus
+tepi: periode masa depan tanpa data (Result=0 di semua cabang, bukan
+error), dan data kosong total (tabel kosong dengan aman).
+
+### 📍 Monitoring Pencapaian Cabang — Tahap 1 (BARU)
+
+Bagian baru terpisah, khusus untuk milestone Tahap 1 (target tetap Rp
+300.006.600, **dengan distribusi TIDAK RATA per cabang** — bukan dibagi
+rata seperti tabel di atas). Kolom: Cabang, Target, Result, % Actual, GAP
+(lebih ringkas dari tabel utama — tanpa Expected/Target Kejar Per Hari/
+Sisa Hari, karena Tahap 1 adalah milestone kumulatif dengan tanggal
+evaluasi fleksibel, bukan program dengan tanggal akhir & laju harian tetap).
+
+- **`TARGET_TAHAP1_LUNA_PER_CABANG`** di `logic_aksesoris.py`: dict 18
+  cabang dengan nilai spesifik (Klender Rp16.690.500, Bintara
+  Rp16.892.100, 16 cabang lain masing-masing Rp16.651.500) — **dijamin
+  totalnya persis Rp 300.006.600**, diverifikasi baris per baris.
+- **Koreksi konsep penting**: tanggal 20 Juli 2026 adalah tanggal produk
+  LUNA **mulai didistribusikan** ke seluruh cabang (bukan tanggal
+  checkpoint tunggal untuk dievaluasi). Versi SEBELUMNYA salah — mengevaluasi
+  pencapaian PERSIS di tanggal 20 Juli itu sendiri, sehingga hasilnya
+  sangat kecil (cuma Rp 1.330.000, karena cuma menangkap transaksi HARI
+  ITU saja). Sekarang fungsi `monitoring_tahap_per_cabang()` menghitung
+  **KUMULATIF sejak 20 Juli sampai tanggal evaluasi** — jauh lebih masuk
+  akal (hasil terverifikasi: Rp 74.659.860 atau 24,9% dari target, dari
+  tanggal 20 Jul sampai 26 Agu 2026).
+- **Tanggal Mulai tetap** (20 Juli 2026, tidak bisa diubah dari UI —
+  sesuai konteks bisnisnya sebagai tanggal drop produk).
+- **Tanggal Evaluasi fleksibel** — default otomatis memakai **tanggal
+  faktur TERAKHIR pada data** (bukan tanggal hari ini), tapi bisa diubah
+  manual lewat date picker kalau ingin evaluasi di tanggal lain (mis. akhir
+  bulan tertentu untuk laporan resmi).
+- Baris **TOTAL JARINGAN** dan **warna indikator ambang batas** (sama
+  seperti tabel utama: 🔴<85% · 🟡85–99% · 🟢≥100%) juga diterapkan di sini,
+  memakai fungsi generik yang sama (`tambah_baris_total()`,
+  `warna_indikator_pencapaian()`).
+
+**Diuji dengan data asli**: evaluasi 20 Jul–26 Agu 2026 (default tanggal
+data terakhir) — Radjiman paling dekat target (96,2% actual), Karawang
+belum ada penjualan LUNA sama sekali (0%). Termasuk kasus tepi: tanggal
+evaluasi diset SEBELUM tanggal mulai (hasil 0 di semua cabang, tidak
+error/negatif palsu).
 
 ## Analisa Mendalam: LUNA, Selain LUNA & Parfum UMAIR
 
