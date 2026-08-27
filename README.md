@@ -438,15 +438,26 @@ evaluasi fleksibel, bukan program dengan tanggal akhir & laju harian tetap).
   cabang dengan nilai spesifik (Klender Rp16.690.500, Bintara
   Rp16.892.100, 16 cabang lain masing-masing Rp16.651.500) — **dijamin
   totalnya persis Rp 300.006.600**, diverifikasi baris per baris.
-- **Koreksi konsep penting**: tanggal 20 Juli 2026 adalah tanggal produk
+- **Koreksi konsep #1**: tanggal 20 Juli 2026 adalah tanggal produk
   LUNA **mulai didistribusikan** ke seluruh cabang (bukan tanggal
   checkpoint tunggal untuk dievaluasi). Versi SEBELUMNYA salah — mengevaluasi
   pencapaian PERSIS di tanggal 20 Juli itu sendiri, sehingga hasilnya
   sangat kecil (cuma Rp 1.330.000, karena cuma menangkap transaksi HARI
   ITU saja). Sekarang fungsi `monitoring_tahap_per_cabang()` menghitung
-  **KUMULATIF sejak 20 Juli sampai tanggal evaluasi** — jauh lebih masuk
-  akal (hasil terverifikasi: Rp 74.659.860 atau 24,9% dari target, dari
-  tanggal 20 Jul sampai 26 Agu 2026).
+  **KUMULATIF sejak 20 Juli sampai tanggal evaluasi**.
+- **Koreksi konsep #2 — pengecualian Hydrogel**: target Rp 300.006.600
+  ini khusus untuk LUNA **SELAIN varian Hydrogel** (LUNA Hydrogel punya
+  skema/target tersendiri, terpisah dari Tahap 1 ini). Parameter baru
+  `keyword_kecuali="HYDROGEL"` pada `monitoring_tahap_per_cabang()` —
+  nama barang yang mengandung "LUNA" DAN "HYDROGEL" sekaligus (mis.
+  "LUNA HYDROGEL MATERIAL CLEAR") dikeluarkan dari Result. Parameter
+  bersifat opsional & backward-compatible (default `None` = tidak
+  mengecualikan apa pun, perilaku lama tetap jalan untuk pemanggilan lain).
+  **Dampak nyata**: koreksi ini mengubah urutan cabang secara signifikan
+  — Radjiman yang SEBELUM koreksi terlihat memimpin (96,2%, ternyata
+  sebagian besar dari penjualan Hydrogel, bukan LUNA reguler) turun jadi
+  cuma 5,4% setelah dikoreksi; Cilangkap yang sekarang benar-benar
+  memimpin (54,3%).
 - **Tanggal Mulai tetap** (20 Juli 2026, tidak bisa diubah dari UI —
   sesuai konteks bisnisnya sebagai tanggal drop produk).
 - **Tanggal Evaluasi fleksibel** — default otomatis memakai **tanggal
@@ -458,11 +469,16 @@ evaluasi fleksibel, bukan program dengan tanggal akhir & laju harian tetap).
   memakai fungsi generik yang sama (`tambah_baris_total()`,
   `warna_indikator_pencapaian()`).
 
-**Diuji dengan data asli**: evaluasi 20 Jul–26 Agu 2026 (default tanggal
-data terakhir) — Radjiman paling dekat target (96,2% actual), Karawang
-belum ada penjualan LUNA sama sekali (0%). Termasuk kasus tepi: tanggal
-evaluasi diset SEBELUM tanggal mulai (hasil 0 di semua cabang, tidak
-error/negatif palsu).
+**Diuji dengan data asli** (evaluasi 20 Jul–26 Agu 2026, default tanggal
+data terakhir, SUDAH mengecualikan Hydrogel): Total Result Rp 59.534.860
+dari target Rp 300.006.600 (19,8%) — selisih Rp 15.125.000 dari versi
+yang masih menghitung Hydrogel (Rp 74.659.860), sesuai omzet LUNA Hydrogel
+pada periode tsb. **Cilangkap** paling unggul (54,3% actual), **Karawang**
+belum ada penjualan LUNA (selain Hydrogel) sama sekali (0%). Termasuk
+kasus tepi: tanggal evaluasi diset SEBELUM tanggal mulai (hasil 0 di semua
+cabang, tidak error/negatif palsu), dan verifikasi backward-compatibility
+(`keyword_kecuali=None` menghasilkan angka identik dengan versi sebelum
+perbaikan ini).
 
 ## Analisa Mendalam: LUNA, Selain LUNA & Parfum UMAIR
 

@@ -1259,6 +1259,7 @@ def monitoring_tahap_per_cabang(
     tanggal_mulai,
     tanggal_evaluasi=None,
     keyword: str = "LUNA",
+    keyword_kecuali: str | None = None,
 ) -> pd.DataFrame:
     """Monitoring pencapaian MILESTONE/TAHAP tetap per cabang (bukan target
     rate-per-hari seperti `target_brand_per_cabang()`) — dipakai untuk
@@ -1270,7 +1271,13 @@ def monitoring_tahap_per_cabang(
     faktur TERAKHIR pada data (bukan tanggal hari ini) — supaya pencapaian
     tidak terlihat rendah cuma karena dievaluasi persis di tanggal_mulai
     (kesalahan yang sempat terjadi di versi sebelumnya). Bisa juga diisi
-    manual kalau ingin evaluasi di tanggal tertentu."""
+    manual kalau ingin evaluasi di tanggal tertentu.
+
+    `keyword_kecuali` opsional: nama barang yang mengandung kata ini
+    DIKELUARKAN dari perhitungan Result, meski juga mengandung `keyword`
+    (mis. keyword="LUNA", keyword_kecuali="HYDROGEL" — untuk target Tahap 1
+    yang khusus LUNA SELAIN varian Hydrogel, karena Hydrogel punya skema
+    insentif & mungkin target terpisah sendiri)."""
     cols = ["Cabang", "Target", "Result", "% Actual", "GAP"]
     if df_aksesoris.empty or not target_per_cabang:
         return pd.DataFrame(columns=cols)
@@ -1284,7 +1291,10 @@ def monitoring_tahap_per_cabang(
         tanggal_evaluasi = pd.Timestamp(tanggal_evaluasi)
 
     df_periode = df_aksesoris[(df_aksesoris["TGL FAKTUR"] >= tanggal_mulai) & (df_aksesoris["TGL FAKTUR"] <= tanggal_evaluasi)]
-    mask_brand = df_periode["NAMA BARANG"].astype(str).str.upper().str.contains(keyword.upper(), na=False)
+    nama_upper = df_periode["NAMA BARANG"].astype(str).str.upper()
+    mask_brand = nama_upper.str.contains(keyword.upper(), na=False)
+    if keyword_kecuali:
+        mask_brand = mask_brand & ~nama_upper.str.contains(keyword_kecuali.upper(), na=False)
     result_per_cabang = df_periode[mask_brand].groupby("CABANG")["TOTAL HARGA"].sum()
 
     rows = []

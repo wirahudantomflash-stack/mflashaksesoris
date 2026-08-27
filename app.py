@@ -1532,7 +1532,8 @@ def render_aksesoris_tab():
         "(bukan tanggal checkpoint tunggal). Pencapaian dihitung KUMULATIF dari tanggal itu sampai "
         "tanggal evaluasi — default memakai tanggal faktur TERAKHIR pada data, atau bisa diisi manual "
         "kalau ingin evaluasi di tanggal lain. Target per cabang sudah ditentukan (total Rp 300.006.600, "
-        "tidak dibagi rata). Warna: 🔴 <85% · 🟡 85–99% · 🟢 ≥100%."
+        "tidak dibagi rata). **Target ini khusus LUNA SELAIN varian Hydrogel** (LUNA Hydrogel dikeluarkan "
+        "dari perhitungan Result, karena punya skema/target tersendiri). Warna: 🔴 <85% · 🟡 85–99% · 🟢 ≥100%."
     )
 
     tgl_data_terakhir = df["TGL FAKTUR"].max()
@@ -1549,7 +1550,7 @@ def render_aksesoris_tab():
 
     tahap1_hasil = la.monitoring_tahap_per_cabang(
         df, la.TARGET_TAHAP1_LUNA_PER_CABANG, tanggal_mulai="2026-07-20",
-        tanggal_evaluasi=tahap1_tgl_evaluasi, keyword="LUNA",
+        tanggal_evaluasi=tahap1_tgl_evaluasi, keyword="LUNA", keyword_kecuali="HYDROGEL",
     )
     if tahap1_hasil.empty:
         st.info("Tidak ada data untuk periode Tahap 1 ini.")
