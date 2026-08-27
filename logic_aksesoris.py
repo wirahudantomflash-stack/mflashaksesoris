@@ -148,6 +148,71 @@ def hanya_kategori(df: pd.DataFrame, kategori: str = "AKSESORIS") -> pd.DataFram
     return df[df["KATEGORI_NORM"] == kategori.strip().upper()]
 
 
+# ---------------------------------------------------------------------------
+# Periode "Samurai" (kuartelan bernama internal) — dipakai untuk pencapaian
+# per periode dan perbandingan antar periode LUNA vs Selain LUNA.
+# ---------------------------------------------------------------------------
+PERIODE_SAMURAI = {
+    "Samurai 37 (Jan–Mar 2026)": (pd.Timestamp("2026-01-01"), pd.Timestamp("2026-03-31")),
+    "Samurai 38 (Apr–Jun 2026)": (pd.Timestamp("2026-04-01"), pd.Timestamp("2026-06-30")),
+    "Samurai 39 (Jul–Sep 2026)": (pd.Timestamp("2026-07-01"), pd.Timestamp("2026-09-30")),
+    "Samurai 40 (Okt–Des 2026)": (pd.Timestamp("2026-10-01"), pd.Timestamp("2026-12-31")),
+}
+
+
+def filter_periode_samurai(df: pd.DataFrame, nama_periode: str) -> pd.DataFrame:
+    """Filter data penjualan ke satu periode Samurai (berdasar TGL FAKTUR)."""
+    if nama_periode not in PERIODE_SAMURAI or df.empty:
+        return df.iloc[0:0]
+    mulai, selesai = PERIODE_SAMURAI[nama_periode]
+    return df[(df["TGL FAKTUR"] >= mulai) & (df["TGL FAKTUR"] <= selesai)]
+
+
+def pencapaian_kelompok_periode(df_aksesoris: pd.DataFrame, nama_periode: str, keyword_brand: str = "LUNA") -> pd.DataFrame:
+    """Omzet & Gross Profit LUNA vs Selain LUNA untuk SATU periode Samurai
+    yang dipilih — dipakai untuk tampilan "pencapaian per periode"."""
+    cols = ["Kelompok", "Omzet", "Gross Profit", "Margin (%)", "Jumlah Nota", "Jumlah Item Terjual"]
+    df_p = filter_periode_samurai(df_aksesoris, nama_periode)
+    if df_p.empty:
+        return pd.DataFrame(columns=cols)
+
+    mask = df_p["NAMA BARANG"].astype(str).str.upper().str.contains(keyword_brand.upper(), na=False)
+    rows = []
+    for label, sub in [(keyword_brand.upper(), df_p[mask]), (f"Selain {keyword_brand.upper()}", df_p[~mask])]:
+        omzet = sub["TOTAL HARGA"].sum()
+        gp = sub["LABA"].sum()
+        rows.append({
+            "Kelompok": label,
+            "Omzet": omzet,
+            "Gross Profit": gp,
+            "Margin (%)": (gp / omzet * 100) if omzet else 0,
+            "Jumlah Nota": sub["NOTA_ID"].nunique() if "NOTA_ID" in sub.columns else 0,
+            "Jumlah Item Terjual": sub["QTY"].sum(),
+        })
+    return pd.DataFrame(rows, columns=cols)
+
+
+def perbandingan_antar_periode_samurai(df_aksesoris: pd.DataFrame, keyword_brand: str = "LUNA") -> pd.DataFrame:
+    """Bandingkan Omzet & Gross Profit LUNA vs Selain LUNA di SELURUH 4
+    periode Samurai sekaligus — satu baris per (Periode, Kelompok)."""
+    cols = ["Periode", "Kelompok", "Omzet", "Gross Profit", "Margin (%)"]
+    if df_aksesoris.empty:
+        return pd.DataFrame(columns=cols)
+
+    rows = []
+    for nama_periode in PERIODE_SAMURAI:
+        hasil = pencapaian_kelompok_periode(df_aksesoris, nama_periode, keyword_brand=keyword_brand)
+        for _, r in hasil.iterrows():
+            rows.append({
+                "Periode": nama_periode,
+                "Kelompok": r["Kelompok"],
+                "Omzet": r["Omzet"],
+                "Gross Profit": r["Gross Profit"],
+                "Margin (%)": r["Margin (%)"],
+            })
+    return pd.DataFrame(rows, columns=cols) if rows else pd.DataFrame(columns=cols)
+
+
 def omzet_per_kelompok(df_aksesoris: pd.DataFrame, df_parfum: pd.DataFrame, keyword_brand: str = "LUNA") -> pd.DataFrame:
     """Bandingkan omzet 3 kelompok: Aksesoris ber-brand `keyword_brand`
     (mis. LUNA), Aksesoris SELAIN brand itu, dan Parfum (kelompok terpisah,

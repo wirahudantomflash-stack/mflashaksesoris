@@ -158,13 +158,30 @@ def render_ringkasan_eksekutif():
     opk_re = la.omzet_per_kelompok(df_aks_re, df_parfum_re, keyword_brand="LUNA")
     kc_re = la.kontribusi_cabang_gabungan(df_aks_re, df_parfum_re)
 
+    # Nilai stok per kelompok (LUNA / Selain LUNA / Parfum) — sumber sama
+    # dengan bagian "Nilai Persediaan" di Dashboard Persediaan Aksesoris & Parfum.
+    nilai_stok_kelompok = {}
+    if not aks_stok_re.empty:
+        nilai_stok_kelompok["Aksesoris LUNA"] = aks_stok_re[aks_stok_re["ADALAH_LUNA"]]["Nilai Total"].sum()
+        nilai_stok_kelompok["Aksesoris Selain LUNA"] = aks_stok_re[~aks_stok_re["ADALAH_LUNA"]]["Nilai Total"].sum()
+    if not parfum_stok_re.empty:
+        nilai_stok_kelompok["Parfum"] = parfum_stok_re["Nilai Total"].sum()
+
     c1, c2, c3 = st.columns(3)
-    warna = {"c1": "#378ADD", "c2": "#888780", "c3": "#D4537E"}
     if not opk_re.empty:
         for col, (_, row) in zip([c1, c2, c3], opk_re.iterrows()):
             with col:
-                st.metric(row["Kelompok"], la.format_rupiah_id(row["Omzet"]))
+                margin_pct = (row["Laba"] / row["Omzet"] * 100) if row["Omzet"] else 0
+                st.metric(row["Kelompok"], la.format_rupiah_id(row["Omzet"]), f"Margin {la.format_percent_id(margin_pct)}")
                 st.caption(f"{la.format_int_id(row['Jumlah Item Terjual'])} pcs terjual")
+
+    if nilai_stok_kelompok:
+        s1, s2, s3 = st.columns(3)
+        for col, kelompok in zip([s1, s2, s3], ["Aksesoris LUNA", "Aksesoris Selain LUNA", "Parfum"]):
+            with col:
+                nilai = nilai_stok_kelompok.get(kelompok)
+                if nilai is not None:
+                    st.metric(f"Nilai Stok — {kelompok}", la.format_rupiah_id(nilai))
 
     st.markdown("&nbsp;", unsafe_allow_html=True)
     g1, g2 = st.columns(2)
@@ -1167,6 +1184,74 @@ def render_aksesoris_tab():
         st.download_button(
             "⬇️ Unduh CSV — Kontribusi Cabang (Aksesoris + Parfum)", kc.to_csv(index=False).encode("utf-8-sig"),
             "kontribusi_cabang.csv", "text/csv", key="ak_dl_kontribusi_cabang",
+        )
+
+    st.divider()
+
+    # -----------------------------------------------------------------
+    # 3a3. Pencapaian per Periode Samurai & Perbandingan Antar Periode
+    # -----------------------------------------------------------------
+    st.header("📅 Pencapaian Omzet & Gross Profit per Periode Samurai")
+    st.caption(
+        "Periode internal: Samurai 37 (Jan–Mar 2026), Samurai 38 (Apr–Jun 2026), "
+        "Samurai 39 (Jul–Sep 2026), Samurai 40 (Okt–Des 2026) — dihitung dari data "
+        "AKSESORIS (LUNA vs Selain LUNA), tidak terpengaruh filter tahun/bulan di atas "
+        "karena periode Samurai sudah menentukan rentang tanggalnya sendiri."
+    )
+
+    periode_pilihan = st.selectbox(
+        "Pilih periode untuk lihat pencapaiannya", list(la.PERIODE_SAMURAI.keys()), key="ak_periode_samurai",
+    )
+    hasil_periode = la.pencapaian_kelompok_periode(df, periode_pilihan, keyword_brand="LUNA")
+
+    if hasil_periode.empty:
+        st.info(f"Belum ada data penjualan aksesoris pada periode **{periode_pilihan}**.")
+    else:
+        p1, p2 = st.columns(2)
+        for col, (_, row) in zip([p1, p2], hasil_periode.iterrows()):
+            with col:
+                st.metric(f"{row['Kelompok']} — Omzet", la.format_rupiah_id(row["Omzet"]))
+                st.caption(
+                    f"Gross Profit {la.format_rupiah_id(row['Gross Profit'])} · "
+                    f"Margin {la.format_percent_id(row['Margin (%)'])} · "
+                    f"{la.format_int_id(row['Jumlah Item Terjual'])} pcs"
+                )
+        tampil_hp = hasil_periode.copy()
+        tampil_hp["Omzet"] = hasil_periode["Omzet"].map(la.format_rupiah_id)
+        tampil_hp["Gross Profit"] = hasil_periode["Gross Profit"].map(la.format_rupiah_id)
+        tampil_hp["Margin (%)"] = hasil_periode["Margin (%)"].map(la.format_percent_id)
+        tampil_hp["Jumlah Nota"] = hasil_periode["Jumlah Nota"].map(la.format_int_id)
+        tampil_hp["Jumlah Item Terjual"] = hasil_periode["Jumlah Item Terjual"].map(la.format_int_id)
+        st.dataframe(tampil_hp, use_container_width=True)
+
+    st.subheader("📊 Perbandingan Antar Periode Samurai")
+    perbandingan_samurai = la.perbandingan_antar_periode_samurai(df, keyword_brand="LUNA")
+    if perbandingan_samurai.empty:
+        st.info("Belum ada data untuk perbandingan antar periode.")
+    else:
+        pivot_omzet = perbandingan_samurai.pivot(index="Periode", columns="Kelompok", values="Omzet")
+        pivot_gp = perbandingan_samurai.pivot(index="Periode", columns="Kelompok", values="Gross Profit")
+
+        pg1, pg2 = st.columns(2)
+        with pg1:
+            st.caption("Omzet per periode")
+            st.bar_chart(pivot_omzet)
+        with pg2:
+            st.caption("Gross Profit per periode")
+            st.bar_chart(pivot_gp)
+
+        tampil_pb = perbandingan_samurai.copy()
+        tampil_pb["Omzet"] = perbandingan_samurai["Omzet"].map(la.format_rupiah_id)
+        tampil_pb["Gross Profit"] = perbandingan_samurai["Gross Profit"].map(la.format_rupiah_id)
+        tampil_pb["Margin (%)"] = perbandingan_samurai["Margin (%)"].map(la.format_percent_id)
+        st.dataframe(tampil_pb, use_container_width=True, height=250)
+        st.caption(
+            "Periode yang belum tercantum berarti belum ada data penjualan pada rentang "
+            "tanggalnya (mis. Samurai 40 kalau data terbaru belum sampai Oktober 2026)."
+        )
+        st.download_button(
+            "⬇️ Unduh CSV — Perbandingan Antar Periode Samurai", perbandingan_samurai.to_csv(index=False).encode("utf-8-sig"),
+            "perbandingan_periode_samurai.csv", "text/csv", key="ak_dl_samurai",
         )
 
     st.divider()

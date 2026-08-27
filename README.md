@@ -43,7 +43,10 @@ tab.
 Bagian ringkas gaya kartu di paling atas halaman, sebelum ketiga dashboard
 detail — untuk gambaran cepat tanpa perlu scroll jauh:
 
-- 3 kartu metrik (Omzet Aksesoris LUNA, Selain LUNA, Parfum) + jumlah pcs terjual
+- 3 kartu metrik (Omzet Aksesoris LUNA, Selain LUNA, Parfum) + jumlah pcs
+  terjual + **Margin (%)** sebagai delta (Laba/Omzet dari kelompok yang sama)
+- **Baru**: 3 kartu **Nilai Stok** per kelompok (LUNA/Selain LUNA/Parfum) —
+  sumber sama dengan bagian "Nilai Persediaan" di dashboard detailnya
 - Grafik batang Omzet per kelompok, dan Kontribusi Cabang (terendah→tertinggi)
 - Breakdown bundling LUNA pada transaksi Service (3 metrik: pakai LUNA /
   brand lain / tanpa aksesoris)
@@ -64,6 +67,11 @@ LUNA 34,7%, target UMAIR 40,1%) — termasuk kasus tepi data Persediaan belum
 diunggah (bagian stok dilewati dengan pesan info, bukan error) dan berkas
 Penjualan rincian satu cabang tanpa nama cabang terisi (`MissingCabangColumn`
 tertangani dengan pesan yang mengarahkan ke bagian pengisian nama cabang).
+
+**Temuan dari kartu Margin & Nilai Stok yang baru ditambahkan**: LUNA
+punya margin tertinggi (56,0%), disusul Selain LUNA (40,1%), Parfum
+paling rendah (17,7%) — Nilai Stok: LUNA Rp285,1jt, Selain LUNA Rp934,0jt,
+Parfum Rp180,8jt.
 
 ## Dashboard Persediaan Parfum — apa yang beda dari Aksesoris
 
@@ -429,6 +437,42 @@ keduanya sebagai satu angka "pelanggaran" akan menyesatkan.
   ke satu cabang. Sudah diperbaiki (`df_semua_kategori_f`) dan
   diverifikasi: filter ke cabang Bintara saja menghasilkan 709 nota temuan
   (bukan lagi 12.867 semua cabang), seluruhnya benar dari Bintara.
+
+## Pencapaian per Periode Samurai & Perbandingan Antar Periode
+
+**Fitur baru**, ditempatkan di tab Penjualan Aksesoris setelah bagian
+grafik LUNA vs Selain LUNA vs Parfum:
+
+- **Periode "Samurai"** — penamaan kuartalan internal, ditanam sebagai
+  konstanta `PERIODE_SAMURAI` di `logic_aksesoris.py`: Samurai 37
+  (Jan–Mar 2026), Samurai 38 (Apr–Jun 2026), Samurai 39 (Jul–Sep 2026),
+  Samurai 40 (Okt–Des 2026). Gampang ditambah periode baru (Samurai 41,
+  dst) kalau perlu — tinggal tambah entri di dict tsb.
+- **Pilihan pencapaian per periode**: dropdown untuk memilih SATU periode,
+  menampilkan Omzet, Gross Profit, Margin, jumlah nota & item terjual untuk
+  LUNA vs Selain LUNA pada periode itu saja (fungsi
+  `pencapaian_kelompok_periode()`).
+- **Perbandingan antar periode**: tabel + 2 grafik batang (Omzet dan Gross
+  Profit) yang menyandingkan SELURUH periode Samurai sekaligus, LUNA vs
+  Selain LUNA berdampingan per periode (fungsi
+  `perbandingan_antar_periode_samurai()`). Periode yang belum ada datanya
+  (mis. Samurai 40 kalau data terbaru belum sampai Oktober 2026) otomatis
+  tidak muncul di perbandingan, bukan tampil sebagai baris kosong/error.
+- Dihitung dari data **AKSESORIS yang sudah difilter kategori** (`df`,
+  bukan `dff`) — **tidak terpengaruh filter tahun/bulan** di bagian atas
+  tab, karena periode Samurai sudah menentukan rentang tanggalnya sendiri
+  secara eksplisit (mengikuti prinsip yang sama dengan Target LUNA/UMAIR).
+
+**Diuji dengan data asli** (184.712 baris, data sampai 24 Agustus 2026):
+- Samurai 37: LUNA Rp1,2jt (margin 68,8%) vs Selain LUNA Rp1,50M (margin 44,2%)
+- Samurai 38: LUNA Rp126,6jt (margin 54,6%) vs Selain LUNA Rp1,55M (margin 39,6%)
+- Samurai 39: LUNA Rp95,7jt (margin 57,6%) vs Selain LUNA Rp963,1jt (margin 34,4%)
+- Samurai 40: belum ada data (benar, karena data terbaru baru sampai Agustus)
+- Terlihat tren jelas: **omzet LUNA melonjak drastis dari Samurai 37 ke 38**
+  (Rp1,2jt → Rp126,6jt) — konsisten dengan program bundling LUNA yang mulai
+  digalakkan pertengahan 2026.
+- Termasuk kasus tepi: periode tanpa data (pesan info, bukan error), dan
+  data kosong total (semua fungsi mengembalikan tabel kosong dengan aman).
 
 ## Grafik Penjualan LUNA vs Selain LUNA vs Parfum & Kontribusi Cabang
 
