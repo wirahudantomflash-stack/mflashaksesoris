@@ -359,6 +359,12 @@ memang butuh kategori lain, seperti target UMAIR Parfum.
 - Default: **Rp 2.000.000.000** dalam **12 bulan mulai 20 Juli 2026**
   (20 Jul 2026 – 19 Jul 2027) — ketiganya bisa diubah langsung dari
   dashboard (target, tanggal mulai, durasi bulan).
+- **Baru: pemilih Periode Samurai** (checkbox "Gunakan Periode Samurai") —
+  saat aktif, pengguna tinggal pilih salah satu dari 6 periode kuartalan
+  (Samurai 39–44, Jul 2026–Des 2027) lewat dropdown, dan tanggal mulai +
+  durasi otomatis terisi (3 bulan per periode) — tidak perlu isi tanggal
+  manual. Matikan checkbox untuk kembali ke mode tanggal manual + durasi
+  bebas (mis. untuk periode 12 bulan lintas kuartal seperti sebelumnya).
 - Produk LUNA diidentifikasi dari **nama barang mengandung kata "LUNA"**,
   dihitung dari **data yang sudah difilter ke kategori AKSESORIS** (tidak
   terpengaruh filter tahun/bulan/cabang di bagian atas tab), supaya
@@ -373,7 +379,7 @@ memang butuh kategori lain, seperti target UMAIR Parfum.
   hari program) dan **% dari Target Penuh** (dibanding target 12 bulan
   penuh) — supaya jelas mana yang jadi ukuran "on-track" dan mana yang
   ukuran progres keseluruhan.
-- **Baru: kotak "📍 Tahap 1" (checkpoint opsional)** — default tanggal
+- Kotak **"📍 Tahap 1" (checkpoint opsional)** — default tanggal
   20 Juli 2026, nilai Rp 300.006.600. Menampilkan pencapaian AKTUAL sampai
   tanggal checkpoint tsb dibandingkan dengan nilai acuannya. **Catatan
   jujur**: makna persis "Tahap 1 senilai Rp300.006.600" agak ambigu dari
@@ -381,6 +387,38 @@ memang butuh kategori lain, seperti target UMAIR Parfum.
   sebelum program dimulai) — diimplementasikan sebagai checkpoint yang bisa
   diubah tanggal & nilainya, silakan sesuaikan lewat kotak input kalau
   interpretasinya belum pas.
+
+### 📋 Monitoring Pencapaian per Cabang (BARU)
+
+Tabel baru langsung di bawah ringkasan jaringan, dengan **9 kolom persis
+sesuai spesifikasi**: Cabang, Target, Result, Expected, % Actual,
+% Expected, GAP, Target Kejar Per Hari, Sisa Hari.
+
+- Fungsi `target_brand_per_cabang()` di `logic_aksesoris.py` — generik
+  (bisa dipakai untuk brand apa saja lewat parameter `keyword`, tidak
+  cuma LUNA), mengikuti periode yang sama dengan ringkasan jaringan di
+  atasnya (Samurai atau manual).
+- **Target dibagi RATA** ke seluruh cabang secara default (Target Total ÷
+  jumlah cabang) — parameter `target_per_cabang` (dict) tersedia di fungsi
+  kalau nanti perlu distribusi tidak rata per cabang, belum diekspos ke UI.
+- **Result dihitung OTOMATIS** dari data penjualan LUNA aktual per cabang
+  pada periode terpilih — bukan input manual seperti versi Excel
+  sebelumnya, jadi selalu real-time mengikuti data yang diunggah.
+- **GAP** = Result − Expected (positif = di atas target seharusnya,
+  negatif = di bawah/tertinggal).
+- Tabel diurutkan dari **% Actual TERENDAH** (cabang paling tertinggal di
+  atas), dengan gradasi warna merah→hijau pada kolom % Actual untuk
+  pemindaian cepat.
+- Baris "Sisa Hari" dan "Expected" SAMA untuk semua cabang dalam satu
+  tabel (karena satu periode yang sama), hanya "Target"/"Result"/turunannya
+  yang beda per cabang.
+
+**Diuji dengan data asli** (Samurai 39, Target Rp2M dibagi 18 cabang =
+Rp111,1jt/cabang): cabang paling tertinggal **Warbong** (0,8% actual),
+paling unggul **Radjiman** (22,5% actual) — keduanya masih di bawah
+% Expected jaringan (62%), menunjukkan seluruh jaringan perlu percepatan.
+Termasuk kasus tepi: periode masa depan tanpa data (Result=0 di semua
+cabang, bukan error), dan data kosong total (tabel kosong dengan aman).
 
 ## Analisa Mendalam: LUNA, Selain LUNA & Parfum UMAIR
 
@@ -444,10 +482,12 @@ keduanya sebagai satu angka "pelanggaran" akan menyesatkan.
 grafik LUNA vs Selain LUNA vs Parfum:
 
 - **Periode "Samurai"** — penamaan kuartalan internal, ditanam sebagai
-  konstanta `PERIODE_SAMURAI` di `logic_aksesoris.py`: Samurai 37
-  (Jan–Mar 2026), Samurai 38 (Apr–Jun 2026), Samurai 39 (Jul–Sep 2026),
-  Samurai 40 (Okt–Des 2026). Gampang ditambah periode baru (Samurai 41,
-  dst) kalau perlu — tinggal tambah entri di dict tsb.
+  konstanta `PERIODE_SAMURAI` di `logic_aksesoris.py`, sekarang mencakup
+  **8 periode**: Samurai 37 (Jan–Mar 2026) sampai Samurai 44
+  (Okt–Des 2027) — diperluas dari 4 periode awal (37–40) atas permintaan
+  untuk mendukung pemilih periode di bagian Target LUNA (lihat di bawah).
+  Satu sumber data dipakai bersama oleh kedua bagian (Perbandingan Antar
+  Periode di sini, dan Monitoring per Cabang di bagian Target LUNA).
 - **Pilihan pencapaian per periode**: dropdown untuk memilih SATU periode,
   menampilkan Omzet, Gross Profit, Margin, jumlah nota & item terjual untuk
   LUNA vs Selain LUNA pada periode itu saja (fungsi

@@ -66,14 +66,40 @@ batas_merah, batas_kuning = 25, 99
 # ---------------------------------------------------------------------------
 # Muat data
 # ---------------------------------------------------------------------------
-DEFAULT_PERSEDIAAN_PATH = "Persediaan_Aksesoris_Regional.xlsx"
-DEFAULT_PENJUALAN_PATH = "penjualan.csv.gz"
+# Dicari berurutan — file PERTAMA yang ketemu di root repo yang dipakai.
+# Boleh xlsx ATAU csv/csv.gz, tidak perlu nama & format persis — jadi Anda
+# tinggal commit berkas datanya ke GitHub dengan salah satu nama ini, tidak
+# perlu upload manual, dan otomatis kelihatan oleh SEMUA orang yang buka
+# aplikasi ini (tidak per-sesi/per-orang seperti tombol upload).
+DEFAULT_PERSEDIAAN_CANDIDATES = [
+    "Persediaan_Aksesoris_Regional.xlsx",
+    "persediaan.csv.gz",
+    "persediaan.csv",
+    "Persediaan_Barang_Regional.csv",
+]
+DEFAULT_PENJUALAN_CANDIDATES = [
+    "penjualan.csv.gz",
+    "penjualan.csv",
+    "Penjualan_Aksesoris_Regional.xlsx",
+    "Penjualan_Regional.csv",
+]
+
+
+def _cari_file_default(kandidat: list[str]) -> str | None:
+    for nama in kandidat:
+        if os.path.exists(nama):
+            return nama
+    return None
+
+
+DEFAULT_PERSEDIAAN_PATH = _cari_file_default(DEFAULT_PERSEDIAAN_CANDIDATES)
+DEFAULT_PENJUALAN_PATH = _cari_file_default(DEFAULT_PENJUALAN_CANDIDATES)
 
 df_persediaan, err_persediaan = None, None
 try:
     if upl_persediaan is not None:
         df_persediaan = lp.load_persediaan(upl_persediaan)
-    elif os.path.exists(DEFAULT_PERSEDIAAN_PATH):
+    elif DEFAULT_PERSEDIAAN_PATH:
         df_persediaan = lp.load_persediaan(DEFAULT_PERSEDIAAN_PATH)
 except Exception as e:
     err_persediaan = str(e)
@@ -99,7 +125,7 @@ raw_penjualan = None
 try:
     if buf_penjualan_1 is not None:
         raw_penjualan = ljl.read_raw(buf_penjualan_1)
-    elif os.path.exists(DEFAULT_PENJUALAN_PATH):
+    elif DEFAULT_PENJUALAN_PATH:
         raw_penjualan = ljl.read_raw(DEFAULT_PENJUALAN_PATH)
 except Exception as e:
     err_penjualan = str(e)
@@ -115,7 +141,7 @@ raw_aksesoris, err_aksesoris = None, None
 try:
     if buf_penjualan_2 is not None:
         raw_aksesoris = la.read_raw(buf_penjualan_2)
-    elif os.path.exists(DEFAULT_PENJUALAN_PATH):
+    elif DEFAULT_PENJUALAN_PATH:
         raw_aksesoris = la.read_raw(DEFAULT_PENJUALAN_PATH)
 except Exception as e:
     err_aksesoris = str(e)
@@ -1392,15 +1418,35 @@ def render_aksesoris_tab():
     # -----------------------------------------------------------------
     st.header("🎯 Target Pencapaian Penjualan Aksesoris LUNA")
 
-    t1, t2, t3 = st.columns(3)
-    with t1:
-        target_rp = st.number_input("Target (Rp)", min_value=0, value=2_000_000_000, step=100_000_000, format="%d", key="target_luna_rp")
-    with t2:
-        tanggal_mulai_target = st.date_input("Mulai program", value=pd.Timestamp("2026-07-20"), key="target_luna_mulai")
-    with t3:
-        durasi_bulan_target = st.number_input("Durasi (bulan)", min_value=1, max_value=60, value=12, step=1, key="target_luna_durasi")
+    gunakan_samurai = st.checkbox(
+        "Gunakan Periode Samurai (kuartalan)", value=True, key="target_luna_pakai_samurai",
+        help="Matikan untuk atur tanggal mulai & durasi secara manual (mis. periode 12 bulan lintas kuartal).",
+    )
 
-    with st.expander("📍 Tahap 1 (checkpoint opsional)", expanded=True):
+    periode_samurai_target_opsi = [
+        "Samurai 39 (Jul–Sep 2026)", "Samurai 40 (Okt–Des 2026)", "Samurai 41 (Jan–Mar 2027)",
+        "Samurai 42 (Apr–Jun 2027)", "Samurai 43 (Jul–Sep 2027)", "Samurai 44 (Okt–Des 2027)",
+    ]
+
+    if gunakan_samurai:
+        t1, t2 = st.columns(2)
+        with t1:
+            target_rp = st.number_input("Target (Rp)", min_value=0, value=2_000_000_000, step=100_000_000, format="%d", key="target_luna_rp")
+        with t2:
+            periode_pilihan_target = st.selectbox("Pilih Periode Samurai", periode_samurai_target_opsi, key="target_luna_periode_samurai")
+        tanggal_mulai_target, _tgl_selesai_periode = la.PERIODE_SAMURAI[periode_pilihan_target]
+        durasi_bulan_target = 3
+        st.caption(f"Periode: {tanggal_mulai_target.strftime('%d %b %Y')} – {_tgl_selesai_periode.strftime('%d %b %Y')} (3 bulan).")
+    else:
+        t1, t2, t3 = st.columns(3)
+        with t1:
+            target_rp = st.number_input("Target (Rp)", min_value=0, value=2_000_000_000, step=100_000_000, format="%d", key="target_luna_rp_manual")
+        with t2:
+            tanggal_mulai_target = st.date_input("Mulai program", value=pd.Timestamp("2026-07-20"), key="target_luna_mulai")
+        with t3:
+            durasi_bulan_target = st.number_input("Durasi (bulan)", min_value=1, max_value=60, value=12, step=1, key="target_luna_durasi")
+
+    with st.expander("📍 Tahap 1 (checkpoint opsional)", expanded=False):
         st.caption(
             "Titik pemeriksaan (checkpoint) di tengah program — dibandingkan dengan pencapaian "
             "AKTUAL sampai tanggal tsb. Kosongkan / set target Rp0 kalau tidak dipakai."
@@ -1460,6 +1506,38 @@ def render_aksesoris_tab():
                 f"✅ Pencapaian **{la.format_percent_id(tprog['pct_pencapaian'])}** dari target yang "
                 "seharusnya — di jalur yang baik."
             )
+
+    st.subheader("📋 Monitoring Pencapaian per Cabang")
+    st.caption(
+        "Target dibagi RATA ke seluruh cabang secara default (Target Total ÷ jumlah cabang). "
+        "Kolom \"Result\" dihitung otomatis dari data penjualan LUNA aktual tiap cabang pada periode ini."
+    )
+    per_cabang_luna = la.target_brand_per_cabang(
+        df, target_total=target_rp, tanggal_mulai=tanggal_mulai_target,
+        durasi_bulan=int(durasi_bulan_target), keyword="LUNA",
+    )
+    if per_cabang_luna.empty:
+        st.info("Tidak ada data cabang untuk periode ini.")
+    else:
+        per_cabang_luna = per_cabang_luna.sort_values("% Actual", ascending=True).reset_index(drop=True)
+        styled_pcl = per_cabang_luna.style.background_gradient(
+            subset=["% Actual"], cmap="RdYlGn", vmin=0, vmax=max(per_cabang_luna["% Expected"].max(), 1),
+        ).format({
+            "Target": la.format_rupiah_id, "Result": la.format_rupiah_id, "Expected": la.format_rupiah_id,
+            "% Actual": la.format_percent_id, "% Expected": la.format_percent_id, "GAP": la.format_rupiah_id,
+            "Target Kejar Per Hari": la.format_rupiah_id, "Sisa Hari": la.format_int_id,
+        })
+        st.dataframe(styled_pcl, use_container_width=True, height=500)
+        st.caption(
+            f"Cabang paling tertinggal: **{per_cabang_luna.iloc[0]['Cabang']}** "
+            f"({la.format_percent_id(per_cabang_luna.iloc[0]['% Actual'])} actual) · "
+            f"paling unggul: **{per_cabang_luna.iloc[-1]['Cabang']}** "
+            f"({la.format_percent_id(per_cabang_luna.iloc[-1]['% Actual'])} actual)."
+        )
+        st.download_button(
+            "⬇️ Unduh CSV — Monitoring Pencapaian LUNA per Cabang", per_cabang_luna.to_csv(index=False).encode("utf-8-sig"),
+            "monitoring_target_luna_per_cabang.csv", "text/csv", key="ak_dl_target_per_cabang",
+        )
 
     st.divider()
 

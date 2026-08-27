@@ -157,6 +157,10 @@ PERIODE_SAMURAI = {
     "Samurai 38 (Apr–Jun 2026)": (pd.Timestamp("2026-04-01"), pd.Timestamp("2026-06-30")),
     "Samurai 39 (Jul–Sep 2026)": (pd.Timestamp("2026-07-01"), pd.Timestamp("2026-09-30")),
     "Samurai 40 (Okt–Des 2026)": (pd.Timestamp("2026-10-01"), pd.Timestamp("2026-12-31")),
+    "Samurai 41 (Jan–Mar 2027)": (pd.Timestamp("2027-01-01"), pd.Timestamp("2027-03-31")),
+    "Samurai 42 (Apr–Jun 2027)": (pd.Timestamp("2027-04-01"), pd.Timestamp("2027-06-30")),
+    "Samurai 43 (Jul–Sep 2027)": (pd.Timestamp("2027-07-01"), pd.Timestamp("2027-09-30")),
+    "Samurai 44 (Okt–Des 2027)": (pd.Timestamp("2027-10-01"), pd.Timestamp("2027-12-31")),
 }
 
 
@@ -1132,6 +1136,82 @@ def target_penjualan_luna(
         df, keyword="LUNA", target=target, tanggal_mulai=tanggal_mulai,
         durasi_bulan=durasi_bulan, tahap_list=tahap_list,
     )
+
+
+def target_brand_per_cabang(
+    df_aksesoris: pd.DataFrame,
+    target_total: float,
+    tanggal_mulai,
+    durasi_bulan: int = 3,
+    keyword: str = "LUNA",
+    target_per_cabang: dict | None = None,
+) -> pd.DataFrame:
+    """Monitoring pencapaian target penjualan brand (mis. LUNA) PER CABANG,
+    untuk satu periode. 9 kolom sesuai spesifikasi:
+    Cabang, Target, Result, Expected, % Actual, % Expected, GAP,
+    Target Kejar Per Hari, Sisa Hari.
+
+    `target_per_cabang` opsional: dict {nama_cabang: nilai_target_rp} untuk
+    distribusi target TIDAK RATA antar cabang. Kalau tidak diisi, target
+    dibagi RATA ke seluruh cabang yang ada di data (`target_total / jumlah
+    cabang`).
+
+    Tanggal acuan "hari berjalan" memakai tanggal faktur TERAKHIR pada
+    SELURUH data (bukan cuma yang sudah masuk periode ini) — konsisten
+    dengan `target_penjualan_brand()` — supaya persentase tidak terlihat
+    rendah cuma karena data belum diperbarui."""
+    cols = ["Cabang", "Target", "Result", "Expected", "% Actual", "% Expected", "GAP", "Target Kejar Per Hari", "Sisa Hari"]
+    if df_aksesoris.empty:
+        return pd.DataFrame(columns=cols)
+
+    tanggal_mulai = pd.Timestamp(tanggal_mulai)
+    tanggal_selesai = tanggal_mulai + pd.DateOffset(months=durasi_bulan) - pd.Timedelta(days=1)
+    total_hari = (tanggal_selesai - tanggal_mulai).days + 1
+
+    # Hari berjalan & sisa hari — dari tanggal faktur TERAKHIR di seluruh data
+    tgl_acuan = df_aksesoris["TGL FAKTUR"].max()
+    if pd.isna(tgl_acuan) or tgl_acuan < tanggal_mulai:
+        hari_berjalan = 0
+    else:
+        tgl_efektif = min(tgl_acuan, tanggal_selesai)
+        hari_berjalan = (tgl_efektif - tanggal_mulai).days + 1
+    hari_berjalan = max(hari_berjalan, 0)
+    sisa_hari = max(total_hari - hari_berjalan, 0)
+
+    df_periode = df_aksesoris[(df_aksesoris["TGL FAKTUR"] >= tanggal_mulai) & (df_aksesoris["TGL FAKTUR"] <= tanggal_selesai)]
+    mask_brand = df_periode["NAMA BARANG"].astype(str).str.upper().str.contains(keyword.upper(), na=False)
+    result_per_cabang = df_periode[mask_brand].groupby("CABANG")["TOTAL HARGA"].sum()
+
+    semua_cabang = sorted(df_aksesoris["CABANG"].dropna().unique().tolist())
+    n_cabang = len(semua_cabang) or 1
+
+    rows = []
+    for cabang in semua_cabang:
+        if target_per_cabang and cabang in target_per_cabang:
+            target_cabang = float(target_per_cabang[cabang])
+        else:
+            target_cabang = target_total / n_cabang
+
+        result = float(result_per_cabang.get(cabang, 0))
+        expected = target_cabang * (hari_berjalan / total_hari) if total_hari else 0
+        pct_actual = (result / target_cabang * 100) if target_cabang else 0
+        pct_expected = (expected / target_cabang * 100) if target_cabang else 0
+        gap = result - expected
+        target_kejar_per_hari = (max(target_cabang - result, 0) / sisa_hari) if sisa_hari else 0
+
+        rows.append({
+            "Cabang": cabang,
+            "Target": target_cabang,
+            "Result": result,
+            "Expected": expected,
+            "% Actual": pct_actual,
+            "% Expected": pct_expected,
+            "GAP": gap,
+            "Target Kejar Per Hari": target_kejar_per_hari,
+            "Sisa Hari": sisa_hari,
+        })
+
+    return pd.DataFrame(rows, columns=cols)
 
 
 # ---------------------------------------------------------------------------
