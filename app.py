@@ -1437,7 +1437,7 @@ def render_aksesoris_tab():
     if gunakan_samurai:
         t1, t2 = st.columns(2)
         with t1:
-            target_rp = st.number_input(f"Target {label_target} (Rp)", min_value=0, value=2_000_000_000, step=100_000_000, format="%d", key="target_luna_rp")
+            target_rp = st.number_input("Target Omzet Aksesoris (Rp)", min_value=0, value=2_000_000_000, step=100_000_000, format="%d", key="target_luna_rp")
         with t2:
             periode_pilihan_target = st.selectbox("Pilih Periode Samurai", periode_samurai_target_opsi, key="target_luna_periode_samurai")
         tanggal_mulai_target, _tgl_selesai_periode = la.PERIODE_SAMURAI[periode_pilihan_target]
@@ -1446,7 +1446,7 @@ def render_aksesoris_tab():
     else:
         t1, t2, t3 = st.columns(3)
         with t1:
-            target_rp = st.number_input(f"Target {label_target} (Rp)", min_value=0, value=2_000_000_000, step=100_000_000, format="%d", key="target_luna_rp_manual")
+            target_rp = st.number_input("Target Omzet Aksesoris (Rp)", min_value=0, value=2_000_000_000, step=100_000_000, format="%d", key="target_luna_rp_manual")
         with t2:
             tanggal_mulai_target = st.date_input("Mulai program", value=pd.Timestamp("2026-08-20"), key="target_luna_mulai")
         with t3:
