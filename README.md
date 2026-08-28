@@ -460,9 +460,15 @@ dengan tanggal akhir & laju harian tetap).
   LUNA reguler) turun jadi cuma 5,4% setelah dikoreksi; Cilangkap yang
   sekarang benar-benar memimpin (54,3%). Semua tahap (bukan cuma Tahap 1)
   memakai pengecualian ini secara konsisten.
-- **Tanggal Mulai tahap 1 tetap** (20 Juli 2026, tidak bisa diubah dari
-  UI — sesuai konteks bisnisnya sebagai tanggal drop produk). Tahap
-  berikutnya boleh punya tanggal mulai sendiri (diatur saat menambahkan).
+- **Tanggal Mulai Tahap 1 sekarang BISA DIISI SENDIRI** (default 20 Juli
+  2026, tanggal drop produk) — diubah dari versi sebelumnya yang terkunci,
+  karena transaksi riil di tiap cabang bisa mulai beberapa hari setelah
+  tanggal drop (mis. 20–26 Juli 2026, tergantung kapan cabang mulai
+  menjual). Date picker terpisah di atas tabel, mempengaruhi seluruh
+  perhitungan Tahap 1. Peringatan otomatis muncul kalau Tanggal Mulai
+  diset SETELAH Tanggal Evaluasi (Result akan 0 untuk semua cabang).
+  Tahap berikutnya tetap punya tanggal mulai sendiri-sendiri (diatur saat
+  menambahkan).
 - **Tanggal Evaluasi fleksibel, dipakai bersama SELURUH tahap** — default
   otomatis memakai **tanggal faktur TERAKHIR pada data** (bukan tanggal
   hari ini), tapi bisa diubah manual lewat satu date picker di atas
@@ -517,6 +523,13 @@ Rp59.534.860, sisa ruang Rp899.993.400 — semua angka terverifikasi manual.
 Peringatan "melebihi Rp2M" juga diuji terpicu dengan benar saat target
 kumulatif disimulasikan melebihi batas. Tidak ada bentrok kunci widget
 sampai 6 tahap tambahan sekaligus (38 kunci unik diverifikasi).
+
+**Diuji: Tanggal Mulai Tahap 1 yang bisa diisi sendiri** — mulai 20 Juli
+menghasilkan Result Rp59.534.860, mulai 26 Juli menghasilkan Rp54.301.860
+— selisih Rp5.233.000 tepat sesuai penjualan tanggal 20–25 Juli yang
+ikut/tidak ikut terhitung tergantung tanggal mulai yang dipilih. Kasus
+tepi (Tanggal Mulai diset SETELAH Tanggal Evaluasi) menghasilkan Result 0
+di semua cabang dengan peringatan yang jelas, bukan angka negatif/error.
 
 ## Analisa Mendalam: LUNA, Selain LUNA & Parfum UMAIR
 

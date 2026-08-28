@@ -1528,20 +1528,32 @@ def render_aksesoris_tab():
     # -----------------------------------------------------------------
     st.subheader("📍 Monitoring Pencapaian Cabang — Bertahap (menuju Rp 2 Miliar)")
     st.caption(
-        "Tanggal 20 Juli 2026 adalah tanggal produk LUNA mulai didistribusikan ke seluruh cabang "
-        "(bukan tanggal checkpoint tunggal). Pencapaian tiap tahap dihitung KUMULATIF dari tanggal "
-        "mulai tahap tsb sampai tanggal evaluasi. **Semua tahap khusus LUNA SELAIN varian Hydrogel** "
-        "(LUNA Hydrogel punya skema/target tersendiri). Warna: 🔴 <85% · 🟡 85–99% · 🟢 ≥100%. "
-        "Tahap 1 adalah tahap pertama dari rangkaian tahap menuju target total Rp 2.000.000.000 — "
-        "tahap berikutnya (Tahap 2, 3, dst) bisa ditambahkan di bagian bawah begitu sudah ditentukan."
+        "Tanggal 20 Juli 2026 adalah tanggal produk LUNA mulai didistribusikan ke seluruh cabang, "
+        "tapi transaksi riil di tiap cabang bisa mulai beberapa hari setelahnya (mis. 20–26 Juli 2026) "
+        "— sesuaikan \"Tanggal Mulai Tahap 1\" di bawah kalau perlu. Pencapaian tiap tahap dihitung "
+        "KUMULATIF dari tanggal mulai tahap tsb sampai tanggal evaluasi. **Semua tahap khusus LUNA "
+        "SELAIN varian Hydrogel** (LUNA Hydrogel punya skema/target tersendiri). Warna: 🔴 <85% · "
+        "🟡 85–99% · 🟢 ≥100%. Tahap 1 adalah tahap pertama dari rangkaian tahap menuju target total "
+        "Rp 2.000.000.000 — tahap berikutnya (Tahap 2, 3, dst) bisa ditambahkan di bagian bawah begitu "
+        "sudah ditentukan."
     )
 
     tgl_data_terakhir = df["TGL FAKTUR"].max()
     default_tgl_evaluasi = tgl_data_terakhir if pd.notna(tgl_data_terakhir) else pd.Timestamp("2026-07-20")
-    tahap1_tgl_evaluasi = st.date_input(
-        "Tanggal Evaluasi untuk seluruh tahap (default: tanggal data terakhir)",
-        value=default_tgl_evaluasi, key="tahap1_tgl_evaluasi",
-    )
+
+    dt1, dt2 = st.columns(2)
+    with dt1:
+        tahap1_tgl_mulai = st.date_input(
+            "Tanggal Mulai Tahap 1 (bisa disesuaikan ke tanggal transaksi riil, mis. 20–26 Juli 2026)",
+            value=pd.Timestamp("2026-07-20"), key="tahap1_tgl_mulai",
+        )
+    with dt2:
+        tahap1_tgl_evaluasi = st.date_input(
+            "Tanggal Evaluasi untuk seluruh tahap (default: tanggal data terakhir)",
+            value=default_tgl_evaluasi, key="tahap1_tgl_evaluasi",
+        )
+    if pd.Timestamp(tahap1_tgl_mulai) > pd.Timestamp(tahap1_tgl_evaluasi):
+        st.warning("⚠️ Tanggal Mulai Tahap 1 lebih besar dari Tanggal Evaluasi — Result akan tampil 0 untuk semua cabang.")
 
     daftar_cabang_tahap = sorted(la.TARGET_TAHAP1_LUNA_PER_CABANG.keys())
 
@@ -1596,7 +1608,7 @@ def render_aksesoris_tab():
 
     st.markdown("#### Tahap 1")
     target_kumulatif, result_kumulatif = _render_tahap_block(
-        "Tahap 1", la.TARGET_TAHAP1_LUNA_PER_CABANG, "2026-07-20", "tahap1",
+        "Tahap 1", la.TARGET_TAHAP1_LUNA_PER_CABANG, tahap1_tgl_mulai, "tahap1",
     )
 
     st.divider()
