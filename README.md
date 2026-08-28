@@ -28,7 +28,7 @@ berisi tiga dashboard berurutan dari atas ke bawah:
      referensi harga LUNA & potensi profit, **matrix insentif resmi &
      kalkulator THP Sales Retail** (dikalibrasi ke target Rp5-8jt/bulan),
      **target pencapaian penjualan LUNA** (default Rp 2 miliar / 12 bulan
-     mulai 20 Juli 2026) & **target penjualan Parfum UMAIR** (maksimal
+     mulai 20 Agustus 2026) & **target penjualan Parfum UMAIR** (maksimal
      6 bulan), serta analisa + proyeksi 5–10 tahun.
 
 Ketiga dashboard memakai **satu tempat unggah data** di sidebar ("📁 Upload
@@ -356,7 +356,7 @@ memang butuh kategori lain, seperti target UMAIR Parfum.
 
 ## Target Pencapaian Penjualan LUNA
 
-- Default: **Rp 2.000.000.000** dalam **12 bulan mulai 20 Juli 2026**
+- Default: **Rp 2.000.000.000** dalam **12 bulan mulai 20 Agustus 2026**
   (20 Jul 2026 – 19 Jul 2027) — ketiganya bisa diubah langsung dari
   dashboard (target, tanggal mulai, durasi bulan).
 - **Baru: pemilih Periode Samurai** (checkbox "Gunakan Periode Samurai") —
@@ -440,13 +440,13 @@ dengan tanggal akhir & laju harian tetap).
   cabang dengan nilai spesifik (Klender Rp16.690.500, Bintara
   Rp16.892.100, 16 cabang lain masing-masing Rp16.651.500) — **dijamin
   totalnya persis Rp 300.006.600**, diverifikasi baris per baris.
-- **Koreksi konsep #1**: tanggal 20 Juli 2026 adalah tanggal produk
+- **Koreksi konsep #1**: tanggal 20 Agustus 2026 adalah tanggal produk
   LUNA **mulai didistribusikan** ke seluruh cabang (bukan tanggal
   checkpoint tunggal untuk dievaluasi). Versi SEBELUMNYA salah — mengevaluasi
-  pencapaian PERSIS di tanggal 20 Juli itu sendiri, sehingga hasilnya
+  pencapaian PERSIS di tanggal 20 Agustus itu sendiri, sehingga hasilnya
   sangat kecil (cuma Rp 1.330.000, karena cuma menangkap transaksi HARI
   ITU saja). Sekarang fungsi `monitoring_tahap_per_cabang()` menghitung
-  **KUMULATIF sejak 20 Juli sampai tanggal evaluasi**.
+  **KUMULATIF sejak 20 Agustus sampai tanggal evaluasi**.
 - **Koreksi konsep #2 — pengecualian Hydrogel**: target Rp 300.006.600
   ini khusus untuk LUNA **SELAIN varian Hydrogel** (LUNA Hydrogel punya
   skema/target tersendiri, terpisah dari Tahap 1 ini). Parameter
@@ -460,10 +460,11 @@ dengan tanggal akhir & laju harian tetap).
   LUNA reguler) turun jadi cuma 5,4% setelah dikoreksi; Cilangkap yang
   sekarang benar-benar memimpin (54,3%). Semua tahap (bukan cuma Tahap 1)
   memakai pengecualian ini secara konsisten.
-- **Tanggal Mulai Tahap 1 sekarang BISA DIISI SENDIRI** (default 20 Juli
-  2026, tanggal drop produk) — diubah dari versi sebelumnya yang terkunci,
+- **Tanggal Mulai Tahap 1 sekarang BISA DIISI SENDIRI** (default 20 Agustus
+  2026, tanggal barang masuk/drop produk — direvisi dari perkiraan awal
+  20 Juli) — diubah dari versi sebelumnya yang terkunci,
   karena transaksi riil di tiap cabang bisa mulai beberapa hari setelah
-  tanggal drop (mis. 20–26 Juli 2026, tergantung kapan cabang mulai
+  tanggal drop (mis. 20–26 Agustus 2026, tergantung kapan cabang mulai
   menjual). Date picker terpisah di atas tabel, mempengaruhi seluruh
   perhitungan Tahap 1. Peringatan otomatis muncul kalau Tanggal Mulai
   diset SETELAH Tanggal Evaluasi (Result akan 0 untuk semua cabang).
@@ -484,7 +485,7 @@ dengan tanggal akhir & laju harian tetap).
 - Kotak angka "Jumlah tahap tambahan" (0–6) — menambah *expander* baru
   per tahap (Tahap 2, Tahap 3, dst).
 - Tiap tahap tambahan punya input sendiri: **Nama Tahap** (bisa diganti,
-  mis. "Tahap 2 - Q4 2026"), **Tanggal Mulai** (bebas, tidak harus 20 Juli),
+  mis. "Tahap 2 - Q4 2026"), **Tanggal Mulai** (bebas, tidak harus 20 Agustus),
   **Target Total (Rp)**.
 - **Target per cabang untuk tahap tambahan bisa diedit langsung**
   (`st.data_editor`) — default dibagi rata (Target Total ÷ 18 cabang),
@@ -524,12 +525,13 @@ Peringatan "melebihi Rp2M" juga diuji terpicu dengan benar saat target
 kumulatif disimulasikan melebihi batas. Tidak ada bentrok kunci widget
 sampai 6 tahap tambahan sekaligus (38 kunci unik diverifikasi).
 
-**Diuji: Tanggal Mulai Tahap 1 yang bisa diisi sendiri** — mulai 20 Juli
-menghasilkan Result Rp59.534.860, mulai 26 Juli menghasilkan Rp54.301.860
-— selisih Rp5.233.000 tepat sesuai penjualan tanggal 20–25 Juli yang
-ikut/tidak ikut terhitung tergantung tanggal mulai yang dipilih. Kasus
-tepi (Tanggal Mulai diset SETELAH Tanggal Evaluasi) menghasilkan Result 0
-di semua cabang dengan peringatan yang jelas, bukan angka negatif/error.
+**Diuji: Tanggal Mulai Tahap 1 yang bisa diisi sendiri** — mulai 20 Agustus
+menghasilkan Result Rp21.016.500, mulai 26 Agustus menghasilkan
+Rp3.000.000 (selisih Rp18.016.500, sesuai penjualan tanggal 20–25 Agustus
+yang ikut/tidak ikut terhitung tergantung tanggal mulai yang dipilih).
+Kasus tepi (Tanggal Mulai diset SETELAH Tanggal Evaluasi) menghasilkan
+Result 0 di semua cabang dengan peringatan yang jelas, bukan angka
+negatif/error.
 
 ## Analisa Mendalam: LUNA, Selain LUNA & Parfum UMAIR
 
@@ -703,9 +705,10 @@ Modul-modul logika sudah diuji memakai data asli Anda:
   (dari 184.712 baris berkas mentah semua kategori), Omzet Rp 4.241.691.227
   — dipastikan BEDA dan LEBIH KECIL dari angka tanpa filter (Rp 46,89 M),
   membuktikan perbaikan bug berfungsi.
-- **Target LUNA** (mulai 20 Juli 2026): tercapai Rp 68.547.360 dari target
-  s/d hari ini Rp 197.260.274 (34,7%), Tahap 1 (20 Jul) tercapai
-  Rp 1.330.000 dari Rp 300.006.600 acuan.
+- **Target LUNA** (mulai 20 Agustus 2026, direvisi dari perkiraan awal
+  20 Juli — sesuai koreksi tanggal barang masuk): tercapai Rp 24.957.500
+  dari target s/d hari ini Rp 38.356.164 (65,1%), baru hari ke-7 dari
+  365 hari program.
 - **Target UMAIR** (6 bulan mulai 1 Jan 2026): tercapai Rp 40.065.000
   dari target Rp 100.000.000 (40,1%), periode sudah habis (sisa hari 0).
     ≤ 0, dan produk terlaris justru paling sering termasuk di dalamnya

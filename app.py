@@ -234,7 +234,7 @@ def render_ringkasan_eksekutif():
             m3.metric("Tanpa aksesoris", la.format_percent_id(bund_re["pct_tanpa_aksesoris"]))
     with b2:
         st.caption("Target pencapaian")
-        target_luna_re = la.target_penjualan_luna(df_aks_re, target=2_000_000_000, tanggal_mulai="2026-07-20", durasi_bulan=12)
+        target_luna_re = la.target_penjualan_luna(df_aks_re, target=2_000_000_000, tanggal_mulai="2026-08-20", durasi_bulan=12)
         target_umair_re = la.target_penjualan_brand(df_parfum_re, keyword="UMAIR", target=100_000_000, tanggal_mulai="2026-01-01", durasi_bulan=6)
         st.caption(f"LUNA · Rp 2 M / 12 bln — {la.format_percent_id(target_luna_re['pct_pencapaian'])}")
         st.progress(min(target_luna_re["pct_pencapaian"] / 100, 1.0) if target_luna_re["pct_pencapaian"] else 0)
@@ -1442,7 +1442,7 @@ def render_aksesoris_tab():
         with t1:
             target_rp = st.number_input("Target (Rp)", min_value=0, value=2_000_000_000, step=100_000_000, format="%d", key="target_luna_rp_manual")
         with t2:
-            tanggal_mulai_target = st.date_input("Mulai program", value=pd.Timestamp("2026-07-20"), key="target_luna_mulai")
+            tanggal_mulai_target = st.date_input("Mulai program", value=pd.Timestamp("2026-08-20"), key="target_luna_mulai")
         with t3:
             durasi_bulan_target = st.number_input("Durasi (bulan)", min_value=1, max_value=60, value=12, step=1, key="target_luna_durasi")
 
@@ -1528,9 +1528,10 @@ def render_aksesoris_tab():
     # -----------------------------------------------------------------
     st.subheader("📍 Monitoring Pencapaian Cabang — Bertahap (menuju Rp 2 Miliar)")
     st.caption(
-        "Tanggal 20 Juli 2026 adalah tanggal produk LUNA mulai didistribusikan ke seluruh cabang, "
-        "tapi transaksi riil di tiap cabang bisa mulai beberapa hari setelahnya (mis. 20–26 Juli 2026) "
-        "— sesuaikan \"Tanggal Mulai Tahap 1\" di bawah kalau perlu. Pencapaian tiap tahap dihitung "
+        "Tanggal 20 Agustus 2026 adalah tanggal produk LUNA barang masuk/mulai didistribusikan ke "
+        "seluruh cabang, tapi transaksi riil di tiap cabang bisa mulai beberapa hari setelahnya "
+        "(mis. 20–26 Agustus 2026) — sesuaikan \"Tanggal Mulai Tahap 1\" di bawah kalau perlu. "
+        "Pencapaian tiap tahap dihitung "
         "KUMULATIF dari tanggal mulai tahap tsb sampai tanggal evaluasi. **Semua tahap khusus LUNA "
         "SELAIN varian Hydrogel** (LUNA Hydrogel punya skema/target tersendiri). Warna: 🔴 <85% · "
         "🟡 85–99% · 🟢 ≥100%. Tahap 1 adalah tahap pertama dari rangkaian tahap menuju target total "
@@ -1539,13 +1540,13 @@ def render_aksesoris_tab():
     )
 
     tgl_data_terakhir = df["TGL FAKTUR"].max()
-    default_tgl_evaluasi = tgl_data_terakhir if pd.notna(tgl_data_terakhir) else pd.Timestamp("2026-07-20")
+    default_tgl_evaluasi = tgl_data_terakhir if pd.notna(tgl_data_terakhir) else pd.Timestamp("2026-08-20")
 
     dt1, dt2 = st.columns(2)
     with dt1:
         tahap1_tgl_mulai = st.date_input(
-            "Tanggal Mulai Tahap 1 (bisa disesuaikan ke tanggal transaksi riil, mis. 20–26 Juli 2026)",
-            value=pd.Timestamp("2026-07-20"), key="tahap1_tgl_mulai",
+            "Tanggal Mulai Tahap 1 (bisa disesuaikan ke tanggal transaksi riil, mis. 20–26 Agustus 2026)",
+            value=pd.Timestamp("2026-08-20"), key="tahap1_tgl_mulai",
         )
     with dt2:
         tahap1_tgl_evaluasi = st.date_input(
@@ -1633,7 +1634,7 @@ def render_aksesoris_tab():
                 nama_tahap_i = st.text_input("Nama Tahap", value=f"Tahap {nomor_tahap}", key=f"tahap{nomor_tahap}_nama")
             with n2:
                 tanggal_mulai_i = st.date_input(
-                    "Tanggal Mulai Tahap Ini", value=pd.Timestamp("2026-07-20"), key=f"tahap{nomor_tahap}_mulai",
+                    "Tanggal Mulai Tahap Ini", value=pd.Timestamp("2026-08-20"), key=f"tahap{nomor_tahap}_mulai",
                 )
             target_total_i = st.number_input(
                 f"Target Total {nama_tahap_i} (Rp)", min_value=0, value=300_000_000, step=1_000_000,
