@@ -415,10 +415,14 @@ otomatis menyesuaikan.
   `keyword=None` untuk "tanpa filter brand"/Semua Aksesoris), mengikuti
   periode yang sama dengan ringkasan jaringan di atasnya (Samurai atau
   manual).
-- **Target dibagi RATA** ke seluruh cabang secara default (Target Total ÷
-  jumlah cabang) — parameter `target_per_cabang` (dict) tersedia di fungsi
-  kalau nanti perlu distribusi tidak rata per cabang, belum diekspos ke UI
-  untuk tabel ini (tapi SUDAH dipakai untuk tabel Tahap 1 di bawah).
+- **Target per cabang sekarang BISA DIEDIT LANGSUNG** (`st.data_editor`) —
+  tabel isian muncul sebelum tabel monitoring, default terisi dibagi RATA
+  (Target Total ÷ jumlah cabang), tapi tiap baris bisa disesuaikan manual
+  kalau distribusinya tidak mau rata (mis. cabang besar dikasih target
+  lebih tinggi). Perubahan pada tabel isian langsung dipakai sebagai
+  `target_per_cabang` di `target_brand_per_cabang()` — parameter yang
+  sebelumnya sudah ada di fungsi tapi belum diekspos ke UI untuk tabel ini
+  (kini sudah).
 - **Result dihitung OTOMATIS** dari data penjualan aktual per cabang
   pada periode terpilih (LUNA saja, atau seluruh AKSESORIS tergantung
   mode) — bukan input manual seperti versi Excel sebelumnya, jadi selalu
@@ -463,7 +467,10 @@ dengan tanggal akhir & laju harian tetap).
 - **`TARGET_TAHAP1_LUNA_PER_CABANG`** di `logic_aksesoris.py`: dict 18
   cabang dengan nilai spesifik (Klender Rp16.690.500, Bintara
   Rp16.892.100, 16 cabang lain masing-masing Rp16.651.500) — **dijamin
-  totalnya persis Rp 300.006.600**, diverifikasi baris per baris.
+  totalnya persis Rp 300.006.600**, diverifikasi baris per baris. Dict ini
+  hanya dipakai sebagai NILAI AWAL (seed) — **sekarang bisa diedit
+  langsung** lewat tabel isian (`st.data_editor`) yang muncul sebelum
+  tabel monitoring Tahap 1, kalau ada revisi target per cabang.
 - **Koreksi konsep #1**: tanggal 20 Agustus 2026 adalah tanggal produk
   LUNA **mulai didistribusikan** ke seluruh cabang (bukan tanggal
   checkpoint tunggal untuk dievaluasi). Versi SEBELUMNYA salah — mengevaluasi
@@ -556,6 +563,15 @@ yang ikut/tidak ikut terhitung tergantung tanggal mulai yang dipilih).
 Kasus tepi (Tanggal Mulai diset SETELAH Tanggal Evaluasi) menghasilkan
 Result 0 di semua cabang dengan peringatan yang jelas, bukan angka
 negatif/error.
+
+**Diuji: Target per cabang yang bisa diedit manual** (tabel utama maupun
+Tahap 1) — simulasi mengubah target Dramaga jadi Rp200jt di tabel utama:
+kolom Target, % Actual, % Expected, GAP, Target Kejar Per Hari untuk baris
+Dramaga langsung ikut berubah sesuai angka baru, dan total keseluruhan
+tabel ikut menyesuaikan (dari Rp2.000.000.000 jadi Rp2.088.888.889).
+Simulasi serupa untuk Tahap 1 (target Klender diubah jadi Rp20jt): total
+Tahap 1 berubah dari Rp300.006.600 jadi Rp303.316.100. Kedua tabel diuji
+render (styling + format) tanpa error setelah target diedit.
 
 ## Analisa Mendalam: LUNA, Selain LUNA & Parfum UMAIR
 

@@ -1499,13 +1499,33 @@ def render_aksesoris_tab():
 
     st.subheader(f"📋 Monitoring Pencapaian per Cabang — {label_target}")
     st.caption(
-        "Target dibagi RATA ke seluruh cabang secara default (Target Total ÷ jumlah cabang). "
-        f"Kolom \"Result\" dihitung otomatis dari data penjualan {label_target} aktual tiap cabang pada periode ini. "
-        "Warna: 🔴 <85% · 🟡 85–99% · 🟢 ≥100%."
+        "Target per cabang bisa diedit langsung di tabel bawah ini (default dibagi RATA dari Target Total ÷ "
+        f"jumlah cabang). Kolom \"Result\" dihitung otomatis dari data penjualan {label_target} aktual tiap "
+        "cabang pada periode ini. Warna: 🔴 <85% · 🟡 85–99% · 🟢 ≥100%."
     )
+
+    daftar_cabang_target = sorted(df["CABANG"].dropna().unique().tolist())
+    n_cabang_target = len(daftar_cabang_target) or 1
+    seed_target_utama = pd.DataFrame({
+        "Cabang": daftar_cabang_target,
+        "Target": [target_rp / n_cabang_target] * n_cabang_target,
+    })
+    edited_target_utama = st.data_editor(
+        seed_target_utama, use_container_width=True, hide_index=True, key="target_utama_editor",
+        column_config={"Target": st.column_config.NumberColumn("Target (Rp)", min_value=0, step=100_000, format="%d")},
+    )
+    target_per_cabang_utama = dict(zip(edited_target_utama["Cabang"], edited_target_utama["Target"]))
+    total_target_edit = edited_target_utama["Target"].sum()
+    if abs(total_target_edit - target_rp) > 1:
+        st.caption(
+            f"ℹ️ Total target hasil edit ({la.format_rupiah_id(total_target_edit)}) berbeda dari "
+            f"Target (Rp) di atas ({la.format_rupiah_id(target_rp)}) — dipakai angka hasil edit ini."
+        )
+
     per_cabang_luna = la.target_brand_per_cabang(
         df, target_total=target_rp, tanggal_mulai=tanggal_mulai_target,
         durasi_bulan=int(durasi_bulan_target), keyword=keyword_target,
+        target_per_cabang=target_per_cabang_utama,
     )
     if per_cabang_luna.empty:
         st.info("Tidak ada data cabang untuk periode ini.")
@@ -1618,8 +1638,23 @@ def render_aksesoris_tab():
         return float(total_row["Target"]), float(total_row["Result"])
 
     st.markdown("#### Tahap 1")
+    st.caption(
+        "Target per cabang bisa disesuaikan langsung di tabel bawah ini — sudah terisi dengan nilai "
+        "acuan resmi (total Rp 300.006.600), tapi bisa diedit kalau ada revisi."
+    )
+    seed_tahap1 = pd.DataFrame({
+        "Cabang": list(la.TARGET_TAHAP1_LUNA_PER_CABANG.keys()),
+        "Target": list(la.TARGET_TAHAP1_LUNA_PER_CABANG.values()),
+    })
+    edited_tahap1 = st.data_editor(
+        seed_tahap1, use_container_width=True, hide_index=True, key="tahap1_target_editor",
+        column_config={"Target": st.column_config.NumberColumn("Target (Rp)", min_value=0, step=100_000, format="%d")},
+    )
+    target_per_cabang_tahap1 = dict(zip(edited_tahap1["Cabang"], edited_tahap1["Target"]))
+    st.caption(f"Total target Tahap 1 (hasil edit): {la.format_rupiah_id(edited_tahap1['Target'].sum())}")
+
     target_kumulatif, result_kumulatif = _render_tahap_block(
-        "Tahap 1", la.TARGET_TAHAP1_LUNA_PER_CABANG, tahap1_tgl_mulai, "tahap1",
+        "Tahap 1", target_per_cabang_tahap1, tahap1_tgl_mulai, "tahap1",
     )
 
     st.divider()
