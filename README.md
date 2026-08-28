@@ -354,22 +354,38 @@ Diminati" pada `render_persediaan_tab()`. Data lintas-kategori yang belum
 difilter tetap disimpan terpisah (`df_semua_kategori`) untuk keperluan yang
 memang butuh kategori lain, seperti target UMAIR Parfum.
 
-## Target Pencapaian Penjualan LUNA
+## Target Pencapaian Penjualan Aksesoris — LUNA vs Semua Aksesoris
 
+**Baru: radio button "Target untuk"** — 2 pilihan: **Target LUNA** (brand
+spesifik, seperti sebelumnya) atau **Target Semua Aksesoris** (seluruh
+kategori AKSESORIS, tidak dibatasi brand). Berlaku untuk SELURUH bagian di
+bawahnya (ringkasan jaringan maupun tabel per cabang) — pindah mode,
+semua angka otomatis ikut menyesuaikan.
+
+- Perubahan di `logic_aksesoris.py`: `target_penjualan_brand()` dan
+  `target_brand_per_cabang()` sekarang menerima `keyword=None` yang
+  berarti TIDAK memfilter brand sama sekali (seluruh baris kategori
+  AKSESORIS dihitung) — sebelumnya `keyword` wajib diisi. Parameter
+  default tetap `"LUNA"`, jadi kompatibel dengan pemanggilan lama yang
+  sudah ada (diverifikasi: hasil identik dengan versi sebelum perubahan).
+- Label tombol, judul sub-bagian, nama file unduhan CSV, dan teks
+  penjelasan otomatis menyesuaikan mode yang dipilih (mis. "Monitoring
+  Pencapaian per Cabang — LUNA" vs "— Semua Aksesoris").
 - Default: **Rp 2.000.000.000** dalam **12 bulan mulai 20 Agustus 2026**
-  (20 Jul 2026 – 19 Jul 2027) — ketiganya bisa diubah langsung dari
-  dashboard (target, tanggal mulai, durasi bulan).
-- **Baru: pemilih Periode Samurai** (checkbox "Gunakan Periode Samurai") —
+  — ketiganya bisa diubah langsung dari dashboard (target, tanggal mulai,
+  durasi bulan), berlaku untuk mode manapun yang dipilih.
+- **Pemilih Periode Samurai** (checkbox "Gunakan Periode Samurai") —
   saat aktif, pengguna tinggal pilih salah satu dari 6 periode kuartalan
   (Samurai 39–44, Jul 2026–Des 2027) lewat dropdown, dan tanggal mulai +
   durasi otomatis terisi (3 bulan per periode) — tidak perlu isi tanggal
   manual. Matikan checkbox untuk kembali ke mode tanggal manual + durasi
   bebas (mis. untuk periode 12 bulan lintas kuartal seperti sebelumnya).
-- Produk LUNA diidentifikasi dari **nama barang mengandung kata "LUNA"**,
-  dihitung dari **data yang sudah difilter ke kategori AKSESORIS** (tidak
-  terpengaruh filter tahun/bulan/cabang di bagian atas tab), supaya
-  progress tidak "menghilang" cuma karena pengguna sedang menyaring
-  tampilan lain.
+- Mode **LUNA**: produk diidentifikasi dari **nama barang mengandung kata
+  "LUNA"**. Mode **Semua Aksesoris**: seluruh baris kategori AKSESORIS
+  dihitung tanpa filter nama. Keduanya dihitung dari **data yang sudah
+  difilter ke kategori AKSESORIS** (tidak terpengaruh filter tahun/bulan/
+  cabang di bagian atas tab), supaya progress tidak "menghilang" cuma
+  karena pengguna sedang menyaring tampilan lain.
 - **Tanggal acuan "hari berjalan" memakai tanggal faktur TERAKHIR pada
   data** (bukan tanggal hari ini) — prinsip yang sama dipakai di bagian
   Proyeksi 5–10 Tahun, supaya persentase tidak terlihat rendah cuma karena
@@ -386,44 +402,52 @@ memang butuh kategori lain, seperti target UMAIR Parfum.
 > "📍 Monitoring Pencapaian Cabang — Tahap 1" di bawah, yang lebih akurat
 > secara konsep — lihat penjelasannya di bagian tersendiri.
 
-### 📋 Monitoring Pencapaian per Cabang
+### 📋 Monitoring Pencapaian per Cabang — LUNA / Semua Aksesoris
 
 Tabel dengan **9 kolom persis sesuai spesifikasi**: Cabang, Target, Result,
 Expected, % Actual, % Expected, GAP, Target Kejar Per Hari, Sisa Hari.
+Sekarang mengikuti mode yang dipilih di radio button "Target untuk"
+(LUNA atau Semua Aksesoris) — judul, label, dan nama file unduhan
+otomatis menyesuaikan.
 
 - Fungsi `target_brand_per_cabang()` di `logic_aksesoris.py` — generik
-  (bisa dipakai untuk brand apa saja lewat parameter `keyword`, tidak
-  cuma LUNA), mengikuti periode yang sama dengan ringkasan jaringan di
-  atasnya (Samurai atau manual).
+  (bisa dipakai untuk brand apa saja lewat parameter `keyword`, termasuk
+  `keyword=None` untuk "tanpa filter brand"/Semua Aksesoris), mengikuti
+  periode yang sama dengan ringkasan jaringan di atasnya (Samurai atau
+  manual).
 - **Target dibagi RATA** ke seluruh cabang secara default (Target Total ÷
   jumlah cabang) — parameter `target_per_cabang` (dict) tersedia di fungsi
   kalau nanti perlu distribusi tidak rata per cabang, belum diekspos ke UI
   untuk tabel ini (tapi SUDAH dipakai untuk tabel Tahap 1 di bawah).
-- **Result dihitung OTOMATIS** dari data penjualan LUNA aktual per cabang
-  pada periode terpilih — bukan input manual seperti versi Excel
-  sebelumnya, jadi selalu real-time mengikuti data yang diunggah.
+- **Result dihitung OTOMATIS** dari data penjualan aktual per cabang
+  pada periode terpilih (LUNA saja, atau seluruh AKSESORIS tergantung
+  mode) — bukan input manual seperti versi Excel sebelumnya, jadi selalu
+  real-time mengikuti data yang diunggah.
 - **GAP** = Result − Expected (positif = di atas target seharusnya,
   negatif = di bawah/tertinggal).
 - Tabel diurutkan dari **% Actual TERENDAH** (cabang paling tertinggal di
   atas).
-- **Baru: baris rekapan "TOTAL JARINGAN"** di paling bawah (fungsi
+- **Baris rekapan "TOTAL JARINGAN"** di paling bawah (fungsi
   `tambah_baris_total()`) — kolom Rp dijumlahkan langsung, tapi kolom %
   DIHITUNG ULANG dari rasio total (Result total ÷ Target total), BUKAN
   dijumlah atau dirata-rata mentah, supaya tetap akurat secara matematis
   (rata-rata dari beberapa persentase tidak selalu sama dengan persentase
   dari totalnya). "Sisa Hari" di baris total diambil dari baris pertama
   (sama untuk semua cabang dalam satu periode).
-- **Baru: warna indikator berbasis AMBANG BATAS** (bukan gradasi kontinu
+- **Warna indikator berbasis AMBANG BATAS** (bukan gradasi kontinu
   seperti sebelumnya) — fungsi `warna_indikator_pencapaian()`: 🔴 Merah
   jika % Actual < 85%, 🟡 Kuning jika 85–99%, 🟢 Hijau jika ≥ 100%.
 
-**Diuji dengan data asli** (Samurai 39, Target Rp2M dibagi 18 cabang =
-Rp111,1jt/cabang): cabang paling tertinggal **Warbong** (0,8% actual),
-paling unggul **Radjiman** (22,5% actual), baris TOTAL JARINGAN terverifikasi
-Target = Rp 2.000.000.000 (sum benar) dan % Actual = 5,2% (dihitung dari
-rasio total, cocok dengan Result total ÷ Target total). Termasuk kasus
-tepi: periode masa depan tanpa data (Result=0 di semua cabang, bukan
-error), dan data kosong total (tabel kosong dengan aman).
+**Diuji dengan data asli** (Samurai 39, Target Rp2M): mode **LUNA**
+tercapai Rp104.069.860 (8,4% dari target-sampai-hari-ini); mode **Semua
+Aksesoris** tercapai Rp1.092.514.916 (88,2%) — perbedaan besar ini masuk
+akal karena Semua Aksesoris mencakup seluruh brand, bukan cuma LUNA.
+Kedua mode diuji render tabel per cabang tanpa error. Verifikasi
+backward-compatibility: pemanggilan lama tanpa parameter `keyword`
+eksplisit tetap default ke `"LUNA"`, hasil identik dengan sebelum
+perubahan ini. Termasuk kasus tepi: periode masa depan tanpa data
+(Result=0 di semua cabang, bukan error), dan data kosong total (tabel
+kosong dengan aman).
 
 ### 📍 Monitoring Pencapaian Cabang — Bertahap, menuju Rp 2 Miliar
 

@@ -1416,7 +1416,13 @@ def render_aksesoris_tab():
     # -----------------------------------------------------------------
     # 3c. Target Pencapaian Penjualan LUNA
     # -----------------------------------------------------------------
-    st.header("🎯 Target Pencapaian Penjualan Aksesoris LUNA")
+    st.header("🎯 Target Pencapaian Penjualan Aksesoris")
+
+    mode_target = st.radio(
+        "Target untuk", ["Target LUNA", "Target Semua Aksesoris"], horizontal=True, key="target_mode_pilihan",
+    )
+    keyword_target = "LUNA" if mode_target == "Target LUNA" else None
+    label_target = "LUNA" if keyword_target else "Semua Aksesoris"
 
     gunakan_samurai = st.checkbox(
         "Gunakan Periode Samurai (kuartalan)", value=True, key="target_luna_pakai_samurai",
@@ -1431,7 +1437,7 @@ def render_aksesoris_tab():
     if gunakan_samurai:
         t1, t2 = st.columns(2)
         with t1:
-            target_rp = st.number_input("Target (Rp)", min_value=0, value=2_000_000_000, step=100_000_000, format="%d", key="target_luna_rp")
+            target_rp = st.number_input(f"Target {label_target} (Rp)", min_value=0, value=2_000_000_000, step=100_000_000, format="%d", key="target_luna_rp")
         with t2:
             periode_pilihan_target = st.selectbox("Pilih Periode Samurai", periode_samurai_target_opsi, key="target_luna_periode_samurai")
         tanggal_mulai_target, _tgl_selesai_periode = la.PERIODE_SAMURAI[periode_pilihan_target]
@@ -1440,21 +1446,25 @@ def render_aksesoris_tab():
     else:
         t1, t2, t3 = st.columns(3)
         with t1:
-            target_rp = st.number_input("Target (Rp)", min_value=0, value=2_000_000_000, step=100_000_000, format="%d", key="target_luna_rp_manual")
+            target_rp = st.number_input(f"Target {label_target} (Rp)", min_value=0, value=2_000_000_000, step=100_000_000, format="%d", key="target_luna_rp_manual")
         with t2:
             tanggal_mulai_target = st.date_input("Mulai program", value=pd.Timestamp("2026-08-20"), key="target_luna_mulai")
         with t3:
             durasi_bulan_target = st.number_input("Durasi (bulan)", min_value=1, max_value=60, value=12, step=1, key="target_luna_durasi")
 
-    tprog = la.target_penjualan_luna(
-        df, target=target_rp, tanggal_mulai=tanggal_mulai_target, durasi_bulan=int(durasi_bulan_target),
-        tahap_list=[],
+    tprog = la.target_penjualan_brand(
+        df, keyword=keyword_target, target=target_rp, tanggal_mulai=tanggal_mulai_target,
+        durasi_bulan=int(durasi_bulan_target), tahap_list=[],
     )
 
     st.caption(
         f"Periode program: {tprog['tanggal_mulai'].strftime('%d %b %Y')} – "
         f"{tprog['tanggal_selesai'].strftime('%d %b %Y')} ({tprog['total_hari_program']} hari). "
-        "Nama barang diidentifikasi mengandung kata \"LUNA\"."
+        + (
+            "Nama barang diidentifikasi mengandung kata \"LUNA\"."
+            if keyword_target else
+            "Seluruh produk kategori AKSESORIS dihitung (tidak dibatasi brand tertentu)."
+        )
     )
 
     if tprog["hari_berjalan"] == 0:
@@ -1487,15 +1497,15 @@ def render_aksesoris_tab():
                 "seharusnya — di jalur yang baik."
             )
 
-    st.subheader("📋 Monitoring Pencapaian per Cabang")
+    st.subheader(f"📋 Monitoring Pencapaian per Cabang — {label_target}")
     st.caption(
         "Target dibagi RATA ke seluruh cabang secara default (Target Total ÷ jumlah cabang). "
-        "Kolom \"Result\" dihitung otomatis dari data penjualan LUNA aktual tiap cabang pada periode ini. "
+        f"Kolom \"Result\" dihitung otomatis dari data penjualan {label_target} aktual tiap cabang pada periode ini. "
         "Warna: 🔴 <85% · 🟡 85–99% · 🟢 ≥100%."
     )
     per_cabang_luna = la.target_brand_per_cabang(
         df, target_total=target_rp, tanggal_mulai=tanggal_mulai_target,
-        durasi_bulan=int(durasi_bulan_target), keyword="LUNA",
+        durasi_bulan=int(durasi_bulan_target), keyword=keyword_target,
     )
     if per_cabang_luna.empty:
         st.info("Tidak ada data cabang untuk periode ini.")
@@ -1517,8 +1527,8 @@ def render_aksesoris_tab():
             f"({la.format_percent_id(per_cabang_luna.iloc[-1]['% Actual'])} actual)."
         )
         st.download_button(
-            "⬇️ Unduh CSV — Monitoring Pencapaian LUNA per Cabang", pcl_dgn_total.to_csv(index=False).encode("utf-8-sig"),
-            "monitoring_target_luna_per_cabang.csv", "text/csv", key="ak_dl_target_per_cabang",
+            f"⬇️ Unduh CSV — Monitoring Pencapaian {label_target} per Cabang", pcl_dgn_total.to_csv(index=False).encode("utf-8-sig"),
+            f"monitoring_target_{'luna' if keyword_target else 'semua_aksesoris'}_per_cabang.csv", "text/csv", key="ak_dl_target_per_cabang",
         )
 
     st.divider()

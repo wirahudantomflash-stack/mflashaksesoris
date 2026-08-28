@@ -1041,7 +1041,7 @@ def target_individual_sales_retail(
 
 def target_penjualan_brand(
     df: pd.DataFrame,
-    keyword: str = "LUNA",
+    keyword: str | None = "LUNA",
     target: float = 2_000_000_000,
     tanggal_mulai=None,
     durasi_bulan: int = 12,
@@ -1053,6 +1053,11 @@ def target_penjualan_brand(
     jangka waktu tertentu. Generik — dipakai untuk LUNA (aksesoris) maupun
     UMAIR (parfum), tinggal ganti `keyword`, `kategori_barang`, `target`,
     `tanggal_mulai`, `durasi_bulan`.
+
+    `keyword=None` (atau string kosong) -> TIDAK memfilter brand sama
+    sekali, seluruh baris pada `df` (biasanya sudah difilter kategori,
+    mis. AKSESORIS) dihitung — dipakai untuk mode "Semua Aksesoris" (bukan
+    cuma satu brand seperti LUNA).
 
     `kategori_barang` opsional: kalau diisi (mis. "PARFUM"), tambahan filter
     KATEGORI_NORM == kategori_barang.upper() — supaya kata kunci brand yang
@@ -1076,7 +1081,10 @@ def target_penjualan_brand(
     df_periode = df[(df["TGL FAKTUR"] >= tanggal_mulai) & (df["TGL FAKTUR"] <= tanggal_selesai)]
     if kategori_barang and "KATEGORI_NORM" in df_periode.columns:
         df_periode = df_periode[df_periode["KATEGORI_NORM"] == kategori_barang.strip().upper()]
-    df_brand = df_periode[df_periode["NAMA BARANG"].astype(str).str.upper().str.contains(keyword.upper(), na=False)]
+    if keyword:
+        df_brand = df_periode[df_periode["NAMA BARANG"].astype(str).str.upper().str.contains(keyword.upper(), na=False)]
+    else:
+        df_brand = df_periode
     tercapai = df_brand["TOTAL HARGA"].sum()
 
     tgl_acuan = df["TGL FAKTUR"].max()
@@ -1143,13 +1151,17 @@ def target_brand_per_cabang(
     target_total: float,
     tanggal_mulai,
     durasi_bulan: int = 3,
-    keyword: str = "LUNA",
+    keyword: str | None = "LUNA",
     target_per_cabang: dict | None = None,
 ) -> pd.DataFrame:
     """Monitoring pencapaian target penjualan brand (mis. LUNA) PER CABANG,
     untuk satu periode. 9 kolom sesuai spesifikasi:
     Cabang, Target, Result, Expected, % Actual, % Expected, GAP,
     Target Kejar Per Hari, Sisa Hari.
+
+    `keyword=None` (atau string kosong) -> TIDAK memfilter brand, seluruh
+    baris pada `df_aksesoris` dihitung — dipakai untuk mode "Semua
+    Aksesoris" (bukan cuma satu brand seperti LUNA).
 
     `target_per_cabang` opsional: dict {nama_cabang: nilai_target_rp} untuk
     distribusi target TIDAK RATA antar cabang. Kalau tidak diisi, target
@@ -1179,8 +1191,11 @@ def target_brand_per_cabang(
     sisa_hari = max(total_hari - hari_berjalan, 0)
 
     df_periode = df_aksesoris[(df_aksesoris["TGL FAKTUR"] >= tanggal_mulai) & (df_aksesoris["TGL FAKTUR"] <= tanggal_selesai)]
-    mask_brand = df_periode["NAMA BARANG"].astype(str).str.upper().str.contains(keyword.upper(), na=False)
-    result_per_cabang = df_periode[mask_brand].groupby("CABANG")["TOTAL HARGA"].sum()
+    if keyword:
+        mask_brand = df_periode["NAMA BARANG"].astype(str).str.upper().str.contains(keyword.upper(), na=False)
+        result_per_cabang = df_periode[mask_brand].groupby("CABANG")["TOTAL HARGA"].sum()
+    else:
+        result_per_cabang = df_periode.groupby("CABANG")["TOTAL HARGA"].sum()
 
     semua_cabang = sorted(df_aksesoris["CABANG"].dropna().unique().tolist())
     n_cabang = len(semua_cabang) or 1
