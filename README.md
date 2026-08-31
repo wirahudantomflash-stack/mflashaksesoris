@@ -471,6 +471,22 @@ dengan tanggal akhir & laju harian tetap).
   hanya dipakai sebagai NILAI AWAL (seed) — **sekarang bisa diedit
   langsung** lewat tabel isian (`st.data_editor`) yang muncul sebelum
   tabel monitoring Tahap 1, kalau ada revisi target per cabang.
+- **🐛 Bug ditemukan & diperbaiki: nama cabang "Karawang" vs "Telukjambe"**
+  — dict ini SEMPAT salah menulis salah satu cabang sebagai "Karawang",
+  padahal nama cabang yang benar (dan konsisten dengan seluruh data
+  penjualan/persediaan asli, serta data lokasi cabang di
+  `logic_persediaan.py`) adalah **"Telukjambe"** ("Karawang" adalah nama
+  KABUPATEN/wilayahnya, bukan nama cabang). Akibatnya, penjualan LUNA dari
+  Telukjambe **selalu tampil Rp0** di tabel Tahap 1 — bukan karena memang
+  tidak ada penjualan, tapi karena `monitoring_tahap_per_cabang()`
+  mencari data dengan nama "Karawang" yang tidak pernah cocok dengan data
+  asli ("Telukjambe"). **Terverifikasi dengan data asli**: periode 1 Jul–
+  30 Ags 2026, Telukjambe punya Rp 3.461.000 penjualan LUNA (selain
+  Hydrogel) yang sebelumnya hilang dari total — total jaringan yang benar
+  adalah Rp 100.598.860, bukan Rp 97.137.860 (versi sebelum perbaikan).
+  Sudah diperbaiki dengan mengganti key dict dari `"Karawang"` menjadi
+  `"Telukjambe"` (nilai target Rp16.651.500 tidak berubah, cuma nama
+  cabangnya).
 - **Koreksi konsep #1**: tanggal 20 Agustus 2026 adalah tanggal produk
   LUNA **mulai didistribusikan** ke seluruh cabang (bukan tanggal
   checkpoint tunggal untuk dievaluasi). Versi SEBELUMNYA salah — mengevaluasi

@@ -1263,7 +1263,7 @@ TARGET_TAHAP1_LUNA_PER_CABANG = {
     "Radjiman": 16_651_500, "Jatimulya": 16_651_500, "Dramaga": 16_651_500,
     "Condet": 16_651_500, "Jatibening": 16_651_500, "Sawangan": 16_651_500,
     "Warbong": 16_651_500, "Cinere": 16_651_500, "Cibinong": 16_651_500,
-    "Karawang": 16_651_500, "Jatiwaringin": 16_651_500, "Cikampek": 16_651_500,
+    "Telukjambe": 16_651_500, "Jatiwaringin": 16_651_500, "Cikampek": 16_651_500,
     "Cilangkap": 16_651_500, "Pejaten": 16_651_500, "Cibubur": 16_651_500,
 }
 
