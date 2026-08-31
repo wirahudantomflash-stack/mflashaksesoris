@@ -885,6 +885,147 @@ def render_aksesoris_tab():
         )
         return
 
+    # -----------------------------------------------------------------
+    # 0. Dashboard & Scoreboard Penjualan Aksesoris — Tertarget vs Non
+    #    Tertarget (Parfum sengaja TIDAK disertakan di bagian ini).
+    # -----------------------------------------------------------------
+    st.header("🏆 Dashboard & Scoreboard Penjualan Aksesoris")
+    st.caption(
+        "**Aksesoris Tertarget** = LUNA KECUALI Hydrogel · **Aksesoris Non Tertarget** = Selain LUNA "
+        "(termasuk LUNA Hydrogel). Parfum tidak disertakan di bagian ini."
+    )
+
+    periode_dsb_opsi = list(la.PERIODE_SAMURAI.keys())
+    default_idx_samurai39 = periode_dsb_opsi.index("Samurai 39 (Jul–Sep 2026)") if "Samurai 39 (Jul–Sep 2026)" in periode_dsb_opsi else 0
+    d1, d2 = st.columns(2)
+    with d1:
+        periode_dsb_pilihan = st.selectbox("Periode", periode_dsb_opsi, index=default_idx_samurai39, key="dsb_periode")
+    with d2:
+        target_total_dsb = st.number_input("1️⃣ Total Target Penjualan Aksesoris (Rp)", min_value=0, value=3_500_000_000, step=100_000_000, format="%d", key="dsb_target_total")
+    tgl_mulai_dsb, tgl_selesai_dsb = la.PERIODE_SAMURAI[periode_dsb_pilihan]
+    st.caption(f"Periode: {tgl_mulai_dsb.strftime('%d %b %Y')} – {tgl_selesai_dsb.strftime('%d %b %Y')}.")
+
+    daftar_cabang_dsb = sorted(df["CABANG"].dropna().unique().tolist())
+    n_cabang_dsb = len(daftar_cabang_dsb) or 1
+    seed_target_dsb = pd.DataFrame({
+        "Cabang": daftar_cabang_dsb, "Target": [target_total_dsb / n_cabang_dsb] * n_cabang_dsb,
+    })
+    with st.expander("✏️ Sesuaikan Target per Cabang (opsional, default dibagi rata)", expanded=False):
+        edited_target_dsb = st.data_editor(
+            seed_target_dsb, use_container_width=True, hide_index=True, key="dsb_target_editor",
+            column_config={"Target": st.column_config.NumberColumn("Target (Rp)", min_value=0, step=100_000, format="%d")},
+        )
+    target_per_cabang_dsb = dict(zip(edited_target_dsb["Cabang"], edited_target_dsb["Target"]))
+
+    scoreboard = la.scoreboard_cabang_aksesoris(
+        df, target_total=target_total_dsb, tanggal_mulai=tgl_mulai_dsb, tanggal_selesai=tgl_selesai_dsb,
+        target_per_cabang=target_per_cabang_dsb,
+    )
+
+    if scoreboard.empty:
+        st.info("Tidak ada data penjualan aksesoris pada periode ini.")
+    else:
+        total_omzet_dsb = scoreboard["Total Omzet"].sum()
+        total_target_dsb_aktual = scoreboard["Target"].sum()
+        total_laba_dsb = scoreboard["Laba"].sum()
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("Total Omzet Aksesoris", la.format_rupiah_id(total_omzet_dsb))
+        m2.metric("Total Target", la.format_rupiah_id(total_target_dsb_aktual))
+        m3.metric("% Pencapaian Jaringan", la.format_percent_id(total_omzet_dsb / total_target_dsb_aktual * 100 if total_target_dsb_aktual else 0))
+        m4.metric("Margin Jaringan", la.format_percent_id(total_laba_dsb / total_omzet_dsb * 100 if total_omzet_dsb else 0))
+
+        st.markdown("##### 2️⃣ Scoreboard Penjualan per Cabang (Omzet Tertinggi → Terendah)")
+        st.caption("Warna indikator % Pencapaian: 🔴 <85% · 🟡 85–99% · 🟢 ≥100%.")
+        styled_scoreboard = scoreboard.style.map(
+            la.warna_indikator_pencapaian, subset=["% Pencapaian"],
+        ).format({
+            "Omzet Tertarget": la.format_rupiah_id, "Omzet Non Tertarget": la.format_rupiah_id,
+            "Total Omzet": la.format_rupiah_id, "Laba": la.format_rupiah_id, "Margin (%)": la.format_percent_id,
+            "Target": la.format_rupiah_id, "% Pencapaian": la.format_percent_id,
+            "Rata-rata Omzet / Hari": la.format_rupiah_id,
+        })
+        st.dataframe(styled_scoreboard, use_container_width=True, height=650)
+        st.download_button(
+            "⬇️ Unduh CSV — Scoreboard Penjualan per Cabang", scoreboard.to_csv(index=False).encode("utf-8-sig"),
+            "scoreboard_penjualan_aksesoris.csv", "text/csv", key="dsb_dl_scoreboard",
+        )
+
+        st.markdown("##### 3️⃣ Rata-rata Penjualan per Hari per Cabang")
+        st.bar_chart(scoreboard.set_index("Cabang")["Rata-rata Omzet / Hari"])
+
+        st.markdown("##### 4️⃣ Monitoring Margin Cabang — Aksesoris di Bawah 40%")
+        margin_rendah = scoreboard[scoreboard["Margin (%)"] < 40].sort_values("Margin (%)", ascending=True).reset_index(drop=True)
+        if margin_rendah.empty:
+            st.success("✅ Semua cabang sudah bermargin ≥ 40% pada periode ini.")
+        else:
+            st.warning(f"⚠️ {len(margin_rendah)} dari {len(scoreboard)} cabang bermargin di bawah 40%.")
+            tampil_margin = margin_rendah[["Cabang", "Total Omzet", "Laba", "Margin (%)"]].copy()
+            tampil_margin["Total Omzet"] = margin_rendah["Total Omzet"].map(la.format_rupiah_id)
+            tampil_margin["Laba"] = margin_rendah["Laba"].map(la.format_rupiah_id)
+            tampil_margin["Margin (%)"] = margin_rendah["Margin (%)"].map(la.format_percent_id)
+            st.dataframe(tampil_margin, use_container_width=True, height=min(80 + 38 * len(margin_rendah), 400))
+
+        produk_scoreboard = la.produk_terlaris_aksesoris_scoreboard(df, tgl_mulai_dsb, tgl_selesai_dsb)
+
+        st.markdown("##### 5️⃣ Produk Terlaris Aksesoris (Qty Tertinggi → Terendah)")
+        if produk_scoreboard.empty:
+            st.info("Tidak ada data produk pada periode ini.")
+        else:
+            top_n_produk_dsb = st.slider("Tampilkan berapa produk teratas", 5, 50, 20, key="dsb_top_n_produk")
+            top_produk = produk_scoreboard.head(top_n_produk_dsb).copy()
+            top_produk["Omzet"] = top_produk["Omzet"].map(la.format_rupiah_id)
+            top_produk["Laba"] = top_produk["Laba"].map(la.format_rupiah_id)
+            top_produk["Margin (%)"] = top_produk["Margin (%)"].map(la.format_percent_id)
+            top_produk["Qty Terjual"] = produk_scoreboard.head(top_n_produk_dsb)["Qty Terjual"].map(la.format_int_id)
+            st.dataframe(top_produk, use_container_width=True, height=min(80 + 38 * len(top_produk), 500))
+            st.download_button(
+                "⬇️ Unduh CSV — Seluruh Produk Terlaris Aksesoris", produk_scoreboard.to_csv(index=False).encode("utf-8-sig"),
+                "produk_terlaris_aksesoris.csv", "text/csv", key="dsb_dl_produk",
+            )
+
+        st.markdown("##### 6️⃣ Monitoring Stok Persediaan — Tertarget vs Non Tertarget")
+        if df_persediaan is None:
+            st.info("Unggah data Persediaan di panel kiri untuk melihat bagian ini.")
+        else:
+            aks_stok_dsb = lp.apply_filters(df_persediaan, hanya_aksesoris=True, filter_luna=None)
+            stok_tertarget_vs_non = lp.nilai_persediaan_tertarget_vs_non(aks_stok_dsb)
+            if stok_tertarget_vs_non.empty:
+                st.info("Tidak ada data stok aksesoris.")
+            else:
+                s1, s2 = st.columns(2)
+                s1.metric("Total Nilai Stok Tertarget", la.format_rupiah_id(stok_tertarget_vs_non["Nilai Tertarget"].sum()))
+                s2.metric("Total Nilai Stok Non Tertarget", la.format_rupiah_id(stok_tertarget_vs_non["Nilai Non Tertarget"].sum()))
+                tampil_stok = stok_tertarget_vs_non.copy()
+                for c in ["Nilai Tertarget", "Nilai Non Tertarget", "Total Nilai"]:
+                    tampil_stok[c] = stok_tertarget_vs_non[c].map(la.format_rupiah_id)
+                for c in ["Qty Tertarget", "Qty Non Tertarget"]:
+                    tampil_stok[c] = stok_tertarget_vs_non[c].map(la.format_int_id)
+                st.dataframe(tampil_stok, use_container_width=True, height=530)
+                st.download_button(
+                    "⬇️ Unduh CSV — Monitoring Stok Tertarget vs Non Tertarget", stok_tertarget_vs_non.to_csv(index=False).encode("utf-8-sig"),
+                    "monitoring_stok_tertarget_vs_non.csv", "text/csv", key="dsb_dl_stok",
+                )
+
+        st.markdown("##### 7️⃣ Monitoring Margin Produk Aksesoris (Tertinggi → Terendah)")
+        if produk_scoreboard.empty:
+            st.info("Tidak ada data produk pada periode ini.")
+        else:
+            produk_margin = produk_scoreboard.sort_values("Margin (%)", ascending=False).reset_index(drop=True)
+            top_n_margin_dsb = st.slider("Tampilkan berapa produk teratas (margin)", 5, 50, 20, key="dsb_top_n_margin")
+            tampil_margin_produk = produk_margin.head(top_n_margin_dsb).copy()
+            tampil_margin_produk["Omzet"] = tampil_margin_produk["Omzet"].map(la.format_rupiah_id)
+            tampil_margin_produk["Laba"] = tampil_margin_produk["Laba"].map(la.format_rupiah_id)
+            tampil_margin_produk["Margin (%)"] = tampil_margin_produk["Margin (%)"].map(la.format_percent_id)
+            tampil_margin_produk["Qty Terjual"] = produk_margin.head(top_n_margin_dsb)["Qty Terjual"].map(la.format_int_id)
+            st.dataframe(tampil_margin_produk, use_container_width=True, height=min(80 + 38 * len(tampil_margin_produk), 500))
+            st.download_button(
+                "⬇️ Unduh CSV — Seluruh Produk (Urut Margin)", produk_margin.to_csv(index=False).encode("utf-8-sig"),
+                "monitoring_margin_produk_aksesoris.csv", "text/csv", key="dsb_dl_margin_produk",
+            )
+
+    st.divider()
+    st.divider()
+
     st.subheader("Filter — Data Penjualan Aksesoris")
     tahun_opsi = sorted([int(t) for t in df["TAHUN"].dropna().unique()])
     bulan_opsi = sorted([int(b) for b in df["BULAN"].dropna().unique()])

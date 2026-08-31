@@ -77,9 +77,33 @@ def load_persediaan(file_or_path, sheet_name: str = SHEET_NAME) -> pd.DataFrame:
     df["KATEGORI_NORM"] = kat
 
     df["ADALAH_LUNA"] = df["Nama Barang"].str.upper().str.contains("LUNA", na=False)
+    df["ADALAH_HYDROGEL"] = df["Nama Barang"].str.upper().str.contains("HYDROGEL", na=False)
+    # "Tertarget" = LUNA KECUALI Hydrogel — definisi resmi target Tahap 1/Samurai
+    # (Hydrogel dikecualikan karena punya skema/target sendiri terpisah).
+    df["ADALAH_LUNA_TERTARGET"] = df["ADALAH_LUNA"] & ~df["ADALAH_HYDROGEL"]
     df["STOK_ANOMALI"] = df["Kts (Semua Gdng)"] < 0
 
     return df
+
+
+def apply_filters_tertarget(df: pd.DataFrame, cabang=None, hanya_aksesoris: bool = True, tertarget: bool | None = True, kategori: str | None = None) -> pd.DataFrame:
+    """Sama seperti `apply_filters()`, tapi memakai definisi "Tertarget"
+    (LUNA KECUALI Hydrogel) bukan "ADALAH_LUNA" biasa (yang masih
+    menghitung Hydrogel sebagai LUNA) — dipakai untuk Dashboard Scoreboard
+    Aksesoris Tertarget/Non Tertarget. `tertarget`: True -> LUNA selain
+    Hydrogel, False -> Selain LUNA (termasuk LUNA Hydrogel), None -> semua."""
+    out = df
+    if kategori is not None:
+        out = out[out["KATEGORI_NORM"] == kategori.strip().upper()]
+    elif hanya_aksesoris:
+        out = out[out["KATEGORI_NORM"] == "AKSESORIS"]
+    if tertarget is True:
+        out = out[out["ADALAH_LUNA_TERTARGET"]]
+    elif tertarget is False:
+        out = out[~out["ADALAH_LUNA_TERTARGET"]]
+    if cabang:
+        out = out[out["Cabang"].isin(cabang)]
+    return out
 
 
 def apply_filters(df: pd.DataFrame, cabang=None, hanya_aksesoris: bool = True, filter_luna: bool | None = True, kategori: str | None = None) -> pd.DataFrame:
@@ -186,6 +210,32 @@ def nilai_persediaan_cabang(df: pd.DataFrame) -> pd.DataFrame:
         **{"Nilai Persediaan": ("Nilai Total", "sum")},
     ).reset_index()
     g = g.sort_values("Nilai Persediaan", ascending=False).reset_index(drop=True)
+    return g[cols]
+
+
+def nilai_persediaan_tertarget_vs_non(df_persediaan_aksesoris: pd.DataFrame) -> pd.DataFrame:
+    """Bandingkan Nilai & Qty persediaan Tertarget (LUNA selain Hydrogel)
+    vs Non Tertarget (Selain LUNA, termasuk LUNA Hydrogel) per cabang,
+    dalam satu tabel sejajar — dipakai untuk Dashboard Scoreboard Aksesoris.
+    `df_persediaan_aksesoris` harus data yang SUDAH difilter kategori
+    AKSESORIS (tapi belum difilter brand)."""
+    cols = ["Cabang", "Qty Tertarget", "Nilai Tertarget", "Qty Non Tertarget", "Nilai Non Tertarget", "Total Nilai"]
+    if df_persediaan_aksesoris.empty:
+        return pd.DataFrame(columns=cols)
+
+    tertarget = df_persediaan_aksesoris[df_persediaan_aksesoris["ADALAH_LUNA_TERTARGET"]]
+    non_tertarget = df_persediaan_aksesoris[~df_persediaan_aksesoris["ADALAH_LUNA_TERTARGET"]]
+
+    nv_t = nilai_persediaan_cabang(tertarget)[["Cabang", "Total Qty", "Nilai Persediaan"]].rename(
+        columns={"Total Qty": "Qty Tertarget", "Nilai Persediaan": "Nilai Tertarget"})
+    nv_nt = nilai_persediaan_cabang(non_tertarget)[["Cabang", "Total Qty", "Nilai Persediaan"]].rename(
+        columns={"Total Qty": "Qty Non Tertarget", "Nilai Persediaan": "Nilai Non Tertarget"})
+
+    g = nv_t.merge(nv_nt, on="Cabang", how="outer").fillna(0)
+    if g.empty:
+        return pd.DataFrame(columns=cols)
+    g["Total Nilai"] = g["Nilai Tertarget"] + g["Nilai Non Tertarget"]
+    g = g.sort_values("Total Nilai", ascending=False).reset_index(drop=True)
     return g[cols]
 
 

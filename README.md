@@ -589,6 +589,66 @@ Simulasi serupa untuk Tahap 1 (target Klender diubah jadi Rp20jt): total
 Tahap 1 berubah dari Rp300.006.600 jadi Rp303.316.100. Kedua tabel diuji
 render (styling + format) tanpa error setelah target diedit.
 
+## 🏆 Dashboard & Scoreboard Penjualan Aksesoris (BARU)
+
+**Fitur besar baru**, ditempatkan paling atas di tab Penjualan Aksesoris —
+sebelum bagian filter tahun/bulan/cabang yang sudah ada — karena
+periodenya diatur sendiri (pilihan Samurai), tidak ikut filter di
+bawahnya. **Parfum sengaja TIDAK disertakan** di bagian ini sesuai
+permintaan.
+
+**Definisi kelompok** (konsisten dengan seluruh perbaikan bug Hydrogel
+sebelumnya):
+- **Aksesoris Tertarget** = LUNA **KECUALI** Hydrogel
+- **Aksesoris Non Tertarget** = Selain LUNA (**termasuk** LUNA Hydrogel)
+
+**Fungsi baru di `logic_aksesoris.py`**: `split_tertarget_non_tertarget()`,
+`scoreboard_cabang_aksesoris()`, `produk_terlaris_aksesoris_scoreboard()`.
+**Fungsi baru di `logic_persediaan.py`**: `apply_filters_tertarget()`,
+`nilai_persediaan_tertarget_vs_non()`, dan kolom baru
+`ADALAH_LUNA_TERTARGET` + `ADALAH_HYDROGEL` di `load_persediaan()` (kolom
+`ADALAH_LUNA` yang lama TIDAK diubah/dihapus, supaya bagian lain yang
+masih memakainya tidak rusak).
+
+**Ketujuh kriteria:**
+
+1. **Total Target** — default Rp 3.500.000.000, periode default **Samurai
+   39 (Jul–Sep 2026)** — keduanya bisa diubah (dropdown periode mencakup
+   Samurai 37–44; target via number input). Target per cabang dibagi rata
+   secara default, bisa disesuaikan lewat tabel isian di expander
+   "✏️ Sesuaikan Target per Cabang".
+2. **Scoreboard Penjualan per Cabang** — diurutkan dari **Total Omzet
+   TERTINGGI ke TERENDAH** (beda dari tabel Monitoring Target LUNA yang
+   urut dari % Actual terendah — di sini memang diminta urut Omzet).
+   Warna indikator pada kolom "% Pencapaian" pakai ambang yang sama:
+   🔴 <85% · 🟡 85–99% · 🟢 ≥100% (fungsi `warna_indikator_pencapaian()`
+   yang sama, dipakai ulang).
+3. **Grafik Rata-rata Penjualan per Hari per Cabang** — dihitung dari
+   Total Omzet ÷ jumlah HARI dalam periode (bukan cuma hari yang ada
+   transaksi), supaya representatif untuk perencanaan ke depan.
+4. **Monitoring Margin Cabang < 40%** — otomatis menyaring & menghitung
+   ulang cabang mana saja yang marginnya di bawah 40% pada periode ini,
+   dengan pesan sukses kalau ternyata semua cabang sudah ≥40%.
+5. **Produk Terlaris Aksesoris** — diurutkan dari Qty Terjual tertinggi,
+   slider untuk atur berapa banyak ditampilkan (5–50), tombol unduh CSV
+   berisi SELURUH produk (tidak dipotong slider).
+6. **Monitoring Stok Tertarget vs Non Tertarget** — nilai & qty stok per
+   cabang untuk kedua kelompok berdampingan, dari data Persediaan yang
+   diunggah terpisah di sidebar.
+7. **Monitoring Margin Produk** — tabel yang SAMA dengan poin 5 (fungsi
+   `produk_terlaris_aksesoris_scoreboard()` dipanggil sekali, dipakai
+   ulang), cuma diurutkan ulang berdasar kolom Margin (%) dari tertinggi
+   ke terendah — tidak menghitung ulang dari nol.
+
+**Diuji dengan data asli** (Samurai 39, Target Rp3,5M): scoreboard 18
+cabang terurut benar dari **Cinere** (Rp214,5jt omzet, tertinggi) sampai
+**Cibubur** (Rp11,9jt, terendah); Total Target hasil sum tepat
+Rp3.500.000.000; **8 dari 18 cabang** bermargin di bawah 40%; 1.761 produk
+unik teridentifikasi pada periode ini; stok Tertarget vs Non Tertarget
+terhitung benar per cabang. Termasuk kasus tepi periode masa depan tanpa
+data sama sekali (Samurai 44) — seluruh tabel tetap tampil dengan Omzet/
+Result = 0, bukan error.
+
 ## Analisa Mendalam: LUNA, Selain LUNA & Parfum UMAIR
 
 **Fitur baru**, ditempatkan di tab Penjualan Aksesoris sebelum bagian
@@ -694,6 +754,24 @@ grafik LUNA vs Selain LUNA vs Parfum:
   tahun/bulan/cabang yang sama dengan bagian atasnya (Parfum diambil dari
   `df_semua_kategori` yang difilter manual dengan filter yang sama, karena
   kategorinya beda dari data Aksesoris yang sudah difilter di awal fungsi).
+- **🐛 Bug ditemukan & diperbaiki: LUNA Hydrogel dihitung dua definisi
+  berbeda** — bagian ini SEMPAT tidak mengecualikan LUNA Hydrogel dari
+  kelompok "Aksesoris LUNA" (beda dengan bagian Monitoring Tahap 1 yang
+  sudah eksplisit mengecualikan Hydrogel sejak diminta sebelumnya).
+  Akibatnya, Omzet LUNA yang tampil di grafik ini **lebih besar** dari
+  yang tampil di tabel Monitoring Tahap 1 untuk periode yang sama —
+  inkonsistensi inilah yang terdeteksi pengguna sebagai "selisih dengan
+  sumber data". **Terverifikasi dengan data asli** (periode 1 Jul–30 Ags
+  2026): sebelum perbaikan Omzet LUNA tampil Rp 125.383.860 (termasuk
+  Rp 24.785.000 dari Hydrogel); setelah perbaikan tampil Rp 100.598.860 —
+  **persis cocok dengan angka di tabel Monitoring Tahap 1**. Diperbaiki
+  dengan menambah parameter `keyword_kecuali="HYDROGEL"` (default) pada
+  `omzet_per_kelompok()`, konsisten dengan `monitoring_tahap_per_cabang()`
+  dan `analisa_bundling_brand()` — LUNA Hydrogel sekarang ikut masuk
+  kelompok "Aksesoris Selain LUNA" di SELURUH bagian dashboard, bukan
+  cuma sebagian. Parameter bersifat opsional & backward-compatible
+  (`keyword_kecuali=None` mengembalikan perilaku lama, diverifikasi
+  hasilnya identik dengan sebelum perbaikan).
 - **Diagram indikator kontribusi cabang**: total omzet Aksesoris + Parfum
   digabung per cabang, **diurutkan dari kontribusi PALING RENDAH ke PALING
   BESAR** (fungsi `kontribusi_cabang_gabungan()`) — supaya cabang yang

@@ -217,15 +217,26 @@ def perbandingan_antar_periode_samurai(df_aksesoris: pd.DataFrame, keyword_brand
     return pd.DataFrame(rows, columns=cols) if rows else pd.DataFrame(columns=cols)
 
 
-def omzet_per_kelompok(df_aksesoris: pd.DataFrame, df_parfum: pd.DataFrame, keyword_brand: str = "LUNA") -> pd.DataFrame:
+def omzet_per_kelompok(df_aksesoris: pd.DataFrame, df_parfum: pd.DataFrame, keyword_brand: str = "LUNA", keyword_kecuali: str | None = "HYDROGEL") -> pd.DataFrame:
     """Bandingkan omzet 3 kelompok: Aksesoris ber-brand `keyword_brand`
     (mis. LUNA), Aksesoris SELAIN brand itu, dan Parfum (kelompok terpisah,
-    kategori beda) — untuk grafik perbandingan penjualan lintas kategori."""
+    kategori beda) — untuk grafik perbandingan penjualan lintas kategori.
+
+    `keyword_kecuali` (default "HYDROGEL"): nama barang yang mengandung
+    `keyword_brand` TAPI juga mengandung kata ini dianggap MASUK kelompok
+    "Selain {keyword_brand}", bukan kelompok brand-nya — konsisten dengan
+    definisi yang sama dipakai di `monitoring_tahap_per_cabang()` dan
+    `analisa_bundling_brand()` (LUNA Hydrogel dihitung terpisah dari LUNA
+    reguler). Set `None` untuk kembali ke perilaku lama (Hydrogel ikut
+    masuk kelompok brand)."""
     cols = ["Kelompok", "Omzet", "Laba", "Jumlah Nota", "Jumlah Item Terjual"]
     rows = []
 
     if not df_aksesoris.empty:
-        mask_brand = df_aksesoris["NAMA BARANG"].astype(str).str.upper().str.contains(keyword_brand.upper(), na=False)
+        nama_upper = df_aksesoris["NAMA BARANG"].astype(str).str.upper()
+        mask_brand = nama_upper.str.contains(keyword_brand.upper(), na=False)
+        if keyword_kecuali:
+            mask_brand = mask_brand & ~nama_upper.str.contains(keyword_kecuali.upper(), na=False)
         for label, sub in [
             (f"Aksesoris {keyword_brand.upper()}", df_aksesoris[mask_brand]),
             (f"Aksesoris Selain {keyword_brand.upper()}", df_aksesoris[~mask_brand]),
@@ -1377,8 +1388,115 @@ def warna_indikator_pencapaian(pct):
 
 
 # ---------------------------------------------------------------------------
-# Format angka gaya Indonesia
+# 8. Dashboard & Scoreboard Penjualan Aksesoris — Tertarget (LUNA selain
+#    Hydrogel) vs Non Tertarget (Selain LUNA, termasuk LUNA Hydrogel).
+#    Dipakai khusus untuk bagian "Dashboard & Scoreboard Penjualan Aksesoris"
+#    per periode Samurai — TIDAK mencampur Parfum (sesuai permintaan).
 # ---------------------------------------------------------------------------
+
+def split_tertarget_non_tertarget(df_aksesoris: pd.DataFrame):
+    """Pisahkan data penjualan AKSESORIS jadi 2 kelompok: Tertarget (LUNA
+    KECUALI Hydrogel) dan Non Tertarget (Selain LUNA, termasuk LUNA
+    Hydrogel — definisi yang sama dipakai di seluruh dashboard lain sejak
+    perbaikan bug Hydrogel). Return (df_tertarget, df_non_tertarget)."""
+    if df_aksesoris.empty:
+        return df_aksesoris, df_aksesoris
+    nama_upper = df_aksesoris["NAMA BARANG"].astype(str).str.upper()
+    mask_luna = nama_upper.str.contains("LUNA", na=False)
+    mask_hydrogel = nama_upper.str.contains("HYDROGEL", na=False)
+    mask_tertarget = mask_luna & ~mask_hydrogel
+    return df_aksesoris[mask_tertarget], df_aksesoris[~mask_tertarget]
+
+
+def scoreboard_cabang_aksesoris(
+    df_aksesoris: pd.DataFrame,
+    target_total: float,
+    tanggal_mulai,
+    tanggal_selesai,
+    target_per_cabang: dict | None = None,
+) -> pd.DataFrame:
+    """Scoreboard penjualan Aksesoris (Tertarget + Non Tertarget digabung)
+    per cabang untuk satu periode — diurutkan dari Total Omzet TERTINGGI ke
+    TERENDAH. Kolom: Cabang, Omzet Tertarget, Omzet Non Tertarget, Total
+    Omzet, Laba, Margin (%), Target, % Pencapaian, Rata-rata Omzet/Hari.
+
+    Target dibagi RATA ke seluruh cabang secara default (target_total /
+    jumlah cabang), atau pakai `target_per_cabang` (dict) untuk distribusi
+    tidak rata. "Rata-rata Omzet/Hari" dihitung dari jumlah HARI dalam
+    periode (tanggal_selesai - tanggal_mulai + 1), bukan cuma hari yang
+    ada transaksinya — supaya representatif sebagai target harian ke depan."""
+    cols = ["Cabang", "Omzet Tertarget", "Omzet Non Tertarget", "Total Omzet", "Laba",
+            "Margin (%)", "Target", "% Pencapaian", "Rata-rata Omzet / Hari"]
+    if df_aksesoris.empty:
+        return pd.DataFrame(columns=cols)
+
+    tanggal_mulai = pd.Timestamp(tanggal_mulai)
+    tanggal_selesai = pd.Timestamp(tanggal_selesai)
+    total_hari = max((tanggal_selesai - tanggal_mulai).days + 1, 1)
+
+    df_periode = df_aksesoris[(df_aksesoris["TGL FAKTUR"] >= tanggal_mulai) & (df_aksesoris["TGL FAKTUR"] <= tanggal_selesai)]
+    df_tertarget, df_non_tertarget = split_tertarget_non_tertarget(df_periode)
+
+    semua_cabang = sorted(df_aksesoris["CABANG"].dropna().unique().tolist())
+    n_cabang = len(semua_cabang) or 1
+
+    omzet_tertarget_cb = df_tertarget.groupby("CABANG")["TOTAL HARGA"].sum()
+    omzet_non_tertarget_cb = df_non_tertarget.groupby("CABANG")["TOTAL HARGA"].sum()
+    laba_cb = df_periode.groupby("CABANG")["LABA"].sum()
+
+    rows = []
+    for cabang in semua_cabang:
+        if target_per_cabang and cabang in target_per_cabang:
+            target_cabang = float(target_per_cabang[cabang])
+        else:
+            target_cabang = target_total / n_cabang
+
+        omzet_t = float(omzet_tertarget_cb.get(cabang, 0))
+        omzet_nt = float(omzet_non_tertarget_cb.get(cabang, 0))
+        total_omzet = omzet_t + omzet_nt
+        laba = float(laba_cb.get(cabang, 0))
+        margin = (laba / total_omzet * 100) if total_omzet else 0
+        pct = (total_omzet / target_cabang * 100) if target_cabang else 0
+        rata2_hari = total_omzet / total_hari
+
+        rows.append({
+            "Cabang": cabang, "Omzet Tertarget": omzet_t, "Omzet Non Tertarget": omzet_nt,
+            "Total Omzet": total_omzet, "Laba": laba, "Margin (%)": margin,
+            "Target": target_cabang, "% Pencapaian": pct, "Rata-rata Omzet / Hari": rata2_hari,
+        })
+
+    out = pd.DataFrame(rows, columns=cols)
+    return out.sort_values("Total Omzet", ascending=False).reset_index(drop=True)
+
+
+def produk_terlaris_aksesoris_scoreboard(df_aksesoris: pd.DataFrame, tanggal_mulai, tanggal_selesai) -> pd.DataFrame:
+    """Ranking produk AKSESORIS (Tertarget + Non Tertarget digabung) dari
+    Qty terjual TERTINGGI ke TERENDAH, dalam satu periode — dengan kolom
+    Margin (%) per produk sekaligus (dipakai juga untuk kriteria #7,
+    tinggal diurutkan ulang berdasar kolom Margin (%) di sisi tampilan)."""
+    cols = ["Nama Barang", "Kelompok", "Qty Terjual", "Omzet", "Laba", "Margin (%)"]
+    if df_aksesoris.empty:
+        return pd.DataFrame(columns=cols)
+
+    tanggal_mulai = pd.Timestamp(tanggal_mulai)
+    tanggal_selesai = pd.Timestamp(tanggal_selesai)
+    df_periode = df_aksesoris[(df_aksesoris["TGL FAKTUR"] >= tanggal_mulai) & (df_aksesoris["TGL FAKTUR"] <= tanggal_selesai)]
+    if df_periode.empty:
+        return pd.DataFrame(columns=cols)
+
+    nama_upper = df_periode["NAMA BARANG"].astype(str).str.upper()
+    mask_tertarget = nama_upper.str.contains("LUNA", na=False) & ~nama_upper.str.contains("HYDROGEL", na=False)
+
+    g = df_periode.groupby("NAMA BARANG").agg(
+        **{"Qty Terjual": ("QTY", "sum")}, Omzet=("TOTAL HARGA", "sum"), Laba=("LABA", "sum"),
+    ).reset_index()
+    kelompok_map = df_periode.assign(_tertarget=mask_tertarget).groupby("NAMA BARANG")["_tertarget"].first()
+    g["Kelompok"] = g["NAMA BARANG"].map(lambda n: "Tertarget" if kelompok_map.get(n, False) else "Non Tertarget")
+    g["Margin (%)"] = g.apply(lambda r: (r["Laba"] / r["Omzet"] * 100) if r["Omzet"] else 0, axis=1)
+    g = g.rename(columns={"NAMA BARANG": "Nama Barang"})
+    g = g.sort_values("Qty Terjual", ascending=False).reset_index(drop=True)
+    return g[cols]
+
 
 def format_int_id(x) -> str:
     try:
