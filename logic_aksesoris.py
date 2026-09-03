@@ -380,7 +380,11 @@ def analisa_bundling_per_cabang(df_jual_semua_kategori: pd.DataFrame, keyword: s
     Service yang TIDAK ada bundling aksesoris sama sekali, per cabang.
     Diurutkan dari **% Tanpa Bundling TERTINGGI** (cabang paling perlu
     ditindaklanjuti ada di paling atas)."""
-    cols = ["Cabang", "Total Nota Service", "Nota Bundling Brand", "Nota Bundling Brand Lain", "Nota Tanpa Bundling", "% Tanpa Bundling"]
+    kolom_brand = f"Nota Bundling {keyword.title()}"
+    kolom_pct_brand = f"% Bundling {keyword.title()}"
+    kolom_pct_tanpa_brand = f"% Tanpa Bundling {keyword.title()}"
+    cols = ["Cabang", "Total Nota Service", kolom_brand, "Nota Bundling Brand Lain",
+            "Nota Tanpa Bundling", kolom_pct_brand, kolom_pct_tanpa_brand, "% Tanpa Bundling"]
     if df_jual_semua_kategori.empty:
         return pd.DataFrame(columns=cols)
 
@@ -399,7 +403,7 @@ def analisa_bundling_per_cabang(df_jual_semua_kategori: pd.DataFrame, keyword: s
 
     def _klasifikasi(nota_id):
         if nota_id in notas_dgn_keyword:
-            return "Nota Bundling Brand"
+            return kolom_brand
         elif nota_id in notas_dgn_aksesoris:
             return "Nota Bundling Brand Lain"
         else:
@@ -408,10 +412,12 @@ def analisa_bundling_per_cabang(df_jual_semua_kategori: pd.DataFrame, keyword: s
     nota_cabang["_kelas"] = nota_cabang["NOTA_ID"].apply(_klasifikasi)
 
     g = nota_cabang.groupby(["CABANG", "_kelas"]).size().unstack(fill_value=0)
-    for c in ["Nota Bundling Brand", "Nota Bundling Brand Lain", "Nota Tanpa Bundling"]:
+    for c in [kolom_brand, "Nota Bundling Brand Lain", "Nota Tanpa Bundling"]:
         if c not in g.columns:
             g[c] = 0
-    g["Total Nota Service"] = g["Nota Bundling Brand"] + g["Nota Bundling Brand Lain"] + g["Nota Tanpa Bundling"]
+    g["Total Nota Service"] = g[kolom_brand] + g["Nota Bundling Brand Lain"] + g["Nota Tanpa Bundling"]
+    g[kolom_pct_brand] = np.where(g["Total Nota Service"] != 0, g[kolom_brand] / g["Total Nota Service"] * 100, 0)
+    g[kolom_pct_tanpa_brand] = np.where(g["Total Nota Service"] != 0, 100 - g[kolom_pct_brand], 0)
     g["% Tanpa Bundling"] = np.where(g["Total Nota Service"] != 0, g["Nota Tanpa Bundling"] / g["Total Nota Service"] * 100, 0)
     g = g.reset_index().rename(columns={"CABANG": "Cabang"})
     g = g.sort_values("% Tanpa Bundling", ascending=False).reset_index(drop=True)

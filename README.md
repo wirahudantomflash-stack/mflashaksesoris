@@ -718,6 +718,23 @@ tinggal disambungkan lagi ke `app.py`.
      Bundling TERTINGGI (cabang paling perlu ditindaklanjuti di atas).
      Data uji: **Jatibening** paling tinggi (54,7% tanpa bundling),
      **Dramaga** paling rendah (5,9%).
+     - **Diperbarui**: kolom "Nota Bundling Brand" diganti nama jadi
+       **"Nota Bundling Luna"** (dibangun dinamis dari parameter
+       `keyword.title()`, jadi otomatis menyesuaikan kalau suatu saat
+       dipanggil dengan brand lain), dan ditambahkan **2 kolom persentase
+       baru**: **"% Bundling Luna"** (persentase nota yang sudah bundling
+       LUNA dari Total Nota Service) dan **"% Tanpa Bundling Luna"**
+       (komplemennya — 100% dikurangi "% Bundling Luna", mencakup nota
+       yang bundling brand lain MAUPUN yang sama sekali tidak ada
+       bundling) — keduanya berdampingan dengan "% Tanpa Bundling" yang
+       sudah ada sebelumnya (definisi berbeda: "Tanpa Bundling" murni =
+       sama sekali tidak ada aksesoris apa pun, sedangkan "Tanpa Bundling
+       Luna" = tidak ada LUNA spesifik, meski mungkin ada aksesoris brand
+       lain). Diverifikasi `% Bundling Luna + % Tanpa Bundling Luna = 100`
+       persis untuk seluruh 18 cabang. Kolom persentase & integer
+       diformat otomatis berdasarkan awalan nama kolom (`%`), bukan
+       daftar nama kolom hardcode, supaya tetap benar meski nama kolom
+       brand berubah.
    - **Baru: Rincian Nomor Nota** — expander "🔍 Lihat Rincian Nomor Nota"
      berisi daftar lengkap NO FAKTUR + tanggal untuk nota Service yang
      sama sekali tidak ada bundling aksesoris, dengan dropdown filter per

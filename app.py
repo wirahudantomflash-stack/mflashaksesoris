@@ -2255,10 +2255,13 @@ def render_pembelian_tab():
                 if bund_cabang.empty:
                     st.info("Tidak ada data per cabang untuk ditampilkan.")
                 else:
+                    kolom_int_bc = [c for c in bund_cabang.columns if c not in ("Cabang",) and not c.startswith("%")]
+                    kolom_pct_bc = [c for c in bund_cabang.columns if c.startswith("%")]
                     st.bar_chart(bund_cabang.set_index("Cabang")["% Tanpa Bundling"])
                     tampil_bc = bund_cabang.copy()
-                    tampil_bc["% Tanpa Bundling"] = bund_cabang["% Tanpa Bundling"].map(la.format_percent_id)
-                    for c in ["Total Nota Service", "Nota Bundling Brand", "Nota Bundling Brand Lain", "Nota Tanpa Bundling"]:
+                    for c in kolom_pct_bc:
+                        tampil_bc[c] = bund_cabang[c].map(la.format_percent_id)
+                    for c in kolom_int_bc:
                         tampil_bc[c] = bund_cabang[c].map(la.format_int_id)
                     st.dataframe(tampil_bc, use_container_width=True, height=min(80 + 38 * len(bund_cabang), 650))
                     st.download_button(
