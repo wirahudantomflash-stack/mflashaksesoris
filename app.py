@@ -2090,6 +2090,7 @@ def render_pembelian_tab():
 
     # --- Siapkan data penjualan aksesoris (independen, sama pola dgn Ringkasan Eksekutif) ---
     df_aks_jual = None
+    df_re = None
     if raw_aksesoris is not None:
         if "CABANG" in raw_aksesoris.columns:
             df_re = la.finalize_data(raw_aksesoris)
@@ -2164,7 +2165,12 @@ def render_pembelian_tab():
     # 3. Grafik Penjualan Perbandingan per Pekan
     # -----------------------------------------------------------------
     st.subheader("3️⃣ Grafik Penjualan Perbandingan per Pekan")
-    st.caption("Omzet Aksesoris Tertarget (LUNA selain Hydrogel) vs Non Tertarget, per minggu (ISO week).")
+    st.caption(
+        "Omzet Aksesoris Tertarget (LUNA selain Hydrogel) vs Non Tertarget, per minggu (ISO week). "
+        "Menghitung SEMUA transaksi yang mengandung barang aksesoris — **termasuk yang terjual "
+        "lewat bundling** di transaksi Service/lainnya (penjualan LUNA lewat bundling tetap "
+        "dihitung sebagai penjualan LUNA)."
+    )
     if df_aks_jual is None:
         st.info("Belum ada data penjualan aksesoris.")
     else:
@@ -2181,6 +2187,29 @@ def render_pembelian_tab():
                 "⬇️ Unduh CSV — Omzet Mingguan", mingguan.to_csv(index=False).encode("utf-8-sig"),
                 "omzet_mingguan_perbandingan.csv", "text/csv", key="pb_dl_mingguan",
             )
+
+        # --- Info tambahan: berapa transaksi Service TIDAK ada bundling aksesoris (terutama LUNA) ---
+        if df_re is not None:
+            bund_info, _ = la.analisa_bundling_brand(df_aks_jual, df_re, keyword="LUNA")
+            if bund_info["jumlah_nota_service"]:
+                st.markdown("###### 📋 Kepatuhan Bundling Aksesoris pada Transaksi Service")
+                bi1, bi2, bi3, bi4 = st.columns(4)
+                bi1.metric("Total Nota Service", la.format_int_id(bund_info["jumlah_nota_service"]))
+                bi2.metric("Ada Bundling LUNA", la.format_int_id(bund_info["jumlah_service_dgn_brand"]), la.format_percent_id(bund_info["pct_bundling_brand"]))
+                bi3.metric("Bundling Brand Lain (bukan LUNA)", la.format_int_id(bund_info["jumlah_service_dgn_aksesoris_lain"]))
+                bi4.metric(
+                    "⚠️ TIDAK Ada Bundling Aksesoris", la.format_int_id(bund_info["jumlah_service_tanpa_aksesoris"]),
+                    la.format_percent_id(bund_info["pct_tanpa_aksesoris"]), delta_color="inverse",
+                )
+                st.caption(
+                    f"Dari {la.format_int_id(bund_info['jumlah_nota_service'])} nota Service: "
+                    f"**{la.format_int_id(bund_info['jumlah_service_tanpa_aksesoris'])} nota "
+                    f"({la.format_percent_id(bund_info['pct_tanpa_aksesoris'])}) sama sekali tidak ada "
+                    "aksesoris apa pun** yang di-bundling — ini yang paling perlu ditindaklanjuti. "
+                    f"{la.format_int_id(bund_info['jumlah_service_dgn_aksesoris_lain'])} nota lain sudah "
+                    "bundling tapi pakai brand SELAIN LUNA (sesuai pengecualian SE kalau LUNA kosong stok "
+                    "— bukan pelanggaran)."
+                )
 
     st.divider()
 

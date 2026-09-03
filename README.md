@@ -629,7 +629,22 @@ tinggal disambungkan lagi ke `app.py`.
    satu soal biaya barang keluar (terjual).
 3. **Grafik Penjualan Perbandingan per Pekan**: Omzet Tertarget vs Non
    Tertarget per minggu (label ISO week "YYYY-Www"), grafik batang
-   berdampingan.
+   berdampingan. **Menghitung SEMUA transaksi** yang mengandung barang
+   aksesoris — **termasuk yang terjual lewat bundling** di transaksi lain
+   (mis. "SERVICE HP"), karena penjualan LUNA lewat bundling tetap
+   penjualan LUNA yang sah. (Sempat dibatasi ke KATEGORI PENJUALAN =
+   "PENJUALAN AKSESORIS" saja di versi sebelumnya, lalu dikembalikan atas
+   permintaan — parameter `kategori_penjualan` tetap tersedia di fungsi
+   kalau suatu saat perlu dibatasi lagi, default sekarang `None`.)
+   - **Info tambahan baru — Kepatuhan Bundling Aksesoris pada Transaksi
+     Service**: 4 kartu metrik di bawah grafik, memakai fungsi
+     `analisa_bundling_brand()` yang sudah ada (dipakai ulang, tidak
+     dihitung dari nol): Total Nota Service, Ada Bundling LUNA, Bundling
+     Brand Lain (bukan LUNA — sesuai pengecualian SE), dan **⚠️ TIDAK Ada
+     Bundling Aksesoris sama sekali** — metrik terakhir inilah yang paling
+     perlu ditindaklanjuti. **Diuji dengan data asli**: dari 15.728 nota
+     Service, 4.551 (28,9%) sudah bundling LUNA, 7.483 bundling brand lain,
+     dan **3.704 (23,6%) sama sekali tidak ada bundling aksesoris apa pun**.
 4. **Perbandingan Penjualan Aksesoris Semua Cabang per Bulan**: tabel
    pivot Cabang × Bulan (kolom bulan otomatis menyesuaikan cakupan data),
    plus kolom Total dan grafik batang, diurutkan dari cabang dengan Total

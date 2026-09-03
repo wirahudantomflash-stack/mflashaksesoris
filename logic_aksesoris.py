@@ -1527,15 +1527,34 @@ def total_hpp_brand(df_aksesoris: pd.DataFrame, keyword: str = "LUNA", keyword_k
     return hasil
 
 
-def omzet_mingguan_perbandingan(df_aksesoris: pd.DataFrame, keyword_brand: str = "LUNA", keyword_kecuali: str | None = "HYDROGEL") -> pd.DataFrame:
+def omzet_mingguan_perbandingan(
+    df_aksesoris: pd.DataFrame,
+    keyword_brand: str = "LUNA",
+    keyword_kecuali: str | None = "HYDROGEL",
+    kategori_penjualan: str | None = None,
+) -> pd.DataFrame:
     """Omzet Tertarget vs Non Tertarget per MINGGU (label "YYYY-Www" ISO
     week) — untuk grafik perbandingan penjualan per pekan. Minggu dengan
-    tanggal mulai (Senin) ditampilkan juga sebagai referensi."""
+    tanggal mulai (Senin) ditampilkan juga sebagai referensi. Default
+    MENGHITUNG SEMUA transaksi yang mengandung barang aksesoris — TERMASUK
+    yang terjual lewat bundling di transaksi lain (mis. SERVICE HP), karena
+    penjualan LUNA lewat bundling tetap penjualan LUNA yang sah.
+
+    `kategori_penjualan` (default `None` = tidak difilter): kalau diisi
+    (mis. "PENJUALAN AKSESORIS"), HANYA transaksi dengan kategori
+    penjualan itu yang dihitung — untuk kasus tertentu kalau perlu melihat
+    penjualan aksesoris "murni" TANPA hasil bundling. Default tetap `None`
+    supaya bundling ikut terhitung, sesuai permintaan."""
     cols = ["Minggu", "Tanggal Mulai Minggu", "Omzet Tertarget", "Omzet Non Tertarget", "Total Omzet"]
     if df_aksesoris.empty:
         return pd.DataFrame(columns=cols)
 
     df = df_aksesoris.copy()
+    if kategori_penjualan and "KATEGORI PENJUALAN" in df.columns:
+        df = df[df["KATEGORI PENJUALAN"].astype(str).str.strip().str.upper() == kategori_penjualan.strip().upper()]
+    if df.empty:
+        return pd.DataFrame(columns=cols)
+
     iso = df["TGL FAKTUR"].dt.isocalendar()
     df["_minggu_label"] = iso["year"].astype(str) + "-W" + iso["week"].astype(str).str.zfill(2)
     df["_minggu_mulai"] = df["TGL FAKTUR"] - pd.to_timedelta(df["TGL FAKTUR"].dt.weekday, unit="D")
