@@ -2170,7 +2170,7 @@ def render_pembelian_tab():
     # -----------------------------------------------------------------
     st.subheader("2️⃣ Total HPP Aksesoris LUNA (dari Faktur Penjualan)")
     st.caption(
-        "HPP = modal barang LUNA (selain Hydrogel) yang SUDAH TERJUAL — beda sumber dari "
+        "HPP = modal barang LUNA (**termasuk Hydrogel**) yang SUDAH TERJUAL — beda sumber dari "
         "Total Pembelian di atas (yang dari faktur pembelian ke pemasok)."
     )
     if df_aks_jual is None:
@@ -2179,7 +2179,7 @@ def render_pembelian_tab():
             "bagian \"🧾 Data Penjualan\"."
         )
     else:
-        hpp = la.total_hpp_brand(df_aks_jual, keyword="LUNA", keyword_kecuali="HYDROGEL")
+        hpp = la.total_hpp_brand(df_aks_jual, keyword="LUNA", keyword_kecuali=None)
         h1, h2, h3, h4 = st.columns(4)
         h1.metric("Total HPP LUNA", la.format_rupiah_id(hpp["hpp"]))
         h2.metric("Total Omzet LUNA", la.format_rupiah_id(hpp["omzet"]))

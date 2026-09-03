@@ -642,11 +642,18 @@ tinggal disambungkan lagi ke `app.py`.
    aksesoris ke SEMUA pemasok, plus ranking lengkap semua pemasok di
    expander terpisah.
 2. **Total HPP Aksesoris LUNA (dari Faktur Penjualan)**: BEDA sumber dari
-   poin 1 — ini modal (kolom MODAL/HARGA BELI) dari barang LUNA (selain
-   Hydrogel, konsisten dengan definisi Tertarget) yang SUDAH TERJUAL,
-   bukan yang dibeli dari pemasok. Kedua angka (Pembelian vs HPP)
-   sengaja dipisah karena mewakili hal berbeda: satu soal pasokan masuk,
-   satu soal biaya barang keluar (terjual).
+   poin 1 — ini modal (kolom MODAL/HARGA BELI) dari barang LUNA **TERMASUK
+   Hydrogel** yang SUDAH TERJUAL, bukan yang dibeli dari pemasok. (Berbeda
+   dari definisi "Tertarget" yang dipakai di bagian lain dashboard — di
+   sini sengaja mencakup Hydrogel atas permintaan, karena tujuannya
+   melihat total modal barang LUNA yang sudah terjual secara keseluruhan,
+   bukan target pencapaian per brand tertentu.) Kedua angka (Pembelian vs
+   HPP) sengaja dipisah karena mewakili hal berbeda: satu soal pasokan
+   masuk, satu soal biaya barang keluar (terjual). **Diuji dengan data
+   asli**: Rp 64.550.291 HPP dari Rp 141.617.860 Omzet (margin 54,4%) —
+   naik dari Rp 59.600.526/Rp 115.632.860 di versi sebelumnya yang
+   mengecualikan Hydrogel (selisih Rp 4.949.765 HPP dan Rp 25.985.000
+   Omzet, persis sebesar kontribusi Hydrogel).
 3. **Grafik Penjualan Perbandingan per Pekan**: Omzet Tertarget vs Non
    Tertarget per minggu (label ISO week "YYYY-Www"), grafik batang
    berdampingan. **Menghitung SEMUA transaksi** yang mengandung barang
