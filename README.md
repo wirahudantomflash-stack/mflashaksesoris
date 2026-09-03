@@ -1,7 +1,24 @@
 # MFlash Dashboard Gadget dan Aksesoris (Persediaan LUNA + Parfum + Penjualan Aksesoris)
 
+> ## ⏸️ Bagian Parfum SEMENTARA DISEMBUNYIKAN dari dashboard
+>
+> Atas permintaan, **seluruh bagian yang berkaitan dengan Parfum** (Dashboard
+> Persediaan Parfum, sub-bagian Parfum UMAIR di Analisa Mendalam, target
+> penjualan UMAIR, kolom/kartu Parfum di grafik & Ringkasan Eksekutif)
+> **disembunyikan dari tampilan** — dikendalikan oleh SATU flag di
+> `app.py`:
+> ```python
+> TAMPILKAN_PARFUM = False
+> ```
+> **Kode/logikanya TIDAK dihapus** — cuma dilewati saat render. Untuk
+> memunculkan kembali semua bagian Parfum kapan saja, ubah nilai flag ini
+> jadi `True` dan simpan ulang `app.py` (tidak perlu ubah bagian lain).
+> Bagian README di bawah yang membahas Parfum tetap dipertahankan sebagai
+> dokumentasi — anggap sebagai referensi untuk saat fitur ini diaktifkan
+> kembali.
+
 **Satu halaman panjang** (bukan tab terpisah — digabung sesuai permintaan),
-berisi tiga dashboard berurutan dari atas ke bawah:
+berisi dashboard berurutan dari atas ke bawah:
 
 1. **📊 Dashboard Persediaan Aksesoris** — versi ringkas, mudah dikontrol,
    berisi 4 bagian:
@@ -20,6 +37,7 @@ berisi tiga dashboard berurutan dari atas ke bawah:
    ≥100 Hijau) — dan kotak Analisa & Tindak Lanjut.
 2. **🌸 Dashboard Persediaan Parfum** — struktur serupa Aksesoris tapi
    disederhanakan sesuai karakter datanya (lihat bagian khusus di bawah).
+   **⏸️ Saat ini disembunyikan** (lihat catatan `TAMPILKAN_PARFUM` di atas).
 3. **🧾 Dashboard Penjualan Aksesoris** — berisi dua bagian:
    - **Ringkasan Cabang, Produk & Sales**: ranking Seluruh Cabang, Semua
      Produk Aksesoris (terlaris & profit), dan Seluruh Sales.
@@ -28,12 +46,14 @@ berisi tiga dashboard berurutan dari atas ke bawah:
      referensi harga LUNA & potensi profit, **matrix insentif resmi &
      kalkulator THP Sales Retail** (dikalibrasi ke target Rp5-8jt/bulan),
      **target pencapaian penjualan LUNA** (default Rp 2 miliar / 12 bulan
-     mulai 20 Agustus 2026) & **target penjualan Parfum UMAIR** (maksimal
-     6 bulan), serta analisa + proyeksi 5–10 tahun.
+     mulai 20 Agustus 2026), serta analisa + proyeksi 5–10 tahun.
+     (Target penjualan Parfum UMAIR **⏸️ saat ini disembunyikan**.)
+4. **📦 Dashboard Pembelian & Perbandingan Penjualan Aksesoris** — sudah
+   AKSESORIS-only sejak awal dibuat, tidak terpengaruh flag ini sama sekali.
 
-Ketiga dashboard memakai **satu tempat unggah data** di sidebar ("📁 Upload
-Data" — dua tombol: Persediaan & Penjualan) yang dipakai bersama oleh
-semuanya, tinggal difilter kategorinya masing-masing per bagian. Karena
+Seluruh dashboard memakai **satu tempat unggah data** di sidebar ("📁 Upload
+Data" — tiga tombol: Persediaan, Penjualan, Pembelian) yang dipakai bersama
+oleh semuanya, tinggal difilter kategorinya masing-masing per bagian. Karena
 ini SATU HALAMAN (bukan tab), semua bagian langsung ter-render begitu data
 diunggah — tinggal scroll untuk berpindah antar dashboard, tidak perlu klik
 tab.

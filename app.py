@@ -9,6 +9,11 @@ import logic_penjualan as ljl
 import logic_aksesoris as la
 import logic_pembelian as lb
 
+# Flag sementara: bagian-bagian yang berkaitan dengan Parfum disembunyikan
+# dari dashboard atas permintaan. Kode/logikanya TIDAK dihapus, cuma
+# dilewati saat render — ubah ke True kapan saja untuk memunculkan lagi.
+TAMPILKAN_PARFUM = False
+
 st.set_page_config(page_title="MFlash Dashboard Gadget dan Aksesoris", page_icon="flash_logo.png", layout="wide")
 
 st.logo("flash_logo.png")
@@ -201,12 +206,17 @@ def render_ringkasan_eksekutif():
             return
 
     df_aks_re = la.hanya_kategori(df_re, "AKSESORIS")
-    df_parfum_re = la.hanya_kategori(df_re, "PARFUM")
+    df_parfum_re = la.hanya_kategori(df_re, "PARFUM") if TAMPILKAN_PARFUM else df_re.iloc[0:0]
 
     aks_stok_re = lp.apply_filters(df_persediaan, hanya_aksesoris=True, filter_luna=None) if df_persediaan is not None else pd.DataFrame()
-    parfum_stok_re = lp.apply_filters(df_persediaan, kategori="PARFUM", filter_luna=None) if df_persediaan is not None else pd.DataFrame()
+    parfum_stok_re = (
+        lp.apply_filters(df_persediaan, kategori="PARFUM", filter_luna=None)
+        if (df_persediaan is not None and TAMPILKAN_PARFUM) else pd.DataFrame()
+    )
 
     opk_re = la.omzet_per_kelompok(df_aks_re, df_parfum_re, keyword_brand="LUNA")
+    if not TAMPILKAN_PARFUM:
+        opk_re = opk_re[opk_re["Kelompok"] != "Parfum"].reset_index(drop=True)
     kc_re = la.kontribusi_cabang_gabungan(df_aks_re, df_parfum_re)
 
     # Nilai stok per kelompok (LUNA / Selain LUNA / Parfum) — sumber sama
@@ -218,17 +228,19 @@ def render_ringkasan_eksekutif():
     if not parfum_stok_re.empty:
         nilai_stok_kelompok["Parfum"] = parfum_stok_re["Nilai Total"].sum()
 
-    c1, c2, c3 = st.columns(3)
+    n_kartu = 3 if TAMPILKAN_PARFUM else 2
+    c1, c2, c3 = st.columns(3) if TAMPILKAN_PARFUM else (*st.columns(2), None)
     if not opk_re.empty:
-        for col, (_, row) in zip([c1, c2, c3], opk_re.iterrows()):
+        for col, (_, row) in zip([c1, c2, c3][:n_kartu], opk_re.iterrows()):
             with col:
                 margin_pct = (row["Laba"] / row["Omzet"] * 100) if row["Omzet"] else 0
                 st.metric(row["Kelompok"], la.format_rupiah_id(row["Omzet"]), f"Margin {la.format_percent_id(margin_pct)}")
                 st.caption(f"{la.format_int_id(row['Jumlah Item Terjual'])} pcs terjual")
 
     if nilai_stok_kelompok:
-        s1, s2, s3 = st.columns(3)
-        for col, kelompok in zip([s1, s2, s3], ["Aksesoris LUNA", "Aksesoris Selain LUNA", "Parfum"]):
+        s1, s2, s3 = st.columns(3) if TAMPILKAN_PARFUM else (*st.columns(2), None)
+        kelompok_list = ["Aksesoris LUNA", "Aksesoris Selain LUNA", "Parfum"] if TAMPILKAN_PARFUM else ["Aksesoris LUNA", "Aksesoris Selain LUNA"]
+        for col, kelompok in zip([s1, s2, s3][:n_kartu], kelompok_list):
             with col:
                 nilai = nilai_stok_kelompok.get(kelompok)
                 if nilai is not None:
@@ -260,11 +272,12 @@ def render_ringkasan_eksekutif():
     with b2:
         st.caption("Target pencapaian")
         target_luna_re = la.target_penjualan_luna(df_aks_re, target=2_000_000_000, tanggal_mulai="2026-08-20", durasi_bulan=12)
-        target_umair_re = la.target_penjualan_brand(df_parfum_re, keyword="UMAIR", target=100_000_000, tanggal_mulai="2026-01-01", durasi_bulan=6)
         st.caption(f"LUNA · Rp 2 M / 12 bln — {la.format_percent_id(target_luna_re['pct_pencapaian'])}")
         st.progress(min(target_luna_re["pct_pencapaian"] / 100, 1.0) if target_luna_re["pct_pencapaian"] else 0)
-        st.caption(f"UMAIR · Rp 100 jt / 6 bln — {la.format_percent_id(target_umair_re['pct_pencapaian'])}")
-        st.progress(min(target_umair_re["pct_pencapaian"] / 100, 1.0) if target_umair_re["pct_pencapaian"] else 0)
+        if TAMPILKAN_PARFUM:
+            target_umair_re = la.target_penjualan_brand(df_parfum_re, keyword="UMAIR", target=100_000_000, tanggal_mulai="2026-01-01", durasi_bulan=6)
+            st.caption(f"UMAIR · Rp 100 jt / 6 bln — {la.format_percent_id(target_umair_re['pct_pencapaian'])}")
+            st.progress(min(target_umair_re["pct_pencapaian"] / 100, 1.0) if target_umair_re["pct_pencapaian"] else 0)
 
     st.caption(
         "Detail lengkap tiap angka di atas ada di bagian \"🔍 Analisa Mendalam\" dan \"🎯 Target Pencapaian\" "
@@ -1200,12 +1213,13 @@ def render_aksesoris_tab():
     st.divider()
 
     # -----------------------------------------------------------------
-    # 3a1. Analisa Mendalam: LUNA, Selain LUNA & Parfum UMAIR
+    # 3a1. Analisa Mendalam: LUNA, Selain LUNA (& Parfum UMAIR kalau TAMPILKAN_PARFUM=True)
     # -----------------------------------------------------------------
-    st.header("🔍 Analisa Mendalam: LUNA, Selain LUNA & Parfum UMAIR")
+    st.header("🔍 Analisa Mendalam: LUNA, Selain LUNA" + (" & Parfum UMAIR" if TAMPILKAN_PARFUM else ""))
     st.caption(
-        "Menyandingkan data STOK (persediaan) dan PENJUALAN untuk tiga kelompok, plus deteksi "
-        "kepatuhan program Bundling Aksesoris (Surat Edaran SE/001/IN-MF/IV/2026) pada transaksi Service."
+        "Menyandingkan data STOK (persediaan) dan PENJUALAN untuk " + ("tiga" if TAMPILKAN_PARFUM else "dua") +
+        " kelompok, plus deteksi kepatuhan program Bundling Aksesoris (Surat Edaran SE/001/IN-MF/IV/2026) "
+        "pada transaksi Service."
     )
 
     if df_persediaan is None:
@@ -1294,50 +1308,59 @@ def render_aksesoris_tab():
             "rincian_aksesoris_selain_luna.csv", "text/csv", key="an_dl_selain_luna",
         )
 
-    st.divider()
-    st.subheader("3️⃣ Parfum UMAIR")
-    st.caption(
-        "Kategori PARFUM (terpisah dari AKSESORIS) — mencakup seluruh varian UMAIR "
-        "(mis. Quantum, ADN, Firdaus, dll), bukan cuma satu varian."
-    )
-    if df_persediaan is None:
-        parfum_umair_stok = pd.DataFrame()
-    else:
-        parfum_stok_dasar = lp.apply_filters(df_persediaan, kategori="PARFUM", filter_luna=None)
+    if TAMPILKAN_PARFUM:
+        st.divider()
+        st.subheader("3️⃣ Parfum UMAIR")
+        st.caption(
+            "Kategori PARFUM (terpisah dari AKSESORIS) — mencakup seluruh varian UMAIR "
+            "(mis. Quantum, ADN, Firdaus, dll), bukan cuma satu varian."
+        )
+        if df_persediaan is None:
+            parfum_umair_stok = pd.DataFrame()
+        else:
+            parfum_stok_dasar = lp.apply_filters(df_persediaan, kategori="PARFUM", filter_luna=None)
+            if sel_cabang:
+                parfum_stok_dasar = parfum_stok_dasar[parfum_stok_dasar["Cabang"].isin(sel_cabang)]
+            parfum_umair_stok = parfum_stok_dasar[parfum_stok_dasar["Nama Barang"].astype(str).str.upper().str.contains("UMAIR", na=False)]
+        df_parfum_jual_an = la.hanya_kategori(df_semua_kategori, "PARFUM")
         if sel_cabang:
-            parfum_stok_dasar = parfum_stok_dasar[parfum_stok_dasar["Cabang"].isin(sel_cabang)]
-        parfum_umair_stok = parfum_stok_dasar[parfum_stok_dasar["Nama Barang"].astype(str).str.upper().str.contains("UMAIR", na=False)]
-    df_parfum_jual_an = la.hanya_kategori(df_semua_kategori, "PARFUM")
-    if sel_cabang:
-        df_parfum_jual_an = df_parfum_jual_an[df_parfum_jual_an["CABANG"].isin(sel_cabang)]
-    if sel_tahun:
-        df_parfum_jual_an = df_parfum_jual_an[df_parfum_jual_an["TAHUN"].isin(sel_tahun)]
-    if sel_bulan:
-        df_parfum_jual_an = df_parfum_jual_an[df_parfum_jual_an["BULAN"].isin(sel_bulan)]
-    umair_jual = df_parfum_jual_an[df_parfum_jual_an["NAMA BARANG"].astype(str).str.upper().str.contains("UMAIR", na=False)]
-    _render_analisa_brand("Parfum UMAIR", parfum_umair_stok, umair_jual, "UMAIR", "an_umair")
+            df_parfum_jual_an = df_parfum_jual_an[df_parfum_jual_an["CABANG"].isin(sel_cabang)]
+        if sel_tahun:
+            df_parfum_jual_an = df_parfum_jual_an[df_parfum_jual_an["TAHUN"].isin(sel_tahun)]
+        if sel_bulan:
+            df_parfum_jual_an = df_parfum_jual_an[df_parfum_jual_an["BULAN"].isin(sel_bulan)]
+        umair_jual = df_parfum_jual_an[df_parfum_jual_an["NAMA BARANG"].astype(str).str.upper().str.contains("UMAIR", na=False)]
+        _render_analisa_brand("Parfum UMAIR", parfum_umair_stok, umair_jual, "UMAIR", "an_umair")
 
     st.divider()
 
     # -----------------------------------------------------------------
     # 3a2. Grafik Penjualan LUNA vs Selain LUNA vs Parfum & Kontribusi Cabang
     # -----------------------------------------------------------------
-    st.header("📊 Penjualan Aksesoris LUNA vs Selain LUNA vs Parfum")
+    st.header("📊 Penjualan Aksesoris LUNA vs Selain LUNA" + (" vs Parfum" if TAMPILKAN_PARFUM else ""))
     st.caption(
-        "Aksesoris LUNA/Selain LUNA dari data yang sudah difilter kategori AKSESORIS; "
-        "Parfum diambil terpisah dari kategori PARFUM pada berkas penjualan yang sama "
-        "(kedua kategori beda, sehingga dibandingkan berdampingan di sini)."
+        "Aksesoris LUNA/Selain LUNA dari data yang sudah difilter kategori AKSESORIS"
+        + (
+            "; Parfum diambil terpisah dari kategori PARFUM pada berkas penjualan yang sama "
+            "(kedua kategori beda, sehingga dibandingkan berdampingan di sini)."
+            if TAMPILKAN_PARFUM else "."
+        )
     )
 
-    df_parfum_untuk_grafik = la.hanya_kategori(df_semua_kategori, "PARFUM")
-    if sel_cabang:
-        df_parfum_untuk_grafik = df_parfum_untuk_grafik[df_parfum_untuk_grafik["CABANG"].isin(sel_cabang)]
-    if sel_tahun:
-        df_parfum_untuk_grafik = df_parfum_untuk_grafik[df_parfum_untuk_grafik["TAHUN"].isin(sel_tahun)]
-    if sel_bulan:
-        df_parfum_untuk_grafik = df_parfum_untuk_grafik[df_parfum_untuk_grafik["BULAN"].isin(sel_bulan)]
+    if TAMPILKAN_PARFUM:
+        df_parfum_untuk_grafik = la.hanya_kategori(df_semua_kategori, "PARFUM")
+        if sel_cabang:
+            df_parfum_untuk_grafik = df_parfum_untuk_grafik[df_parfum_untuk_grafik["CABANG"].isin(sel_cabang)]
+        if sel_tahun:
+            df_parfum_untuk_grafik = df_parfum_untuk_grafik[df_parfum_untuk_grafik["TAHUN"].isin(sel_tahun)]
+        if sel_bulan:
+            df_parfum_untuk_grafik = df_parfum_untuk_grafik[df_parfum_untuk_grafik["BULAN"].isin(sel_bulan)]
+    else:
+        df_parfum_untuk_grafik = dff.iloc[0:0]
 
     opk = la.omzet_per_kelompok(dff, df_parfum_untuk_grafik, keyword_brand="LUNA")
+    if not TAMPILKAN_PARFUM:
+        opk = opk[opk["Kelompok"] != "Parfum"].reset_index(drop=True)
     if opk.empty or opk["Omzet"].sum() == 0:
         st.info("Tidak ada data untuk grafik ini pada filter saat ini.")
     else:
@@ -1349,14 +1372,15 @@ def render_aksesoris_tab():
         tampil_opk["Jumlah Item Terjual"] = opk["Jumlah Item Terjual"].map(la.format_int_id)
         st.dataframe(tampil_opk, use_container_width=True)
         st.download_button(
-            "⬇️ Unduh CSV — Omzet per Kelompok (LUNA/Selain LUNA/Parfum)", opk.to_csv(index=False).encode("utf-8-sig"),
+            "⬇️ Unduh CSV — Omzet per Kelompok" + (" (LUNA/Selain LUNA/Parfum)" if TAMPILKAN_PARFUM else " (LUNA/Selain LUNA)"),
+            opk.to_csv(index=False).encode("utf-8-sig"),
             "omzet_per_kelompok.csv", "text/csv", key="ak_dl_kelompok",
         )
 
     st.subheader("📶 Indikator Kontribusi Cabang (Terendah → Tertinggi)")
     st.caption(
-        "Total omzet Aksesoris + Parfum per cabang, diurutkan dari kontribusi PALING RENDAH "
-        "ke PALING BESAR — cabang di paling atas grafik yang paling perlu didorong."
+        "Total omzet Aksesoris" + (" + Parfum" if TAMPILKAN_PARFUM else "") + " per cabang, diurutkan dari "
+        "kontribusi PALING RENDAH ke PALING BESAR — cabang di paling atas grafik yang paling perlu didorong."
     )
     kc = la.kontribusi_cabang_gabungan(dff, df_parfum_untuk_grafik)
     if kc.empty:
@@ -1368,13 +1392,16 @@ def render_aksesoris_tab():
         tampil_kc["Omzet Parfum"] = kc["Omzet Parfum"].map(la.format_rupiah_id)
         tampil_kc["Total Omzet"] = kc["Total Omzet"].map(la.format_rupiah_id)
         tampil_kc["Porsi Kontribusi (%)"] = kc["Porsi Kontribusi (%)"].map(la.format_percent_id)
+        if not TAMPILKAN_PARFUM:
+            tampil_kc = tampil_kc.drop(columns=["Omzet Parfum"])
         st.dataframe(tampil_kc, use_container_width=True, height=460)
         st.caption(
             f"Kontribusi terendah: **{kc.iloc[0]['Cabang']}** ({la.format_percent_id(kc.iloc[0]['Porsi Kontribusi (%)'])}) · "
             f"tertinggi: **{kc.iloc[-1]['Cabang']}** ({la.format_percent_id(kc.iloc[-1]['Porsi Kontribusi (%)'])})."
         )
         st.download_button(
-            "⬇️ Unduh CSV — Kontribusi Cabang (Aksesoris + Parfum)", kc.to_csv(index=False).encode("utf-8-sig"),
+            "⬇️ Unduh CSV — Kontribusi Cabang" + (" (Aksesoris + Parfum)" if TAMPILKAN_PARFUM else " (Aksesoris)"),
+            kc.to_csv(index=False).encode("utf-8-sig"),
             "kontribusi_cabang.csv", "text/csv", key="ak_dl_kontribusi_cabang",
         )
 
@@ -1892,77 +1919,78 @@ def render_aksesoris_tab():
             f"{la.format_rupiah_id(sisa_menuju_2m)} untuk tahap-tahap berikutnya."
         )
 
-    st.divider()
+    if TAMPILKAN_PARFUM:
+        st.divider()
 
-    # -----------------------------------------------------------------
-    # 3d. Target Pencapaian Penjualan Parfum UMAIR
-    # -----------------------------------------------------------------
-    st.header("🌸 Target Pencapaian Penjualan Parfum UMAIR")
-    st.caption(
-        "Kategori PARFUM diambil dari berkas penjualan yang sama (tidak dibatasi oleh filter "
-        "AKSESORIS di atas — Parfum kategori terpisah). Nama barang diidentifikasi mengandung kata \"UMAIR\"."
-    )
-
-    df_parfum_jual = la.hanya_kategori(df_semua_kategori, "PARFUM")
-
-    if df_parfum_jual.empty:
-        st.info(
-            "Tidak ada baris berkategori PARFUM pada berkas penjualan ini — target belum bisa "
-            "dihitung. Pastikan berkas yang diunggah mencakup transaksi Parfum."
-        )
-    else:
-        u1, u2, u3 = st.columns(3)
-        with u1:
-            target_umair_rp = st.number_input("Target Penjualan Parfum UMAIR (Rp)", min_value=0, value=100_000_000, step=10_000_000, format="%d", key="target_umair_rp")
-        with u2:
-            tanggal_mulai_umair = st.date_input("Mulai program", value=pd.Timestamp("2026-01-01"), key="target_umair_mulai")
-        with u3:
-            durasi_bulan_umair = st.number_input("Durasi (bulan, maksimal)", min_value=1, max_value=24, value=6, step=1, key="target_umair_durasi")
-
-        tprog_umair = la.target_penjualan_brand(
-            df_parfum_jual, keyword="UMAIR", target=target_umair_rp,
-            tanggal_mulai=tanggal_mulai_umair, durasi_bulan=int(durasi_bulan_umair),
-        )
-
+        # -----------------------------------------------------------------
+        # 3d. Target Pencapaian Penjualan Parfum UMAIR
+        # -----------------------------------------------------------------
+        st.header("🌸 Target Pencapaian Penjualan Parfum UMAIR")
         st.caption(
-            f"Periode program: {tprog_umair['tanggal_mulai'].strftime('%d %b %Y')} – "
-            f"{tprog_umair['tanggal_selesai'].strftime('%d %b %Y')} ({tprog_umair['total_hari_program']} hari, "
-            f"maksimal {int(durasi_bulan_umair)} bulan)."
+            "Kategori PARFUM diambil dari berkas penjualan yang sama (tidak dibatasi oleh filter "
+            "AKSESORIS di atas — Parfum kategori terpisah). Nama barang diidentifikasi mengandung kata \"UMAIR\"."
         )
 
-        if tprog_umair["hari_berjalan"] == 0:
-            st.info("Data faktur belum masuk periode program ini, atau program belum dimulai — indikator belum bisa dihitung.")
+        df_parfum_jual = la.hanya_kategori(df_semua_kategori, "PARFUM")
+
+        if df_parfum_jual.empty:
+            st.info(
+                "Tidak ada baris berkategori PARFUM pada berkas penjualan ini — target belum bisa "
+                "dihitung. Pastikan berkas yang diunggah mencakup transaksi Parfum."
+            )
         else:
-            c1, c2, c3, c4 = st.columns(4)
-            c1.metric("Tercapai", la.format_rupiah_id(tprog_umair["tercapai"]))
-            c2.metric("Target s/d Hari Ini", la.format_rupiah_id(tprog_umair["target_sampai_hari_ini"]))
-            c3.metric("% Pencapaian (vs target s/d hari ini)", la.format_percent_id(tprog_umair["pct_pencapaian"]))
-            c4.metric("% dari Target Penuh", la.format_percent_id(tprog_umair["pct_dari_target_penuh"]))
+            u1, u2, u3 = st.columns(3)
+            with u1:
+                target_umair_rp = st.number_input("Target Penjualan Parfum UMAIR (Rp)", min_value=0, value=100_000_000, step=10_000_000, format="%d", key="target_umair_rp")
+            with u2:
+                tanggal_mulai_umair = st.date_input("Mulai program", value=pd.Timestamp("2026-01-01"), key="target_umair_mulai")
+            with u3:
+                durasi_bulan_umair = st.number_input("Durasi (bulan, maksimal)", min_value=1, max_value=24, value=6, step=1, key="target_umair_durasi")
 
-            st.progress(min(tprog_umair["pct_pencapaian"] / 100, 1.0) if tprog_umair["pct_pencapaian"] else 0)
-
-            st.caption(
-                f"Tanggal acuan: **{tprog_umair['tgl_acuan'].strftime('%d %b %Y')}** — hari ke-"
-                f"{tprog_umair['hari_berjalan']} dari {tprog_umair['total_hari_program']} hari program "
-                f"(maksimal {int(durasi_bulan_umair)} bulan), sisa {la.format_int_id(tprog_umair['sisa_hari'])} hari. "
-                f"{la.format_int_id(tprog_umair['jumlah_transaksi'])} baris transaksi UMAIR tercatat."
+            tprog_umair = la.target_penjualan_brand(
+                df_parfum_jual, keyword="UMAIR", target=target_umair_rp,
+                tanggal_mulai=tanggal_mulai_umair, durasi_bulan=int(durasi_bulan_umair),
             )
 
-            if tprog_umair["sisa_hari"] == 0 and tprog_umair["pct_dari_target_penuh"] < 100:
-                st.warning(
-                    f"⏰ Periode maksimal {int(durasi_bulan_umair)} bulan sudah/hampir habis — pencapaian "
-                    f"baru **{la.format_percent_id(tprog_umair['pct_dari_target_penuh'])}** dari target penuh."
-                )
-            elif tprog_umair["pct_pencapaian"] < 80:
-                st.warning(
-                    f"⚠️ Pencapaian baru **{la.format_percent_id(tprog_umair['pct_pencapaian'])}** dari target "
-                    "yang seharusnya sudah dicapai sampai hari ini — di bawah jalur target."
-                )
+            st.caption(
+                f"Periode program: {tprog_umair['tanggal_mulai'].strftime('%d %b %Y')} – "
+                f"{tprog_umair['tanggal_selesai'].strftime('%d %b %Y')} ({tprog_umair['total_hari_program']} hari, "
+                f"maksimal {int(durasi_bulan_umair)} bulan)."
+            )
+
+            if tprog_umair["hari_berjalan"] == 0:
+                st.info("Data faktur belum masuk periode program ini, atau program belum dimulai — indikator belum bisa dihitung.")
             else:
-                st.success(
-                    f"✅ Pencapaian **{la.format_percent_id(tprog_umair['pct_pencapaian'])}** dari target yang "
-                    "seharusnya — di jalur yang baik."
+                c1, c2, c3, c4 = st.columns(4)
+                c1.metric("Tercapai", la.format_rupiah_id(tprog_umair["tercapai"]))
+                c2.metric("Target s/d Hari Ini", la.format_rupiah_id(tprog_umair["target_sampai_hari_ini"]))
+                c3.metric("% Pencapaian (vs target s/d hari ini)", la.format_percent_id(tprog_umair["pct_pencapaian"]))
+                c4.metric("% dari Target Penuh", la.format_percent_id(tprog_umair["pct_dari_target_penuh"]))
+
+                st.progress(min(tprog_umair["pct_pencapaian"] / 100, 1.0) if tprog_umair["pct_pencapaian"] else 0)
+
+                st.caption(
+                    f"Tanggal acuan: **{tprog_umair['tgl_acuan'].strftime('%d %b %Y')}** — hari ke-"
+                    f"{tprog_umair['hari_berjalan']} dari {tprog_umair['total_hari_program']} hari program "
+                    f"(maksimal {int(durasi_bulan_umair)} bulan), sisa {la.format_int_id(tprog_umair['sisa_hari'])} hari. "
+                    f"{la.format_int_id(tprog_umair['jumlah_transaksi'])} baris transaksi UMAIR tercatat."
                 )
+
+                if tprog_umair["sisa_hari"] == 0 and tprog_umair["pct_dari_target_penuh"] < 100:
+                    st.warning(
+                        f"⏰ Periode maksimal {int(durasi_bulan_umair)} bulan sudah/hampir habis — pencapaian "
+                        f"baru **{la.format_percent_id(tprog_umair['pct_dari_target_penuh'])}** dari target penuh."
+                    )
+                elif tprog_umair["pct_pencapaian"] < 80:
+                    st.warning(
+                        f"⚠️ Pencapaian baru **{la.format_percent_id(tprog_umair['pct_pencapaian'])}** dari target "
+                        "yang seharusnya sudah dicapai sampai hari ini — di bawah jalur target."
+                    )
+                else:
+                    st.success(
+                        f"✅ Pencapaian **{la.format_percent_id(tprog_umair['pct_pencapaian'])}** dari target yang "
+                        "seharusnya — di jalur yang baik."
+                    )
 
     st.divider()
 
@@ -2267,11 +2295,12 @@ render_persediaan_tab()
 st.markdown("---")
 st.markdown("---")
 
-st.markdown("# 🌸 Dashboard Persediaan Parfum")
-render_persediaan_parfum_tab()
+if TAMPILKAN_PARFUM:
+    st.markdown("# 🌸 Dashboard Persediaan Parfum")
+    render_persediaan_parfum_tab()
 
-st.markdown("---")
-st.markdown("---")
+    st.markdown("---")
+    st.markdown("---")
 
 st.markdown("# 🧾 Dashboard Penjualan Aksesoris")
 render_penjualan_tab()
