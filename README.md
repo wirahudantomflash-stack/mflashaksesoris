@@ -101,12 +101,12 @@ Parfum berbeda:
 ## Isi repo
 
 ```
-app.py               # aplikasi utama (3 tab)
+app.py               # aplikasi utama (satu halaman, 4 dashboard)
 flash_logo.png        # logo Flash — dipakai di judul halaman & sidebar (st.logo)
 logic_persediaan.py    # logika indikator stok (dipakai Aksesoris & Parfum)
 logic_penjualan.py    # logika olah data penjualan/cabang (umum)
 logic_aksesoris.py     # logika olah data revenue penjualan aksesoris
-logic_pembelian.py     # TIDAK dipakai app.py lagi — lihat catatan di bawah
+logic_pembelian.py     # logika olah data pembelian/pemasok — AKTIF lagi
 requirements.txt      # dependensi untuk Streamlit Cloud
 ```
 
@@ -116,11 +116,13 @@ requirements.txt      # dependensi untuk Streamlit Cloud
 > akan gagal jalan (`FileNotFoundError`) karena keduanya dipanggil di baris
 > paling awal skrip.
 
-> **Catatan:** `logic_pembelian.py` (dashboard porsi pemasok yang lama)
-> sudah tidak lagi dipanggil dari `app.py` sejak tab Pembelian diganti
-> menjadi tab Persediaan Aksesoris. Berkasnya tetap disertakan kalau-kalau
-> Anda masih butuh logikanya nanti — boleh dihapus dari repo kalau memang
-> tidak dipakai.
+> **Catatan (diperbarui):** `logic_pembelian.py` sebelumnya sempat TIDAK
+> dipanggil dari `app.py` (sejak tab Pembelian versi awal diganti jadi tab
+> Persediaan Aksesoris) — **sekarang AKTIF lagi**, dipakai untuk bagian
+> "📦 Dashboard Pembelian & Perbandingan Penjualan Aksesoris" (kriteria
+> "Total Pembelian Aksesoris — Pemasok LUNA"). Struktur modulnya ternyata
+> masih cocok persis dengan skema kolom berkas Faktur Pembelian terbaru,
+> jadi tidak perlu ditulis ulang.
 
 ## Cara pakai di GitHub + Streamlit Cloud
 
@@ -146,6 +148,8 @@ Sidebar dipakai bersama oleh SELURUH bagian di halaman, berisi:
   & bagian Persediaan Parfum (tinggal difilter kategorinya masing-masing)
 - Unggah data penjualan — dipakai untuk bagian Persediaan Aksesoris/Parfum
   ("Produk Paling Diminati") dan **kedua bagian** di bagian Penjualan Aksesoris
+- **Unggah data pembelian** (BARU) — khusus dipakai untuk bagian "📦 Dashboard
+  Pembelian & Perbandingan Penjualan Aksesoris" (total pembelian per pemasok)
 
 > **Catatan:** kontrol ambang indikator stok (batas Merah/Kuning) dan angka
 > "Jumlah SKU" **sementara disembunyikan** dari sidebar & tampilan dashboard
@@ -588,6 +592,69 @@ tabel ikut menyesuaikan (dari Rp2.000.000.000 jadi Rp2.088.888.889).
 Simulasi serupa untuk Tahap 1 (target Klender diubah jadi Rp20jt): total
 Tahap 1 berubah dari Rp300.006.600 jadi Rp303.316.100. Kedua tabel diuji
 render (styling + format) tanpa error setelah target diedit.
+
+## 📦 Dashboard Pembelian & Perbandingan Penjualan Aksesoris (BARU)
+
+**Tab besar baru**, ditempatkan paling bawah halaman (setelah Dashboard
+Penjualan Aksesoris) — sekarang ada **4 dashboard total** dalam satu
+halaman, bukan 3.
+
+**Sumber data baru**: kotak unggah **"📦 Data Pembelian"** ditambahkan di
+sidebar (sejajar Persediaan & Penjualan) — sheet "DB Pembelian" atau CSV
+skema sama. Nama file default yang dikenali otomatis: `pembelian.csv.gz`,
+`pembelian.csv`, `Faktur_Pembelian.xlsx`.
+
+**Modul `logic_pembelian.py` dihidupkan kembali** — sebelumnya sudah ada
+di repo tapi TIDAK dipanggil dari `app.py` sejak lama (peninggalan dari
+dashboard "Porsi Pemasok" versi awal proyek). Strukturnya (`load_pembelian()`,
+`luna_progress()`, `porsi_pemasok()`) ternyata masih cocok persis dengan
+skema kolom berkas Faktur Pembelian terbaru — tidak perlu ditulis ulang,
+tinggal disambungkan lagi ke `app.py`.
+
+**Fungsi baru di `logic_aksesoris.py`**: `total_hpp_brand()`,
+`omzet_mingguan_perbandingan()`, `omzet_cabang_per_bulan()`.
+
+**Keempat kriteria:**
+
+1. **Total Pembelian Aksesoris — Pemasok LUNA**: dari FAKTUR PEMBELIAN
+   (bukan penjualan) — total belanja ke pemasok bernama "LUNA"/"Luna"
+   (disatukan case-insensitive), dibandingkan dengan total belanja
+   aksesoris ke SEMUA pemasok, plus ranking lengkap semua pemasok di
+   expander terpisah.
+2. **Total HPP Aksesoris LUNA (dari Faktur Penjualan)**: BEDA sumber dari
+   poin 1 — ini modal (kolom MODAL/HARGA BELI) dari barang LUNA (selain
+   Hydrogel, konsisten dengan definisi Tertarget) yang SUDAH TERJUAL,
+   bukan yang dibeli dari pemasok. Kedua angka (Pembelian vs HPP)
+   sengaja dipisah karena mewakili hal berbeda: satu soal pasokan masuk,
+   satu soal biaya barang keluar (terjual).
+3. **Grafik Penjualan Perbandingan per Pekan**: Omzet Tertarget vs Non
+   Tertarget per minggu (label ISO week "YYYY-Www"), grafik batang
+   berdampingan.
+4. **Perbandingan Penjualan Aksesoris Semua Cabang per Bulan**: tabel
+   pivot Cabang × Bulan (kolom bulan otomatis menyesuaikan cakupan data),
+   plus kolom Total dan grafik batang, diurutkan dari cabang dengan Total
+   Omzet tertinggi.
+
+**Diuji dengan data asli** (Faktur Pembelian: 1.782 baris aksesoris dari
+Jul–Sep 2026; Faktur Penjualan: 51.179 baris periode sama):
+- Total Pembelian ke LUNA: Rp 353.942.148 dari total Rp 1.095.016.240
+  (32,3% porsi) — 62 pemasok berbeda teridentifikasi
+- Total HPP LUNA (dari penjualan): Rp 59.600.526, Omzet Rp 115.632.860
+- Grafik mingguan: 10 minggu, dari 2026-W27 sampai 2026-W36
+- Perbandingan bulanan: 18 cabang × 3 bulan (Jul/Agu/Sep 2026), Cinere
+  tertinggi total (Rp 218,1jt)
+- Termasuk kasus tepi: data pembelian belum diunggah (pesan info, bukan
+  error), data penjualan kosong, dan berkas rincian satu cabang tanpa
+  nama cabang terisi.
+
+**Catatan penting soal berkas sumber**: file Faktur Pembelian & Faktur
+Penjualan terbaru (per 1 Jul–2 Sep 2026) ternyata **mencampur dua format
+tanggal** dalam satu kolom — format standar (`2026-07-14 00:00:00`) untuk
+data Juli, dan format Indonesia singkat (`22 Agu 2026`) untuk data
+Agustus. Parser tanggal biasa gagal total pada ~49% baris. Sudah
+ditangani saat konversi ke `.csv.gz` (di luar kode aplikasi ini) dengan
+parser khusus yang mengenali kedua format — file CSV yang sudah dikonversi
+aman dipakai langsung tanpa masalah ini.
 
 ## 🏆 Dashboard & Scoreboard Penjualan Aksesoris (BARU)
 

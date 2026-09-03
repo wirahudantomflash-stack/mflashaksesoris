@@ -7,6 +7,7 @@ import numpy as np
 import logic_persediaan as lp
 import logic_penjualan as ljl
 import logic_aksesoris as la
+import logic_pembelian as lb
 
 st.set_page_config(page_title="MFlash Dashboard Gadget dan Aksesoris", page_icon="flash_logo.png", layout="wide")
 
@@ -55,6 +56,15 @@ upl_penjualan = st.sidebar.file_uploader(
     "Unggah berkas penjualan", type=["gz", "csv", "xlsx", "xls"], key="upl_penjualan",
 )
 
+st.sidebar.markdown("**📦 Data Pembelian**")
+st.sidebar.caption(
+    "Sheet \"DB Pembelian\" (atau CSV skema sama) — dipakai untuk Dashboard Pembelian "
+    "& Perbandingan Penjualan Aksesoris (total pembelian per pemasok, dst)."
+)
+upl_pembelian = st.sidebar.file_uploader(
+    "Unggah berkas pembelian", type=["gz", "csv", "xlsx", "xls"], key="upl_pembelian",
+)
+
 st.sidebar.divider()
 # NOTE: kontrol ambang indikator (Merah/Kuning) sementara disembunyikan dari
 # sidebar atas permintaan — dipakai default tetap di kode saja, supaya
@@ -83,6 +93,11 @@ DEFAULT_PENJUALAN_CANDIDATES = [
     "Penjualan_Aksesoris_Regional.xlsx",
     "Penjualan_Regional.csv",
 ]
+DEFAULT_PEMBELIAN_CANDIDATES = [
+    "pembelian.csv.gz",
+    "pembelian.csv",
+    "Faktur_Pembelian.xlsx",
+]
 
 
 def _cari_file_default(kandidat: list[str]) -> str | None:
@@ -94,6 +109,7 @@ def _cari_file_default(kandidat: list[str]) -> str | None:
 
 DEFAULT_PERSEDIAAN_PATH = _cari_file_default(DEFAULT_PERSEDIAAN_CANDIDATES)
 DEFAULT_PENJUALAN_PATH = _cari_file_default(DEFAULT_PENJUALAN_CANDIDATES)
+DEFAULT_PEMBELIAN_PATH = _cari_file_default(DEFAULT_PEMBELIAN_CANDIDATES)
 
 df_persediaan, err_persediaan = None, None
 try:
@@ -103,6 +119,15 @@ try:
         df_persediaan = lp.load_persediaan(DEFAULT_PERSEDIAAN_PATH)
 except Exception as e:
     err_persediaan = str(e)
+
+df_pembelian, err_pembelian = None, None
+try:
+    if upl_pembelian is not None:
+        df_pembelian = lb.load_pembelian(upl_pembelian)
+    elif DEFAULT_PEMBELIAN_PATH:
+        df_pembelian = lb.load_pembelian(DEFAULT_PEMBELIAN_PATH)
+except Exception as e:
+    err_pembelian = str(e)
 
 
 def _dua_salinan(uploaded_file):
@@ -2054,6 +2079,135 @@ def render_aksesoris_tab():
 
 
 # ---------------------------------------------------------------------------
+# TAB BARU — Dashboard Pembelian & Perbandingan Penjualan Aksesoris
+# ---------------------------------------------------------------------------
+def render_pembelian_tab():
+    st.header("📦 Dashboard Pembelian & Perbandingan Penjualan Aksesoris")
+    st.caption(
+        "Menggabungkan data Faktur Pembelian (pemasok) dengan data Faktur Penjualan "
+        "(HPP & tren) — khusus kategori AKSESORIS."
+    )
+
+    # --- Siapkan data penjualan aksesoris (independen, sama pola dgn Ringkasan Eksekutif) ---
+    df_aks_jual = None
+    if raw_aksesoris is not None:
+        if "CABANG" in raw_aksesoris.columns:
+            df_re = la.finalize_data(raw_aksesoris)
+        else:
+            nama_bersama_pb = st.session_state.get("nama_cabang_bersama")
+            df_re = la.finalize_data(raw_aksesoris, cabang_default=nama_bersama_pb) if nama_bersama_pb else None
+        if df_re is not None:
+            df_aks_jual = la.hanya_kategori(df_re, "AKSESORIS")
+
+    # -----------------------------------------------------------------
+    # 1. Total Pembelian Aksesoris — Pemasok LUNA
+    # -----------------------------------------------------------------
+    st.subheader("1️⃣ Total Pembelian Aksesoris — Pemasok LUNA")
+    if err_pembelian:
+        st.error(f"Gagal membaca berkas pembelian: {err_pembelian}")
+    elif df_pembelian is None:
+        st.info(
+            "Belum ada data. Unggah berkas Faktur Pembelian (Excel/CSV) di panel kiri, "
+            "bagian \"📦 Data Pembelian\"."
+        )
+    else:
+        beli = lb.luna_progress(df_pembelian, target=0, supplier_key="LUNA")
+        b1, b2, b3 = st.columns(3)
+        b1.metric("Total Pembelian ke LUNA", la.format_rupiah_id(beli["tercapai"]))
+        b2.metric("Total Pembelian Aksesoris (Semua Pemasok)", la.format_rupiah_id(beli["total_aksesoris"]))
+        b3.metric("Porsi ke LUNA", la.format_percent_id(beli["pct_dari_total_aksesoris"]))
+        st.caption(
+            f"Periode data pembelian: {beli['tgl_min'].strftime('%d %b %Y') if pd.notna(beli['tgl_min']) else '-'} "
+            f"– {beli['tgl_max'].strftime('%d %b %Y') if pd.notna(beli['tgl_max']) else '-'}."
+        )
+
+        with st.expander("📋 Ranking Seluruh Pemasok Aksesoris", expanded=False):
+            porsi = lb.porsi_pemasok(df_pembelian)
+            tampil_porsi = porsi.copy()
+            tampil_porsi["Total Pembelian"] = porsi["Total Pembelian"].map(la.format_rupiah_id)
+            tampil_porsi["Jumlah Transaksi"] = porsi["Jumlah Transaksi"].map(la.format_int_id)
+            tampil_porsi["Porsi (%)"] = porsi["Porsi (%)"].map(la.format_percent_id)
+            tampil_porsi["Kumulatif (%)"] = porsi["Kumulatif (%)"].map(la.format_percent_id)
+            st.dataframe(tampil_porsi, use_container_width=True, height=400)
+            st.download_button(
+                "⬇️ Unduh CSV — Porsi Pemasok Aksesoris", porsi.to_csv(index=True).encode("utf-8-sig"),
+                "porsi_pemasok_aksesoris.csv", "text/csv", key="pb_dl_porsi",
+            )
+
+    st.divider()
+
+    # -----------------------------------------------------------------
+    # 2. Total HPP Aksesoris LUNA (dari Faktur Penjualan)
+    # -----------------------------------------------------------------
+    st.subheader("2️⃣ Total HPP Aksesoris LUNA (dari Faktur Penjualan)")
+    st.caption(
+        "HPP = modal barang LUNA (selain Hydrogel) yang SUDAH TERJUAL — beda sumber dari "
+        "Total Pembelian di atas (yang dari faktur pembelian ke pemasok)."
+    )
+    if df_aks_jual is None:
+        st.info(
+            "Belum ada data penjualan aksesoris. Unggah berkas penjualan di panel kiri "
+            "bagian \"🧾 Data Penjualan\"."
+        )
+    else:
+        hpp = la.total_hpp_brand(df_aks_jual, keyword="LUNA", keyword_kecuali="HYDROGEL")
+        h1, h2, h3, h4 = st.columns(4)
+        h1.metric("Total HPP LUNA", la.format_rupiah_id(hpp["hpp"]))
+        h2.metric("Total Omzet LUNA", la.format_rupiah_id(hpp["omzet"]))
+        h3.metric("Total Laba LUNA", la.format_rupiah_id(hpp["laba"]))
+        h4.metric("Margin LUNA", la.format_percent_id(hpp["margin_persen"]))
+        st.caption(f"{la.format_int_id(hpp['qty_terjual'])} pcs terjual dari {la.format_int_id(hpp['jumlah_baris'])} baris transaksi.")
+
+    st.divider()
+
+    # -----------------------------------------------------------------
+    # 3. Grafik Penjualan Perbandingan per Pekan
+    # -----------------------------------------------------------------
+    st.subheader("3️⃣ Grafik Penjualan Perbandingan per Pekan")
+    st.caption("Omzet Aksesoris Tertarget (LUNA selain Hydrogel) vs Non Tertarget, per minggu (ISO week).")
+    if df_aks_jual is None:
+        st.info("Belum ada data penjualan aksesoris.")
+    else:
+        mingguan = la.omzet_mingguan_perbandingan(df_aks_jual, keyword_brand="LUNA")
+        if mingguan.empty:
+            st.info("Tidak ada data untuk grafik ini.")
+        else:
+            st.bar_chart(mingguan.set_index("Minggu")[["Omzet Tertarget", "Omzet Non Tertarget"]])
+            tampil_mgg = mingguan.copy()
+            for c in ["Omzet Tertarget", "Omzet Non Tertarget", "Total Omzet"]:
+                tampil_mgg[c] = mingguan[c].map(la.format_rupiah_id)
+            st.dataframe(tampil_mgg, use_container_width=True, height=min(80 + 38 * len(mingguan), 400))
+            st.download_button(
+                "⬇️ Unduh CSV — Omzet Mingguan", mingguan.to_csv(index=False).encode("utf-8-sig"),
+                "omzet_mingguan_perbandingan.csv", "text/csv", key="pb_dl_mingguan",
+            )
+
+    st.divider()
+
+    # -----------------------------------------------------------------
+    # 4. Perbandingan Penjualan Aksesoris Semua Cabang per Bulan
+    # -----------------------------------------------------------------
+    st.subheader("4️⃣ Perbandingan Penjualan Aksesoris Semua Cabang per Bulan")
+    if df_aks_jual is None:
+        st.info("Belum ada data penjualan aksesoris.")
+    else:
+        bulanan = la.omzet_cabang_per_bulan(df_aks_jual)
+        if bulanan.empty:
+            st.info("Tidak ada data untuk tabel ini.")
+        else:
+            kolom_bulan = [c for c in bulanan.columns if c not in ("Cabang", "Total")]
+            st.bar_chart(bulanan.set_index("Cabang")[kolom_bulan])
+            tampil_bulanan = bulanan.copy()
+            for c in kolom_bulan + ["Total"]:
+                tampil_bulanan[c] = bulanan[c].map(la.format_rupiah_id)
+            st.dataframe(tampil_bulanan, use_container_width=True, height=min(80 + 38 * len(bulanan), 700))
+            st.download_button(
+                "⬇️ Unduh CSV — Omzet Aksesoris per Cabang per Bulan", bulanan.to_csv(index=False).encode("utf-8-sig"),
+                "omzet_cabang_per_bulan.csv", "text/csv", key="pb_dl_bulanan",
+            )
+
+
+# ---------------------------------------------------------------------------
 # Layout — SATU HALAMAN (bukan tab terpisah), ketiga dashboard ditampilkan
 # berurutan dari atas ke bawah dengan pemisah jelas.
 # ---------------------------------------------------------------------------
@@ -2087,3 +2241,9 @@ st.caption(
 )
 
 render_aksesoris_tab()
+
+st.markdown("---")
+st.markdown("---")
+
+st.markdown("# 📦 Dashboard Pembelian & Perbandingan Penjualan Aksesoris")
+render_pembelian_tab()

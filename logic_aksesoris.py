@@ -1498,6 +1498,80 @@ def produk_terlaris_aksesoris_scoreboard(df_aksesoris: pd.DataFrame, tanggal_mul
     return g[cols]
 
 
+# ---------------------------------------------------------------------------
+# 9. Dashboard Pembelian & Perbandingan Penjualan Aksesoris — total HPP
+#    LUNA dari faktur penjualan, grafik mingguan, dan perbandingan bulanan
+#    antar cabang. (Total pembelian per pemasok LUNA sendiri sudah ada di
+#    logic_pembelian.py fungsi luna_progress()/porsi_pemasok().)
+# ---------------------------------------------------------------------------
+
+def total_hpp_brand(df_aksesoris: pd.DataFrame, keyword: str = "LUNA", keyword_kecuali: str | None = "HYDROGEL") -> dict:
+    """Total HPP (Harga Pokok Penjualan = kolom MODAL/HARGA BELI) untuk
+    produk brand tertentu dari data FAKTUR PENJUALAN — beda sumber dari
+    Total Pembelian (yang dari faktur pembelian ke pemasok). HPP di sini
+    mencerminkan modal barang yang SUDAH TERJUAL, bukan yang dibeli."""
+    hasil = dict(hpp=0, omzet=0, laba=0, margin_persen=0, qty_terjual=0, jumlah_baris=0)
+    if df_aksesoris.empty:
+        return hasil
+    nama_upper = df_aksesoris["NAMA BARANG"].astype(str).str.upper()
+    mask = nama_upper.str.contains(keyword.upper(), na=False)
+    if keyword_kecuali:
+        mask = mask & ~nama_upper.str.contains(keyword_kecuali.upper(), na=False)
+    sub = df_aksesoris[mask]
+    hasil["hpp"] = sub["MODAL"].sum() if "MODAL" in sub.columns else sub["HARGA BELI"].sum()
+    hasil["omzet"] = sub["TOTAL HARGA"].sum()
+    hasil["laba"] = sub["LABA"].sum() if "LABA" in sub.columns else (hasil["omzet"] - hasil["hpp"])
+    hasil["margin_persen"] = (hasil["laba"] / hasil["omzet"] * 100) if hasil["omzet"] else 0
+    hasil["qty_terjual"] = sub["QTY"].sum()
+    hasil["jumlah_baris"] = len(sub)
+    return hasil
+
+
+def omzet_mingguan_perbandingan(df_aksesoris: pd.DataFrame, keyword_brand: str = "LUNA", keyword_kecuali: str | None = "HYDROGEL") -> pd.DataFrame:
+    """Omzet Tertarget vs Non Tertarget per MINGGU (label "YYYY-Www" ISO
+    week) — untuk grafik perbandingan penjualan per pekan. Minggu dengan
+    tanggal mulai (Senin) ditampilkan juga sebagai referensi."""
+    cols = ["Minggu", "Tanggal Mulai Minggu", "Omzet Tertarget", "Omzet Non Tertarget", "Total Omzet"]
+    if df_aksesoris.empty:
+        return pd.DataFrame(columns=cols)
+
+    df = df_aksesoris.copy()
+    iso = df["TGL FAKTUR"].dt.isocalendar()
+    df["_minggu_label"] = iso["year"].astype(str) + "-W" + iso["week"].astype(str).str.zfill(2)
+    df["_minggu_mulai"] = df["TGL FAKTUR"] - pd.to_timedelta(df["TGL FAKTUR"].dt.weekday, unit="D")
+
+    nama_upper = df["NAMA BARANG"].astype(str).str.upper()
+    mask_brand = nama_upper.str.contains(keyword_brand.upper(), na=False)
+    if keyword_kecuali:
+        mask_brand = mask_brand & ~nama_upper.str.contains(keyword_kecuali.upper(), na=False)
+    df["_kelompok"] = np.where(mask_brand, "Tertarget", "Non Tertarget")
+
+    g = df.groupby(["_minggu_label", "_minggu_mulai", "_kelompok"])["TOTAL HARGA"].sum().unstack(fill_value=0).reset_index()
+    for c in ["Tertarget", "Non Tertarget"]:
+        if c not in g.columns:
+            g[c] = 0
+    g = g.rename(columns={"_minggu_label": "Minggu", "_minggu_mulai": "Tanggal Mulai Minggu",
+                           "Tertarget": "Omzet Tertarget", "Non Tertarget": "Omzet Non Tertarget"})
+    g["Total Omzet"] = g["Omzet Tertarget"] + g["Omzet Non Tertarget"]
+    g = g.sort_values("Tanggal Mulai Minggu").reset_index(drop=True)
+    return g[cols]
+
+
+def omzet_cabang_per_bulan(df_aksesoris: pd.DataFrame) -> pd.DataFrame:
+    """Pivot Omzet Aksesoris: baris = Cabang, kolom = Bulan ("YYYY-MM") —
+    untuk perbandingan penjualan aksesoris semua cabang antar bulan."""
+    if df_aksesoris.empty:
+        return pd.DataFrame()
+    df = df_aksesoris.copy()
+    df["_bulan_label"] = df["TGL FAKTUR"].dt.strftime("%Y-%m")
+    pivot = df.pivot_table(index="CABANG", columns="_bulan_label", values="TOTAL HARGA", aggfunc="sum", fill_value=0)
+    pivot = pivot.reindex(sorted(pivot.columns), axis=1)
+    pivot["Total"] = pivot.sum(axis=1)
+    pivot = pivot.sort_values("Total", ascending=False)
+    pivot.index.name = "Cabang"
+    return pivot.reset_index()
+
+
 def format_int_id(x) -> str:
     try:
         x = int(round(float(x)))
