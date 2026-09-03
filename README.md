@@ -17,6 +17,26 @@
 > dokumentasi — anggap sebagai referensi untuk saat fitur ini diaktifkan
 > kembali.
 
+> ## ⏸️ Ringkasan Eksekutif dan Matrix Insentif juga SEMENTARA DISEMBUNYIKAN
+>
+> Dua flag serupa, mekanisme & alasan sama seperti di atas:
+> ```python
+> TAMPILKAN_RINGKASAN_EKSEKUTIF = False   # bagian kartu ringkasan paling atas halaman
+> TAMPILKAN_MATRIX_INSENTIF = False       # Skema Tiering Sales Retail + Matrix Insentif Per Item
+> ```
+> **Ringkasan Eksekutif**: seluruh bagian "📌 Ringkasan Eksekutif" (kartu
+> Omzet/Margin/Nilai Stok per kelompok, grafik, breakdown bundling, progress
+> target) di paling atas halaman tidak dirender sama sekali — halaman
+> langsung mulai dari "📊 Dashboard Persediaan Aksesoris".
+> **Matrix Insentif**: seluruh bagian "💸 Matrix Insentif Aksesoris" (Skema
+> Tiering Sales Retail 10 tier + expander Matrix Insentif Per Item) di
+> dalam Dashboard Penjualan Aksesoris tidak dirender — bagian sebelumnya
+> (Katalog Referensi Harga LUNA) langsung disambung ke bagian sesudahnya
+> ("🎯 Target Pencapaian Penjualan Aksesoris").
+> Sama seperti flag Parfum: kode/logikanya tetap ada, cuma dilewati saat
+> render, dan bisa dimunculkan lagi kapan saja dengan mengubah nilai flag
+> jadi `True`.
+
 **Satu halaman panjang** (bukan tab terpisah — digabung sesuai permintaan),
 berisi dashboard berurutan dari atas ke bawah:
 
@@ -44,7 +64,8 @@ berisi dashboard berurutan dari atas ke bawah:
    - **Revenue, HPP & Katalog LUNA**: revenue & tren bulanan, Top 10 produk
      aksesoris terlaris & profit, omzet + HPP seluruh cabang, katalog
      referensi harga LUNA & potensi profit, **matrix insentif resmi &
-     kalkulator THP Sales Retail** (dikalibrasi ke target Rp5-8jt/bulan),
+     kalkulator THP Sales Retail** (dikalibrasi ke target Rp5-8jt/bulan)
+     **⏸️ saat ini disembunyikan**,
      **target pencapaian penjualan LUNA** (default Rp 2 miliar / 12 bulan
      mulai 20 Agustus 2026), serta analisa + proyeksi 5–10 tahun.
      (Target penjualan Parfum UMAIR **⏸️ saat ini disembunyikan**.)

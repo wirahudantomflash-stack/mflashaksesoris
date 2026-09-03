@@ -14,6 +14,12 @@ import logic_pembelian as lb
 # dilewati saat render — ubah ke True kapan saja untuk memunculkan lagi.
 TAMPILKAN_PARFUM = False
 
+# Flag sementara serupa: Ringkasan Eksekutif dan Matrix Insentif Aksesoris
+# disembunyikan atas permintaan. Ubah ke True kapan saja untuk memunculkan
+# lagi — kode/logikanya juga TIDAK dihapus.
+TAMPILKAN_RINGKASAN_EKSEKUTIF = False
+TAMPILKAN_MATRIX_INSENTIF = False
+
 st.set_page_config(page_title="MFlash Dashboard Gadget dan Aksesoris", page_icon="flash_logo.png", layout="wide")
 
 st.logo("flash_logo.png")
@@ -1550,61 +1556,62 @@ def render_aksesoris_tab():
     # -----------------------------------------------------------------
     # 3b. Matrix Insentif Resmi (Skema v3 — Tiering Sales Retail + Manager)
     # -----------------------------------------------------------------
-    st.header("💸 Matrix Insentif Aksesoris")
-    st.caption(
-        "Berdasarkan referensi resmi terbaru: **Skema Tiering Sales Retail** (GP 30%, insentif "
-        "50% dari GP, Gaji Bulanan tetap, THP dihitung langsung per tier) dan **Matrix Insentif "
-        "Per Item** (insentif tetap per unit terjual berdasarkan rentang harga jual)."
-    )
-
-    st.subheader("📋 Skema Tiering Insentif — Sales Retail")
-    st.caption(
-        f"10 tier Omzet/Pekan Rp750rb–Rp7,5jt. **Gaji Bulanan tetap "
-        f"{la.format_rupiah_id(la.GAJI_BULANAN_SALES_RETAIL)}**, THP = Gaji Bulanan + Insentif/Bulan "
-        "— dihitung langsung dari skema resmi, bukan hasil kalibrasi manual."
-    )
-    sr_tiering = la.matrix_tiering_sales_retail()
-    sr_tiering["Status Target (Rp5–8jt)"] = sr_tiering["THP"].apply(
-        lambda x: "✅ Dalam target" if 5_000_000 <= x <= 8_000_000 else ("⬇️ Di bawah target" if x < 5_000_000 else "⬆️ Di atas target")
-    )
-    tampil_sr = sr_tiering.copy()
-    for col in ["Tiering Omzet / Pekan", "Omzet / Bulan", "Estimasi GP (30%)", "Insentif / Pekan", "Insentif / Bulan", "Gaji Bulanan", "THP"]:
-        tampil_sr[col] = sr_tiering[col].map(la.format_rupiah_id)
-    tampil_sr["% Insentif dari GP"] = (sr_tiering["% Insentif dari GP"] * 100).map(lambda x: la.format_percent_id(x, 0))
-    st.dataframe(tampil_sr, use_container_width=True, height=420)
-
-    n_luar_target = (~sr_tiering["Status Target (Rp5–8jt)"].str.startswith("✅")).sum()
-    if n_luar_target > 0:
+    if TAMPILKAN_MATRIX_INSENTIF:
+        st.header("💸 Matrix Insentif Aksesoris")
         st.caption(
-            f"ℹ️ {n_luar_target} dari {len(sr_tiering)} tier berada di luar rentang target Rp5–8jt "
-            "(tier terendah & tertinggi sedikit melenceng dari target — bagian dari skema resmi ini, "
-            "bukan sesuatu yang dikalibrasi ulang oleh dashboard)."
+            "Berdasarkan referensi resmi terbaru: **Skema Tiering Sales Retail** (GP 30%, insentif "
+            "50% dari GP, Gaji Bulanan tetap, THP dihitung langsung per tier) dan **Matrix Insentif "
+            "Per Item** (insentif tetap per unit terjual berdasarkan rentang harga jual)."
         )
-    st.download_button(
-        "⬇️ Unduh CSV — Skema Tiering Sales Retail", sr_tiering.to_csv(index=False).encode("utf-8-sig"),
-        "skema_tiering_sales_retail.csv", "text/csv", key="ak_dl_tiering_sr",
-    )
 
-    with st.expander("🎁 Matrix Insentif Per Item", expanded=False):
-        mi = la.matrix_insentif_per_item()
-        tampil_mi = mi.copy()
-        tampil_mi["Harga Acuan"] = mi["Harga Acuan"].map(la.format_rupiah_id)
-        tampil_mi["Gross Profit"] = mi["Gross Profit"].map(la.format_rupiah_id)
-        tampil_mi["Insentif / Item"] = mi["Insentif / Item"].map(la.format_rupiah_id)
-        tampil_mi["% Insentif vs GP"] = mi["% Insentif vs GP"].map(lambda x: la.format_percent_id(x, 1))
-        tampil_mi["Sisa GP"] = mi["Sisa GP"].map(la.format_rupiah_id)
-        st.dataframe(tampil_mi, use_container_width=True)
-        st.info(
-            f"🧊 **Pengecualian — Produk HYDROGEL**: insentif TETAP "
-            f"**{la.format_rupiah_id(la.INSENTIF_HYDROGEL_PER_PCS)}/pcs**, berapa pun harga jualnya "
-            "— tidak mengikuti tingkat harga pada tabel di atas."
+        st.subheader("📋 Skema Tiering Insentif — Sales Retail")
+        st.caption(
+            f"10 tier Omzet/Pekan Rp750rb–Rp7,5jt. **Gaji Bulanan tetap "
+            f"{la.format_rupiah_id(la.GAJI_BULANAN_SALES_RETAIL)}**, THP = Gaji Bulanan + Insentif/Bulan "
+            "— dihitung langsung dari skema resmi, bukan hasil kalibrasi manual."
         )
+        sr_tiering = la.matrix_tiering_sales_retail()
+        sr_tiering["Status Target (Rp5–8jt)"] = sr_tiering["THP"].apply(
+            lambda x: "✅ Dalam target" if 5_000_000 <= x <= 8_000_000 else ("⬇️ Di bawah target" if x < 5_000_000 else "⬆️ Di atas target")
+        )
+        tampil_sr = sr_tiering.copy()
+        for col in ["Tiering Omzet / Pekan", "Omzet / Bulan", "Estimasi GP (30%)", "Insentif / Pekan", "Insentif / Bulan", "Gaji Bulanan", "THP"]:
+            tampil_sr[col] = sr_tiering[col].map(la.format_rupiah_id)
+        tampil_sr["% Insentif dari GP"] = (sr_tiering["% Insentif dari GP"] * 100).map(lambda x: la.format_percent_id(x, 0))
+        st.dataframe(tampil_sr, use_container_width=True, height=420)
+
+        n_luar_target = (~sr_tiering["Status Target (Rp5–8jt)"].str.startswith("✅")).sum()
+        if n_luar_target > 0:
+            st.caption(
+                f"ℹ️ {n_luar_target} dari {len(sr_tiering)} tier berada di luar rentang target Rp5–8jt "
+                "(tier terendah & tertinggi sedikit melenceng dari target — bagian dari skema resmi ini, "
+                "bukan sesuatu yang dikalibrasi ulang oleh dashboard)."
+            )
         st.download_button(
-            "⬇️ Unduh CSV — Matrix Insentif Per Item", mi.to_csv(index=False).encode("utf-8-sig"),
-            "matrix_insentif_per_item.csv", "text/csv", key="ak_dl_matrix_item",
+            "⬇️ Unduh CSV — Skema Tiering Sales Retail", sr_tiering.to_csv(index=False).encode("utf-8-sig"),
+            "skema_tiering_sales_retail.csv", "text/csv", key="ak_dl_tiering_sr",
         )
 
-    st.divider()
+        with st.expander("🎁 Matrix Insentif Per Item", expanded=False):
+            mi = la.matrix_insentif_per_item()
+            tampil_mi = mi.copy()
+            tampil_mi["Harga Acuan"] = mi["Harga Acuan"].map(la.format_rupiah_id)
+            tampil_mi["Gross Profit"] = mi["Gross Profit"].map(la.format_rupiah_id)
+            tampil_mi["Insentif / Item"] = mi["Insentif / Item"].map(la.format_rupiah_id)
+            tampil_mi["% Insentif vs GP"] = mi["% Insentif vs GP"].map(lambda x: la.format_percent_id(x, 1))
+            tampil_mi["Sisa GP"] = mi["Sisa GP"].map(la.format_rupiah_id)
+            st.dataframe(tampil_mi, use_container_width=True)
+            st.info(
+                f"🧊 **Pengecualian — Produk HYDROGEL**: insentif TETAP "
+                f"**{la.format_rupiah_id(la.INSENTIF_HYDROGEL_PER_PCS)}/pcs**, berapa pun harga jualnya "
+                "— tidak mengikuti tingkat harga pada tabel di atas."
+            )
+            st.download_button(
+                "⬇️ Unduh CSV — Matrix Insentif Per Item", mi.to_csv(index=False).encode("utf-8-sig"),
+                "matrix_insentif_per_item.csv", "text/csv", key="ak_dl_matrix_item",
+            )
+
+        st.divider()
 
     # -----------------------------------------------------------------
     # 3c. Target Pencapaian Penjualan LUNA
@@ -2314,10 +2321,11 @@ def render_pembelian_tab():
 # Layout — SATU HALAMAN (bukan tab terpisah), ketiga dashboard ditampilkan
 # berurutan dari atas ke bawah dengan pemisah jelas.
 # ---------------------------------------------------------------------------
-render_ringkasan_eksekutif()
+if TAMPILKAN_RINGKASAN_EKSEKUTIF:
+    render_ringkasan_eksekutif()
 
-st.markdown("---")
-st.markdown("---")
+    st.markdown("---")
+    st.markdown("---")
 
 st.markdown("# 📊 Dashboard Persediaan Aksesoris")
 render_persediaan_tab()
