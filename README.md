@@ -539,19 +539,24 @@ dengan tanggal akhir & laju harian tetap).
   sangat kecil (cuma Rp 1.330.000, karena cuma menangkap transaksi HARI
   ITU saja). Sekarang fungsi `monitoring_tahap_per_cabang()` menghitung
   **KUMULATIF sejak 20 Agustus sampai tanggal evaluasi**.
-- **Koreksi konsep #2 — pengecualian Hydrogel**: target Rp 300.006.600
-  ini khusus untuk LUNA **SELAIN varian Hydrogel** (LUNA Hydrogel punya
-  skema/target tersendiri, terpisah dari Tahap 1 ini). Parameter
-  `keyword_kecuali="HYDROGEL"` pada `monitoring_tahap_per_cabang()` —
-  nama barang yang mengandung "LUNA" DAN "HYDROGEL" sekaligus (mis.
-  "LUNA HYDROGEL MATERIAL CLEAR") dikeluarkan dari Result. Parameter
-  bersifat opsional & backward-compatible (default `None` = tidak
-  mengecualikan apa pun). **Dampak nyata**: koreksi ini mengubah urutan
-  cabang secara signifikan — Radjiman yang SEBELUM koreksi terlihat
-  memimpin (96,2%, ternyata sebagian besar dari penjualan Hydrogel, bukan
-  LUNA reguler) turun jadi cuma 5,4% setelah dikoreksi; Cilangkap yang
-  sekarang benar-benar memimpin (54,3%). Semua tahap (bukan cuma Tahap 1)
-  memakai pengecualian ini secara konsisten.
+- **Koreksi konsep #2 — pengecualian Hydrogel (HISTORIS, kini dibalik)**:
+  target Rp 300.006.600 SEMPAT dihitung khusus untuk LUNA **SELAIN
+  varian Hydrogel** (parameter `keyword_kecuali="HYDROGEL"` pada
+  `monitoring_tahap_per_cabang()`), karena LUNA Hydrogel dianggap punya
+  skema/target tersendiri. **Perubahan terbaru**: atas permintaan, SEMUA
+  tahap (Tahap 1, 2, 3, dst) di bagian "Monitoring Pencapaian Cabang —
+  Bertahap" sekarang menghitung **SELURUH produk LUNA, TERMASUK Hydrogel**
+  (`keyword_kecuali=None`) — bagian rincian produk per cabang juga ikut
+  berubah, sekarang produk seperti "LUNA HYDROGEL MATERIAL CLEAR" muncul
+  di daftar (contoh nyata: Radjiman menjual 64 pcs Rp4.730.000 dari produk
+  ini, sekarang ikut terhitung). Parameter `keyword_kecuali` tetap ada di
+  fungsi (bersifat opsional) kalau suatu saat perlu dikecualikan lagi.
+  **Catatan penting**: kata "HYDROGEL" ternyata juga muncul di produk
+  brand LAIN yang tidak berkaitan (mis. "VIVAN HYDROGEL BASIC ANTI GLARE")
+  — fungsi selalu mensyaratkan nama barang mengandung KEDUA kata ("LUNA"
+  DAN "HYDROGEL") sebelum dianggap sebagai varian Hydrogel LUNA, supaya
+  tidak salah tangkap produk brand lain yang kebetulan mengandung kata
+  "Hydrogel" di namanya.
 - **Tanggal Mulai Tahap 1 sekarang BISA DIISI SENDIRI** (default 20 Agustus
   2026, tanggal barang masuk/drop produk — direvisi dari perkiraan awal
   20 Juli) — diubah dari versi sebelumnya yang terkunci,

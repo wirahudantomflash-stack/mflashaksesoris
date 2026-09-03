@@ -1762,8 +1762,8 @@ def render_aksesoris_tab():
         "seluruh cabang, tapi transaksi riil di tiap cabang bisa mulai beberapa hari setelahnya "
         "(mis. 20–26 Agustus 2026) — sesuaikan \"Tanggal Mulai Tahap 1\" di bawah kalau perlu. "
         "Pencapaian tiap tahap dihitung "
-        "KUMULATIF dari tanggal mulai tahap tsb sampai tanggal evaluasi. **Semua tahap khusus LUNA "
-        "SELAIN varian Hydrogel** (LUNA Hydrogel punya skema/target tersendiri). Warna: 🔴 <85% · "
+        "KUMULATIF dari tanggal mulai tahap tsb sampai tanggal evaluasi. **Semua tahap mencakup "
+        "SELURUH produk LUNA, termasuk Hydrogel.** Warna: 🔴 <85% · "
         "🟡 85–99% · 🟢 ≥100%. Tahap 1 adalah tahap pertama dari rangkaian tahap menuju target total "
         "Rp 2.000.000.000 — tahap berikutnya (Tahap 2, 3, dst) bisa ditambahkan di bagian bawah begitu "
         "sudah ditentukan."
@@ -1793,7 +1793,7 @@ def render_aksesoris_tab():
         + rincian produk per cabang. Mengembalikan (target_total, result_total)."""
         hasil = la.monitoring_tahap_per_cabang(
             df, target_per_cabang, tanggal_mulai=tanggal_mulai_tahap,
-            tanggal_evaluasi=tahap1_tgl_evaluasi, keyword="LUNA", keyword_kecuali="HYDROGEL",
+            tanggal_evaluasi=tahap1_tgl_evaluasi, keyword="LUNA", keyword_kecuali=None,
         )
         if hasil.empty:
             st.info(f"Tidak ada data untuk {nama_tahap} pada periode ini.")
@@ -1817,14 +1817,14 @@ def render_aksesoris_tab():
         )
 
         st.markdown(f"###### 🔍 Rincian Produk per Cabang — {nama_tahap}")
-        st.caption("Pilih cabang untuk lihat rincian jenis barang LUNA (selain Hydrogel) apa saja yang terjual, dan berapa kuantitasnya.")
+        st.caption("Pilih cabang untuk lihat rincian jenis barang LUNA (termasuk Hydrogel) apa saja yang terjual, dan berapa kuantitasnya.")
         cabang_pilihan_detail = st.selectbox("Pilih cabang", daftar_cabang_tahap, key=f"{key_prefix}_cabang_detail")
         detail_produk = la.detail_produk_brand_cabang(
             df, cabang_pilihan_detail, tanggal_mulai_tahap, tahap1_tgl_evaluasi,
-            keyword="LUNA", keyword_kecuali="HYDROGEL",
+            keyword="LUNA", keyword_kecuali=None,
         )
         if detail_produk.empty:
-            st.info(f"Belum ada penjualan LUNA (selain Hydrogel) di cabang **{cabang_pilihan_detail}** pada periode {nama_tahap}.")
+            st.info(f"Belum ada penjualan LUNA di cabang **{cabang_pilihan_detail}** pada periode {nama_tahap}.")
         else:
             tampil_detail = detail_produk.copy()
             tampil_detail["Qty"] = detail_produk["Qty"].map(la.format_int_id)
