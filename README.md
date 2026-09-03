@@ -702,6 +702,19 @@ tinggal disambungkan lagi ke `app.py`.
      dihitung di bagian 2️⃣. Termasuk kasus tepi: data kosong dan data
      tanpa produk LUNA sama sekali (keduanya mengembalikan tabel kosong
      dengan aman, bukan error).
+   - **🐛 Bug ditemukan & diperbaiki: urutan pekan di grafik garis
+     melompat (Pekan 1 → 10 → 2 → 3 → ...)** — label pekan awalnya
+     ditulis tanpa zero-padding ("Pekan 1", "Pekan 2", ..., "Pekan 10").
+     Saat dipakai sebagai index kategorikal untuk `st.line_chart()`,
+     chart mengurutkan label secara ALFABETIS, bukan mengikuti urutan
+     baris DataFrame — dan secara alfabetis "Pekan 10" jatuh SETELAH
+     "Pekan 1" tapi SEBELUM "Pekan 2" (karena karakter "1" < "2" pada
+     posisi kedua), sehingga grafik garisnya melompat tidak beraturan.
+     Diperbaiki dengan zero-pad nomor pekan jadi 2 digit ("Pekan 01",
+     "Pekan 02", ..., "Pekan 10") — sekarang urutan alfabetis PERSIS
+     sama dengan urutan kronologis untuk pekan 1–99 (lebih dari cukup
+     untuk kebutuhan ini). Diverifikasi: `sorted(daftar_label) ==
+     daftar_label_asli` bernilai `True` untuk seluruh 10 pekan data uji.
    - **Info tambahan — Kepatuhan Bundling Aksesoris pada Transaksi
      Service**: 4 kartu metrik di bawah grafik, memakai fungsi
      `analisa_bundling_brand()` yang sudah ada (dipakai ulang, tidak

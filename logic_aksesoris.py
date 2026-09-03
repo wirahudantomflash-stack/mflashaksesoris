@@ -1681,8 +1681,14 @@ def omzet_luna_mingguan_blok7(df_aksesoris: pd.DataFrame, keyword_brand: str = "
 
     g["Tanggal Mulai"] = g["_pekan_ke"].apply(lambda n: tanggal_mulai_data + pd.Timedelta(days=7 * n))
     g["Tanggal Selesai"] = g["Tanggal Mulai"] + pd.Timedelta(days=6)
+    # PENTING: nomor pekan di-zero-pad 2 digit ("Pekan 01", bukan "Pekan 1")
+    # supaya urutan ALFABETIS label ini (yang dipakai chart/Streamlit saat
+    # jadi index kategorikal) SAMA dengan urutan NUMERIK/kronologisnya —
+    # tanpa zero-pad, "Pekan 10" akan tersorot alfabetis SEBELUM "Pekan 2"
+    # (karena "1" < "2" secara karakter), membuat grafik garis melompat
+    # dari pekan 1 langsung ke pekan 10 lalu balik ke pekan 2, dst.
     g["Pekan"] = (
-        "Pekan " + (g["_pekan_ke"] + 1).astype(str) + " (" +
+        "Pekan " + (g["_pekan_ke"] + 1).astype(str).str.zfill(2) + " (" +
         g["Tanggal Mulai"].dt.strftime("%d %b") + " – " + g["Tanggal Selesai"].dt.strftime("%d %b") + ")"
     )
     g = g.sort_values("_pekan_ke").reset_index(drop=True)
