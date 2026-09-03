@@ -2201,32 +2201,29 @@ def render_pembelian_tab():
     # -----------------------------------------------------------------
     st.subheader("3️⃣ Grafik Penjualan Perbandingan per Pekan")
     st.caption(
-        "Omzet Aksesoris Tertarget (LUNA selain Hydrogel) vs Non Tertarget, per minggu (ISO week). "
-        "Menghitung SEMUA transaksi yang mengandung barang aksesoris — **termasuk yang terjual "
-        "lewat bundling** di transaksi Service/lainnya (penjualan LUNA lewat bundling tetap "
-        "dihitung sebagai penjualan LUNA)."
+        "Khusus produk **LUNA** (seluruh varian, **termasuk Hydrogel**) — bukan seluruh kategori "
+        "Aksesoris. Menghitung SEMUA transaksi yang mengandung produk LUNA — **termasuk yang "
+        "terjual lewat bundling** di transaksi Service/lainnya. Pekan dihitung per blok 7 hari "
+        "tetap mulai dari tanggal paling awal pada data (mis. Pekan 1 = 1–7 Juli, Pekan 2 = "
+        "8–14 Juli, dst) — bukan pekan kalender ISO."
     )
     if df_aks_jual is None:
         st.info("Belum ada data penjualan aksesoris.")
     else:
-        mingguan = la.omzet_mingguan_perbandingan(df_aks_jual, keyword_brand="LUNA")
+        mingguan = la.omzet_luna_mingguan_blok7(df_aks_jual, keyword_brand="LUNA")
         if mingguan.empty:
             st.info("Tidak ada data untuk grafik ini.")
         else:
-            st.markdown("**Total Pencapaian — Semua Aksesoris, Semua Kategori (termasuk bundling)**")
-            st.line_chart(mingguan.set_index("Minggu")["Total Omzet"])
-            st.caption("Grafik di atas: total gabungan Tertarget + Non Tertarget per minggu.")
-
-            st.markdown("**Perbandingan Tertarget vs Non Tertarget**")
-            st.line_chart(mingguan.set_index("Minggu")[["Omzet Tertarget", "Omzet Non Tertarget"]])
+            st.markdown("**Omzet LUNA per Pekan (termasuk Hydrogel)**")
+            st.line_chart(mingguan.set_index("Pekan")["Omzet LUNA"])
 
             tampil_mgg = mingguan.copy()
-            for c in ["Omzet Tertarget", "Omzet Non Tertarget", "Total Omzet"]:
-                tampil_mgg[c] = mingguan[c].map(la.format_rupiah_id)
+            tampil_mgg["Omzet LUNA"] = mingguan["Omzet LUNA"].map(la.format_rupiah_id)
+            tampil_mgg["Qty Terjual"] = mingguan["Qty Terjual"].map(la.format_int_id)
             st.dataframe(tampil_mgg, use_container_width=True, height=min(80 + 38 * len(mingguan), 400))
             st.download_button(
-                "⬇️ Unduh CSV — Omzet Mingguan", mingguan.to_csv(index=False).encode("utf-8-sig"),
-                "omzet_mingguan_perbandingan.csv", "text/csv", key="pb_dl_mingguan",
+                "⬇️ Unduh CSV — Omzet LUNA per Pekan", mingguan.to_csv(index=False).encode("utf-8-sig"),
+                "omzet_luna_mingguan.csv", "text/csv", key="pb_dl_mingguan",
             )
 
         # --- Info tambahan: berapa transaksi Service TIDAK ada bundling aksesoris (terutama LUNA) ---

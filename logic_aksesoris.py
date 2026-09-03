@@ -1644,6 +1644,45 @@ def omzet_mingguan_perbandingan(
     return g[cols]
 
 
+def omzet_luna_mingguan_blok7(df_aksesoris: pd.DataFrame, keyword_brand: str = "LUNA") -> pd.DataFrame:
+    """Omzet LUNA (SELURUH varian, TERMASUK Hydrogel — tidak difilter Selain
+    LUNA sama sekali) per blok 7 hari tetap, MULAI DARI TANGGAL PALING AWAL
+    pada data (bukan pekan kalender ISO yang mulai Senin) — supaya
+    pekan 1 = tanggal_mulai_data s/d +6 hari, pekan 2 = +7 s/d +13 hari,
+    dst, persis seperti "1–7 Juli, 8–14 Juli, ..." kalau data mulai
+    1 Juli. Label pekan memakai rentang tanggal literal (bukan nomor ISO
+    week) supaya langsung jelas dibaca tanpa perlu tabel referensi."""
+    cols = ["Pekan", "Tanggal Mulai", "Tanggal Selesai", "Omzet LUNA", "Qty Terjual"]
+    if df_aksesoris.empty:
+        return pd.DataFrame(columns=cols)
+
+    nama_upper = df_aksesoris["NAMA BARANG"].astype(str).str.upper()
+    mask_luna = nama_upper.str.contains(keyword_brand.upper(), na=False)
+    df_luna = df_aksesoris[mask_luna]
+    if df_luna.empty:
+        return pd.DataFrame(columns=cols)
+
+    tanggal_mulai_data = df_aksesoris["TGL FAKTUR"].min().normalize()
+    hari_ke = (df_luna["TGL FAKTUR"].dt.normalize() - tanggal_mulai_data).dt.days
+    nomor_pekan = (hari_ke // 7).astype(int)
+
+    tmp = df_luna.copy()
+    tmp["_pekan_ke"] = nomor_pekan
+
+    g = tmp.groupby("_pekan_ke").agg(
+        **{"Omzet LUNA": ("TOTAL HARGA", "sum")}, **{"Qty Terjual": ("QTY", "sum")},
+    ).reset_index()
+
+    g["Tanggal Mulai"] = g["_pekan_ke"].apply(lambda n: tanggal_mulai_data + pd.Timedelta(days=7 * n))
+    g["Tanggal Selesai"] = g["Tanggal Mulai"] + pd.Timedelta(days=6)
+    g["Pekan"] = (
+        "Pekan " + (g["_pekan_ke"] + 1).astype(str) + " (" +
+        g["Tanggal Mulai"].dt.strftime("%d %b") + " – " + g["Tanggal Selesai"].dt.strftime("%d %b") + ")"
+    )
+    g = g.sort_values("_pekan_ke").reset_index(drop=True)
+    return g[cols]
+
+
 def omzet_cabang_per_bulan(df_aksesoris: pd.DataFrame) -> pd.DataFrame:
     """Pivot Omzet Aksesoris: baris = Cabang, kolom = Bulan ("YYYY-MM"),
     diselingi kolom "% vs Bulan Lalu" (pertumbuhan bulan-ke-bulan) setelah

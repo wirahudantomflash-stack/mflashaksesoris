@@ -680,20 +680,28 @@ tinggal disambungkan lagi ke `app.py`.
    naik dari Rp 59.600.526/Rp 115.632.860 di versi sebelumnya yang
    mengecualikan Hydrogel (selisih Rp 4.949.765 HPP dan Rp 25.985.000
    Omzet, persis sebesar kontribusi Hydrogel).
-3. **Grafik Penjualan Perbandingan per Pekan**: Omzet Tertarget vs Non
-   Tertarget per minggu (label ISO week "YYYY-Www"), grafik batang
-   berdampingan. **Menghitung SEMUA transaksi** yang mengandung barang
-   aksesoris — **termasuk yang terjual lewat bundling** di transaksi lain
-   (mis. "SERVICE HP"), karena penjualan LUNA lewat bundling tetap
-   penjualan LUNA yang sah. (Sempat dibatasi ke KATEGORI PENJUALAN =
-   "PENJUALAN AKSESORIS" saja di versi sebelumnya, lalu dikembalikan atas
-   permintaan — parameter `kategori_penjualan` tetap tersedia di fungsi
-   kalau suatu saat perlu dibatasi lagi, default sekarang `None`.)
-   - **Grafik Total Pencapaian (BARU)**: grafik batang terpisah di ATAS
-     grafik perbandingan Tertarget/Non Tertarget, menampilkan **"Total
-     Omzet"** — pencapaian SEMUA aksesoris, SEMUA kategori, TERMASUK
-     bundling — sesuai permintaan eksplisit untuk menonjolkan angka total
-     gabungan, bukan cuma dua sub-kelompoknya.
+3. **Grafik Penjualan Perbandingan per Pekan**: **direvisi total** dari
+   versi sebelumnya berdasarkan permintaan lanjutan —
+   - **Khusus produk LUNA** (seluruh varian, **TERMASUK Hydrogel**) —
+     bukan lagi seluruh kategori Aksesoris (Tertarget+Non Tertarget).
+     Grafik "Perbandingan Tertarget vs Non Tertarget" yang sebelumnya ada
+     **dihapus** sesuai permintaan — sekarang cuma satu garis: total
+     Omzet LUNA per pekan.
+   - **Pekan dihitung per blok 7 hari TETAP**, bukan pekan kalender ISO
+     seperti versi sebelumnya — Pekan 1 = tanggal paling awal pada data
+     s/d +6 hari (mis. **1–7 Juli**), Pekan 2 = **8–14 Juli**, dst. Fungsi
+     baru `omzet_luna_mingguan_blok7()` di `logic_aksesoris.py` — dimulai
+     otomatis dari `TGL FAKTUR` paling awal di data (bukan tanggal
+     hardcode), supaya tetap akurat kalau cakupan data berubah.
+   - Menghitung SEMUA transaksi yang mengandung produk LUNA — **termasuk
+     yang terjual lewat bundling** di transaksi Service/lainnya.
+   - **Diuji dengan data asli**: 10 pekan (1 Juli – 8 September 2026),
+     Pekan 1 tepat "01 Jul – 07 Jul" (Rp12.022.000), Pekan 9 tertinggi
+     (Rp36.332.000, 26 Ags–1 Sep). Total seluruh pekan Rp141.617.860 —
+     cocok persis dengan Total HPP/Omzet LUNA (termasuk Hydrogel) yang
+     dihitung di bagian 2️⃣. Termasuk kasus tepi: data kosong dan data
+     tanpa produk LUNA sama sekali (keduanya mengembalikan tabel kosong
+     dengan aman, bukan error).
    - **Info tambahan — Kepatuhan Bundling Aksesoris pada Transaksi
      Service**: 4 kartu metrik di bawah grafik, memakai fungsi
      `analisa_bundling_brand()` yang sudah ada (dipakai ulang, tidak
