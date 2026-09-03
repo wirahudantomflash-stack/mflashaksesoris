@@ -2214,11 +2214,11 @@ def render_pembelian_tab():
             st.info("Tidak ada data untuk grafik ini.")
         else:
             st.markdown("**Total Pencapaian — Semua Aksesoris, Semua Kategori (termasuk bundling)**")
-            st.bar_chart(mingguan.set_index("Minggu")["Total Omzet"])
+            st.line_chart(mingguan.set_index("Minggu")["Total Omzet"])
             st.caption("Grafik di atas: total gabungan Tertarget + Non Tertarget per minggu.")
 
             st.markdown("**Perbandingan Tertarget vs Non Tertarget**")
-            st.bar_chart(mingguan.set_index("Minggu")[["Omzet Tertarget", "Omzet Non Tertarget"]])
+            st.line_chart(mingguan.set_index("Minggu")[["Omzet Tertarget", "Omzet Non Tertarget"]])
 
             tampil_mgg = mingguan.copy()
             for c in ["Omzet Tertarget", "Omzet Non Tertarget", "Total Omzet"]:
