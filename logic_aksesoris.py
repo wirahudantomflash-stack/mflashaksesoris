@@ -345,8 +345,15 @@ def analisa_bundling_brand(df_jual_brand: pd.DataFrame, df_jual_semua_kategori: 
     # 2. Breakdown nota Service
     service_notas = set(df_jual_semua_kategori[df_jual_semua_kategori["SEGMEN"] == "Service"]["NOTA_ID"].unique())
     notas_dgn_aksesoris = set(df_jual_semua_kategori[df_jual_semua_kategori["KATEGORI_NORM"] == "AKSESORIS"]["NOTA_ID"].unique())
+    # PENTING: keyword brand harus DIBATASI ke baris berkategori AKSESORIS
+    # saja — kalau tidak, item yang namanya kebetulan mengandung kata
+    # brand (mis. "LUNA DATA CABLE...") tapi SALAH tercatat kategorinya
+    # (mis. jadi SPAREPART, bukan AKSESORIS) bisa membuat nota yang sama
+    # terhitung DUA KALI: masuk "dgn_brand" sekaligus "tanpa_aksesoris" —
+    # dua himpunan yang seharusnya saling eksklusif jadi tidak eksklusif.
     mask_keyword_all = df_jual_semua_kategori["NAMA BARANG"].astype(str).str.upper().str.contains(keyword.upper(), na=False)
-    notas_dgn_keyword = set(df_jual_semua_kategori[mask_keyword_all]["NOTA_ID"].unique())
+    mask_keyword_aksesoris = mask_keyword_all & (df_jual_semua_kategori["KATEGORI_NORM"] == "AKSESORIS")
+    notas_dgn_keyword = set(df_jual_semua_kategori[mask_keyword_aksesoris]["NOTA_ID"].unique())
 
     service_tanpa_aksesoris = service_notas - notas_dgn_aksesoris
     service_dgn_brand = service_notas & notas_dgn_keyword
@@ -366,6 +373,49 @@ def analisa_bundling_brand(df_jual_brand: pd.DataFrame, df_jual_semua_kategori: 
     ].drop_duplicates(subset=["NOTA_ID"]).rename(columns={"CABANG": "Cabang"}).sort_values(["Cabang", "TGL FAKTUR"]).reset_index(drop=True)
 
     return ringkasan, detail[cols_temuan]
+
+
+def analisa_bundling_per_cabang(df_jual_semua_kategori: pd.DataFrame, keyword: str = "LUNA") -> pd.DataFrame:
+    """Breakdown per CABANG dari `analisa_bundling_brand()` — porsi nota
+    Service yang TIDAK ada bundling aksesoris sama sekali, per cabang.
+    Diurutkan dari **% Tanpa Bundling TERTINGGI** (cabang paling perlu
+    ditindaklanjuti ada di paling atas)."""
+    cols = ["Cabang", "Total Nota Service", "Nota Bundling Brand", "Nota Bundling Brand Lain", "Nota Tanpa Bundling", "% Tanpa Bundling"]
+    if df_jual_semua_kategori.empty:
+        return pd.DataFrame(columns=cols)
+
+    service_df = df_jual_semua_kategori[df_jual_semua_kategori["SEGMEN"] == "Service"]
+    if service_df.empty:
+        return pd.DataFrame(columns=cols)
+
+    notas_dgn_aksesoris = set(df_jual_semua_kategori[df_jual_semua_kategori["KATEGORI_NORM"] == "AKSESORIS"]["NOTA_ID"].unique())
+    # Sama seperti di analisa_bundling_brand(): keyword brand dibatasi ke
+    # baris berkategori AKSESORIS saja, supaya konsisten & saling eksklusif.
+    mask_keyword_all = df_jual_semua_kategori["NAMA BARANG"].astype(str).str.upper().str.contains(keyword.upper(), na=False)
+    mask_keyword_aksesoris = mask_keyword_all & (df_jual_semua_kategori["KATEGORI_NORM"] == "AKSESORIS")
+    notas_dgn_keyword = set(df_jual_semua_kategori[mask_keyword_aksesoris]["NOTA_ID"].unique())
+
+    nota_cabang = service_df.drop_duplicates(subset=["NOTA_ID"])[["NOTA_ID", "CABANG"]].copy()
+
+    def _klasifikasi(nota_id):
+        if nota_id in notas_dgn_keyword:
+            return "Nota Bundling Brand"
+        elif nota_id in notas_dgn_aksesoris:
+            return "Nota Bundling Brand Lain"
+        else:
+            return "Nota Tanpa Bundling"
+
+    nota_cabang["_kelas"] = nota_cabang["NOTA_ID"].apply(_klasifikasi)
+
+    g = nota_cabang.groupby(["CABANG", "_kelas"]).size().unstack(fill_value=0)
+    for c in ["Nota Bundling Brand", "Nota Bundling Brand Lain", "Nota Tanpa Bundling"]:
+        if c not in g.columns:
+            g[c] = 0
+    g["Total Nota Service"] = g["Nota Bundling Brand"] + g["Nota Bundling Brand Lain"] + g["Nota Tanpa Bundling"]
+    g["% Tanpa Bundling"] = np.where(g["Total Nota Service"] != 0, g["Nota Tanpa Bundling"] / g["Total Nota Service"] * 100, 0)
+    g = g.reset_index().rename(columns={"CABANG": "Cabang"})
+    g = g.sort_values("% Tanpa Bundling", ascending=False).reset_index(drop=True)
+    return g[cols]
 
 
 def rincian_produk_brand(df_persediaan_brand: pd.DataFrame) -> pd.DataFrame:

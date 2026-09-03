@@ -2224,7 +2224,7 @@ def render_pembelian_tab():
 
         # --- Info tambahan: berapa transaksi Service TIDAK ada bundling aksesoris (terutama LUNA) ---
         if df_re is not None:
-            bund_info, _ = la.analisa_bundling_brand(df_aks_jual, df_re, keyword="LUNA")
+            bund_info, bund_detail = la.analisa_bundling_brand(df_aks_jual, df_re, keyword="LUNA")
             if bund_info["jumlah_nota_service"]:
                 st.markdown("###### 📋 Kepatuhan Bundling Aksesoris pada Transaksi Service")
                 bi1, bi2, bi3, bi4 = st.columns(4)
@@ -2244,6 +2244,36 @@ def render_pembelian_tab():
                     "bundling tapi pakai brand SELAIN LUNA (sesuai pengecualian SE kalau LUNA kosong stok "
                     "— bukan pelanggaran)."
                 )
+
+                st.markdown("**Porsi Tanpa Bundling per Cabang**")
+                st.caption("Diurutkan dari % Tanpa Bundling TERTINGGI (cabang paling perlu ditindaklanjuti di atas).")
+                bund_cabang = la.analisa_bundling_per_cabang(df_re, keyword="LUNA")
+                if bund_cabang.empty:
+                    st.info("Tidak ada data per cabang untuk ditampilkan.")
+                else:
+                    st.bar_chart(bund_cabang.set_index("Cabang")["% Tanpa Bundling"])
+                    tampil_bc = bund_cabang.copy()
+                    tampil_bc["% Tanpa Bundling"] = bund_cabang["% Tanpa Bundling"].map(la.format_percent_id)
+                    for c in ["Total Nota Service", "Nota Bundling Brand", "Nota Bundling Brand Lain", "Nota Tanpa Bundling"]:
+                        tampil_bc[c] = bund_cabang[c].map(la.format_int_id)
+                    st.dataframe(tampil_bc, use_container_width=True, height=min(80 + 38 * len(bund_cabang), 650))
+                    st.download_button(
+                        "⬇️ Unduh CSV — Porsi Tanpa Bundling per Cabang", bund_cabang.to_csv(index=False).encode("utf-8-sig"),
+                        "porsi_tanpa_bundling_per_cabang.csv", "text/csv", key="pb_dl_bundling_cabang",
+                    )
+
+                with st.expander(f"🔍 Lihat Rincian Nomor Nota — {la.format_int_id(bund_info['jumlah_service_tanpa_aksesoris'])} Nota Tanpa Bundling", expanded=False):
+                    st.caption("Daftar nota Service yang sama sekali tidak ada aksesoris apa pun di dalamnya — bisa difilter per cabang.")
+                    cabang_opsi_bund = ["— Semua Cabang —"] + sorted(bund_detail["Cabang"].dropna().unique().tolist())
+                    cabang_pilihan_bund = st.selectbox("Filter Cabang", cabang_opsi_bund, key="pb_bundling_cabang_filter")
+                    detail_tampil = bund_detail if cabang_pilihan_bund == "— Semua Cabang —" else bund_detail[bund_detail["Cabang"] == cabang_pilihan_bund]
+                    st.caption(f"Menampilkan {la.format_int_id(len(detail_tampil))} dari {la.format_int_id(len(bund_detail))} nota.")
+                    st.dataframe(detail_tampil, use_container_width=True, height=min(80 + 38 * len(detail_tampil), 500))
+                    st.download_button(
+                        "⬇️ Unduh CSV — Rincian Nomor Nota Tanpa Bundling (lengkap)",
+                        bund_detail.to_csv(index=False).encode("utf-8-sig"),
+                        "rincian_nota_tanpa_bundling.csv", "text/csv", key="pb_dl_bundling_detail",
+                    )
 
     st.divider()
 

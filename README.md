@@ -675,8 +675,36 @@ tinggal disambungkan lagi ke `app.py`.
      Brand Lain (bukan LUNA — sesuai pengecualian SE), dan **⚠️ TIDAK Ada
      Bundling Aksesoris sama sekali** — metrik terakhir inilah yang paling
      perlu ditindaklanjuti. **Diuji dengan data asli**: dari 15.728 nota
-     Service, 4.551 (28,9%) sudah bundling LUNA, 7.483 bundling brand lain,
+     Service, 4.541 (28,9%) sudah bundling LUNA, 7.483 bundling brand lain,
      dan **3.704 (23,6%) sama sekali tidak ada bundling aksesoris apa pun**.
+   - **Baru: Porsi Tanpa Bundling per Cabang** — tabel + grafik batang
+     memakai fungsi `analisa_bundling_per_cabang()` yang SUDAH ADA di
+     `logic_aksesoris.py` sejak sebelumnya tapi belum pernah dipakai di
+     UI manapun — sekarang disambungkan ke sini. Diurutkan dari % Tanpa
+     Bundling TERTINGGI (cabang paling perlu ditindaklanjuti di atas).
+     Data uji: **Jatibening** paling tinggi (54,7% tanpa bundling),
+     **Dramaga** paling rendah (5,9%).
+   - **Baru: Rincian Nomor Nota** — expander "🔍 Lihat Rincian Nomor Nota"
+     berisi daftar lengkap NO FAKTUR + tanggal untuk nota Service yang
+     sama sekali tidak ada bundling aksesoris, dengan dropdown filter per
+     cabang dan tombol unduh CSV (baik untuk hasil terfilter maupun data
+     lengkap semua cabang).
+   - **🐛 Bug ditemukan & diperbaiki saat membangun fitur ini**: fungsi
+     `analisa_bundling_brand()` (dan `analisa_bundling_per_cabang()`)
+     SEMPAT menghitung "notas_dgn_keyword" (nota yang punya item bernama
+     mengandung kata brand, mis. "LUNA") TANPA mensyaratkan kategori
+     barangnya AKSESORIS. Ditemukan kasus nyata: item bernama
+     **"LUNA DATA CABLE TYPE C TO C"** salah tercatat berkategori
+     **SPAREPART** (bukan AKSESORIS) di data sumber — akibatnya nota yang
+     memuat item ini terhitung GANDA: masuk kelompok "Ada Bundling LUNA"
+     SEKALIGUS "Tanpa Bundling Aksesoris" (dua kelompok yang seharusnya
+     saling eksklusif). Ini menyebabkan jumlah "Nota Tanpa Bundling" hasil
+     breakdown per cabang (3.694) tidak cocok dengan angka ringkasan
+     jaringan (3.704) — selisih 10 nota. Diperbaiki dengan menambahkan
+     syarat `KATEGORI_NORM == "AKSESORIS"` pada perhitungan
+     `notas_dgn_keyword` di KEDUA fungsi — sekarang kedua angka cocok
+     persis (3.704 = 3.704), diverifikasi juga untuk kolom "Nota Bundling
+     Brand" (4.541 = 4.541) dan Total Nota Service (15.728 = 15.728).
 4. **Perbandingan Penjualan Aksesoris Semua Cabang per Bulan**: tabel
    pivot Cabang × Bulan, plus kolom Total dan grafik batang, diurutkan
    dari cabang dengan Total Omzet tertinggi.
