@@ -1387,6 +1387,24 @@ def warna_indikator_pencapaian(pct):
         return "background-color: #c3e6cb; color: #0f5132;"
 
 
+def warna_indikator_pencapaian_naik_turun(pct):
+    """Warna indikator NAIK/TURUN (beda dari `warna_indikator_pencapaian()`
+    yang berbasis ambang target 85%/100%): 🟢 Hijau kalau positif (naik),
+    🔴 Merah kalau negatif (turun), netral kalau persis 0%. Dipakai untuk
+    kolom pertumbuhan bulan-ke-bulan (mis. "% Jul → Agu"), bukan kolom
+    pencapaian target."""
+    try:
+        v = float(pct)
+    except (TypeError, ValueError):
+        return ""
+    if v > 0:
+        return "background-color: #c3e6cb; color: #0f5132;"
+    elif v < 0:
+        return "background-color: #f5c6cb; color: #58151c;"
+    else:
+        return ""
+
+
 # ---------------------------------------------------------------------------
 # 8. Dashboard & Scoreboard Penjualan Aksesoris — Tertarget (LUNA selain
 #    Hydrogel) vs Non Tertarget (Selain LUNA, termasuk LUNA Hydrogel).
@@ -1577,18 +1595,35 @@ def omzet_mingguan_perbandingan(
 
 
 def omzet_cabang_per_bulan(df_aksesoris: pd.DataFrame) -> pd.DataFrame:
-    """Pivot Omzet Aksesoris: baris = Cabang, kolom = Bulan ("YYYY-MM") —
-    untuk perbandingan penjualan aksesoris semua cabang antar bulan."""
+    """Pivot Omzet Aksesoris: baris = Cabang, kolom = Bulan ("YYYY-MM"),
+    diselingi kolom "% vs Bulan Lalu" (pertumbuhan bulan-ke-bulan) setelah
+    tiap bulan (kecuali bulan pertama, karena tidak ada bulan sebelumnya
+    untuk dibandingkan) — untuk perbandingan penjualan aksesoris semua
+    cabang antar bulan sekaligus melihat tren naik/turunnya."""
     if df_aksesoris.empty:
         return pd.DataFrame()
     df = df_aksesoris.copy()
     df["_bulan_label"] = df["TGL FAKTUR"].dt.strftime("%Y-%m")
     pivot = df.pivot_table(index="CABANG", columns="_bulan_label", values="TOTAL HARGA", aggfunc="sum", fill_value=0)
     pivot = pivot.reindex(sorted(pivot.columns), axis=1)
-    pivot["Total"] = pivot.sum(axis=1)
-    pivot = pivot.sort_values("Total", ascending=False)
-    pivot.index.name = "Cabang"
-    return pivot.reset_index()
+
+    bulan_cols = list(pivot.columns)
+    out = pd.DataFrame(index=pivot.index)
+    for i, bulan in enumerate(bulan_cols):
+        out[bulan] = pivot[bulan]
+        if i > 0:
+            bulan_lalu = bulan_cols[i - 1]
+            pct = np.where(
+                pivot[bulan_lalu] != 0,
+                (pivot[bulan] - pivot[bulan_lalu]) / pivot[bulan_lalu] * 100,
+                np.where(pivot[bulan] != 0, 100.0, 0.0),
+            )
+            out[f"% {bulan_lalu} → {bulan}"] = pct
+
+    out["Total"] = pivot.sum(axis=1)
+    out = out.sort_values("Total", ascending=False)
+    out.index.name = "Cabang"
+    return out.reset_index()
 
 
 def format_int_id(x) -> str:

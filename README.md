@@ -636,7 +636,12 @@ tinggal disambungkan lagi ke `app.py`.
    "PENJUALAN AKSESORIS" saja di versi sebelumnya, lalu dikembalikan atas
    permintaan — parameter `kategori_penjualan` tetap tersedia di fungsi
    kalau suatu saat perlu dibatasi lagi, default sekarang `None`.)
-   - **Info tambahan baru — Kepatuhan Bundling Aksesoris pada Transaksi
+   - **Grafik Total Pencapaian (BARU)**: grafik batang terpisah di ATAS
+     grafik perbandingan Tertarget/Non Tertarget, menampilkan **"Total
+     Omzet"** — pencapaian SEMUA aksesoris, SEMUA kategori, TERMASUK
+     bundling — sesuai permintaan eksplisit untuk menonjolkan angka total
+     gabungan, bukan cuma dua sub-kelompoknya.
+   - **Info tambahan — Kepatuhan Bundling Aksesoris pada Transaksi
      Service**: 4 kartu metrik di bawah grafik, memakai fungsi
      `analisa_bundling_brand()` yang sudah ada (dipakai ulang, tidak
      dihitung dari nol): Total Nota Service, Ada Bundling LUNA, Bundling
@@ -646,9 +651,26 @@ tinggal disambungkan lagi ke `app.py`.
      Service, 4.551 (28,9%) sudah bundling LUNA, 7.483 bundling brand lain,
      dan **3.704 (23,6%) sama sekali tidak ada bundling aksesoris apa pun**.
 4. **Perbandingan Penjualan Aksesoris Semua Cabang per Bulan**: tabel
-   pivot Cabang × Bulan (kolom bulan otomatis menyesuaikan cakupan data),
-   plus kolom Total dan grafik batang, diurutkan dari cabang dengan Total
-   Omzet tertinggi.
+   pivot Cabang × Bulan, plus kolom Total dan grafik batang, diurutkan
+   dari cabang dengan Total Omzet tertinggi.
+   - **Baru: kolom "% Bulan A → Bulan B"** — pertumbuhan bulan-ke-bulan,
+     disisipkan setelah tiap bulan (kecuali bulan pertama, karena tidak
+     ada bulan sebelumnya untuk dibandingkan). Warna otomatis: 🟢 hijau
+     kalau naik, 🔴 merah kalau turun (fungsi baru
+     `warna_indikator_pencapaian_naik_turun()` — beda logika dari
+     `warna_indikator_pencapaian()` yang berbasis ambang target 85%/100%,
+     karena di sini yang dinilai adalah ARAH perubahan, bukan pencapaian
+     target). Kolom Rp dan kolom % diformat & di-bar-chart TERPISAH (bar
+     chart cuma pakai kolom Rp asli, supaya skala grafiknya tidak
+     tercampur dengan skala persentase).
+   - Kasus pembagi nol ditangani eksplisit: dari Rp0 ke Rp>0 dianggap
+     +100%, dari Rp0 ke Rp0 dianggap 0% (bukan `inf`/error).
+   - ⚠️ **Catatan penting**: bulan TERAKHIR pada data biasanya belum
+     penuh sebulan (tergantung tanggal data terakhir diunggah) — pada
+     data uji, September cuma berisi tanggal 1–2, sehingga wajar terlihat
+     "turun drastis" (~90-99%) padahal bukan penurunan performa
+     sungguhan. Caption di dashboard menjelaskan ini secara eksplisit
+     supaya tidak disalahartikan.
 
 **Diuji dengan data asli** (Faktur Pembelian: 1.782 baris aksesoris dari
 Jul–Sep 2026; Faktur Penjualan: 51.179 baris periode sama):

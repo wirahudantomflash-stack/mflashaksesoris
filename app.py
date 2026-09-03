@@ -2178,7 +2178,13 @@ def render_pembelian_tab():
         if mingguan.empty:
             st.info("Tidak ada data untuk grafik ini.")
         else:
+            st.markdown("**Total Pencapaian — Semua Aksesoris, Semua Kategori (termasuk bundling)**")
+            st.bar_chart(mingguan.set_index("Minggu")["Total Omzet"])
+            st.caption("Grafik di atas: total gabungan Tertarget + Non Tertarget per minggu.")
+
+            st.markdown("**Perbandingan Tertarget vs Non Tertarget**")
             st.bar_chart(mingguan.set_index("Minggu")[["Omzet Tertarget", "Omzet Non Tertarget"]])
+
             tampil_mgg = mingguan.copy()
             for c in ["Omzet Tertarget", "Omzet Non Tertarget", "Total Omzet"]:
                 tampil_mgg[c] = mingguan[c].map(la.format_rupiah_id)
@@ -2217,6 +2223,12 @@ def render_pembelian_tab():
     # 4. Perbandingan Penjualan Aksesoris Semua Cabang per Bulan
     # -----------------------------------------------------------------
     st.subheader("4️⃣ Perbandingan Penjualan Aksesoris Semua Cabang per Bulan")
+    st.caption(
+        "Kolom \"% Bulan A → Bulan B\" menunjukkan pertumbuhan omzet dari bulan sebelumnya ke bulan "
+        "berikutnya (🟢 naik, 🔴 turun). Bulan TERAKHIR pada data biasanya belum penuh sebulan "
+        "(tergantung tanggal data terakhir diunggah) — wajar kalau terlihat turun drastis, bukan "
+        "berarti performa anjlok."
+    )
     if df_aks_jual is None:
         st.info("Belum ada data penjualan aksesoris.")
     else:
@@ -2224,12 +2236,16 @@ def render_pembelian_tab():
         if bulanan.empty:
             st.info("Tidak ada data untuk tabel ini.")
         else:
-            kolom_bulan = [c for c in bulanan.columns if c not in ("Cabang", "Total")]
-            st.bar_chart(bulanan.set_index("Cabang")[kolom_bulan])
-            tampil_bulanan = bulanan.copy()
-            for c in kolom_bulan + ["Total"]:
-                tampil_bulanan[c] = bulanan[c].map(la.format_rupiah_id)
-            st.dataframe(tampil_bulanan, use_container_width=True, height=min(80 + 38 * len(bulanan), 700))
+            kolom_rp = [c for c in bulanan.columns if c not in ("Cabang", "Total") and not c.startswith("%")]
+            kolom_persen = [c for c in bulanan.columns if c.startswith("%")]
+
+            st.bar_chart(bulanan.set_index("Cabang")[kolom_rp])
+
+            styled_bulanan = bulanan.style.map(la.warna_indikator_pencapaian_naik_turun, subset=kolom_persen) if kolom_persen else bulanan.style
+            format_dict = {c: la.format_rupiah_id for c in kolom_rp + ["Total"]}
+            format_dict.update({c: la.format_percent_id for c in kolom_persen})
+            styled_bulanan = styled_bulanan.format(format_dict)
+            st.dataframe(styled_bulanan, use_container_width=True, height=min(80 + 38 * len(bulanan), 700))
             st.download_button(
                 "⬇️ Unduh CSV — Omzet Aksesoris per Cabang per Bulan", bulanan.to_csv(index=False).encode("utf-8-sig"),
                 "omzet_cabang_per_bulan.csv", "text/csv", key="pb_dl_bulanan",
