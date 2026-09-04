@@ -445,12 +445,23 @@ semua angka otomatis ikut menyesuaikan.
 - Default: **Rp 2.000.000.000** dalam **12 bulan mulai 20 Agustus 2026**
   — ketiganya bisa diubah langsung dari dashboard (target, tanggal mulai,
   durasi bulan), berlaku untuk mode manapun yang dipilih.
-- **Pemilih Periode Samurai** (checkbox "Gunakan Periode Samurai") —
-  saat aktif, pengguna tinggal pilih salah satu dari 6 periode kuartalan
-  (Samurai 39–44, Jul 2026–Des 2027) lewat dropdown, dan tanggal mulai +
-  durasi otomatis terisi (3 bulan per periode) — tidak perlu isi tanggal
-  manual. Matikan checkbox untuk kembali ke mode tanggal manual + durasi
-  bebas (mis. untuk periode 12 bulan lintas kuartal seperti sebelumnya).
+- **Pemilih Jenis Periode** — radio button dengan 2 opsi eksplisit:
+  **"Periode Samurai (Kuartalan)"** dan **"Program Custom (1–12 Bulan)"**
+  (sebelumnya checkbox on/off yang kurang jelas sebagai pilihan, sekarang
+  dibuat jadi pilihan tegas berdampingan).
+  - **Periode Samurai**: pilih salah satu dari 6 periode kuartalan
+    (Samurai 39–44, Jul 2026–Des 2027) lewat dropdown — tanggal mulai +
+    durasi (3 bulan) otomatis terisi, tidak perlu isi tanggal manual.
+  - **Program Custom (BARU)**: atur sendiri **Tanggal Mulai** (date
+    picker bebas) dan **Durasi Program** lewat slider **1–12 bulan**
+    (dulu number_input tanpa batas atas yang jelas, maksimal 60 bulan —
+    sekarang dibatasi tegas sesuai kebutuhan program custom yang wajar).
+    Tanggal selesai otomatis dihitung & ditampilkan di caption.
+  - **Diuji dengan data asli** untuk seluruh rentang durasi (1, 6, 12
+    bulan) dari tanggal mulai yang sama — tanggal selesai terhitung benar
+    di setiap kasus (1 bulan: 01 Jul–31 Jul; 12 bulan: 01 Jul 2026–30 Jun
+    2027), dan `target_penjualan_brand()` menerima tipe `datetime.date`
+    dari `st.date_input()` tanpa masalah konversi.
 - Mode **LUNA**: produk diidentifikasi dari **nama barang mengandung kata
   "LUNA"**. Mode **Semua Aksesoris**: seluruh baris kategori AKSESORIS
   dihitung tanpa filter nama. Keduanya dihitung dari **data yang sudah

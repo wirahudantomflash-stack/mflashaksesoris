@@ -1631,9 +1631,10 @@ def render_aksesoris_tab():
     keyword_target = "LUNA" if mode_target == "Target LUNA" else None
     label_target = "LUNA" if keyword_target else "Semua Aksesoris"
 
-    gunakan_samurai = st.checkbox(
-        "Gunakan Periode Samurai (kuartalan)", value=True, key="target_luna_pakai_samurai",
-        help="Matikan untuk atur tanggal mulai & durasi secara manual (mis. periode 12 bulan lintas kuartal).",
+    mode_periode = st.radio(
+        "Jenis Periode", ["Periode Samurai (Kuartalan)", "Program Custom (1–12 Bulan)"],
+        horizontal=True, key="target_mode_periode",
+        help="Periode Samurai = kuartalan tetap (Jul 2026–Des 2027). Program Custom = atur sendiri tanggal mulai & durasi (1–12 bulan).",
     )
 
     periode_samurai_target_opsi = [
@@ -1641,7 +1642,7 @@ def render_aksesoris_tab():
         "Samurai 42 (Apr–Jun 2027)", "Samurai 43 (Jul–Sep 2027)", "Samurai 44 (Okt–Des 2027)",
     ]
 
-    if gunakan_samurai:
+    if mode_periode == "Periode Samurai (Kuartalan)":
         t1, t2 = st.columns(2)
         with t1:
             target_rp = st.number_input("Target Omzet Aksesoris (Rp)", min_value=0, value=2_000_000_000, step=100_000_000, format="%d", key="target_luna_rp")
@@ -1651,13 +1652,17 @@ def render_aksesoris_tab():
         durasi_bulan_target = 3
         st.caption(f"Periode: {tanggal_mulai_target.strftime('%d %b %Y')} – {_tgl_selesai_periode.strftime('%d %b %Y')} (3 bulan).")
     else:
-        t1, t2, t3 = st.columns(3)
+        t1, t2 = st.columns(2)
         with t1:
             target_rp = st.number_input("Target Omzet Aksesoris (Rp)", min_value=0, value=2_000_000_000, step=100_000_000, format="%d", key="target_luna_rp_manual")
         with t2:
-            tanggal_mulai_target = st.date_input("Mulai program", value=pd.Timestamp("2026-08-20"), key="target_luna_mulai")
-        with t3:
-            durasi_bulan_target = st.number_input("Durasi (bulan)", min_value=1, max_value=60, value=12, step=1, key="target_luna_durasi")
+            tanggal_mulai_target = st.date_input("Mulai Program", value=pd.Timestamp("2026-08-20"), key="target_luna_mulai")
+        durasi_bulan_target = st.slider("Durasi Program (bulan)", min_value=1, max_value=12, value=3, key="target_luna_durasi_custom")
+        tgl_selesai_custom = pd.Timestamp(tanggal_mulai_target) + pd.DateOffset(months=int(durasi_bulan_target)) - pd.Timedelta(days=1)
+        st.caption(
+            f"Periode: {pd.Timestamp(tanggal_mulai_target).strftime('%d %b %Y')} – "
+            f"{tgl_selesai_custom.strftime('%d %b %Y')} ({durasi_bulan_target} bulan)."
+        )
 
     tprog = la.target_penjualan_brand(
         df, keyword=keyword_target, target=target_rp, tanggal_mulai=tanggal_mulai_target,
