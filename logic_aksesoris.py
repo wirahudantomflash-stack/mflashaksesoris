@@ -1695,6 +1695,65 @@ def omzet_luna_mingguan_blok7(df_aksesoris: pd.DataFrame, keyword_brand: str = "
     return g[cols]
 
 
+def omzet_luna_cabang_per_pekan_blok7(df_aksesoris: pd.DataFrame, keyword_brand: str = "LUNA") -> pd.DataFrame:
+    """Breakdown Omzet LUNA (SELURUH varian, termasuk Hydrogel) per CABANG
+    per pekan (blok 7 hari tetap, sama persis dengan
+    `omzet_luna_mingguan_blok7()`) — untuk melihat cabang mana yang paling
+    berkontribusi mendorong omzet tinggi di pekan tertentu. Baris = Cabang,
+    kolom = Pekan (label sama seperti fungsi mingguan), + kolom Total."""
+    if df_aksesoris.empty:
+        return pd.DataFrame()
+
+    nama_upper = df_aksesoris["NAMA BARANG"].astype(str).str.upper()
+    mask_luna = nama_upper.str.contains(keyword_brand.upper(), na=False)
+    df_luna = df_aksesoris[mask_luna]
+    if df_luna.empty:
+        return pd.DataFrame()
+
+    tanggal_mulai_data = df_aksesoris["TGL FAKTUR"].min().normalize()
+    hari_ke = (df_luna["TGL FAKTUR"].dt.normalize() - tanggal_mulai_data).dt.days
+    nomor_pekan = (hari_ke // 7).astype(int)
+
+    tmp = df_luna.copy()
+    tmp["_pekan_ke"] = nomor_pekan
+    tmp["_tgl_mulai_pekan"] = tmp["_pekan_ke"].apply(lambda n: tanggal_mulai_data + pd.Timedelta(days=7 * n))
+    tmp["_tgl_selesai_pekan"] = tmp["_tgl_mulai_pekan"] + pd.Timedelta(days=6)
+    tmp["_label_pekan"] = (
+        "Pekan " + (tmp["_pekan_ke"] + 1).astype(str).str.zfill(2) + " (" +
+        tmp["_tgl_mulai_pekan"].dt.strftime("%d %b") + " – " + tmp["_tgl_selesai_pekan"].dt.strftime("%d %b") + ")"
+    )
+
+    urutan_label = tmp.sort_values("_pekan_ke")["_label_pekan"].unique().tolist()
+    pivot = tmp.pivot_table(index="CABANG", columns="_label_pekan", values="TOTAL HARGA", aggfunc="sum", fill_value=0)
+    pivot = pivot.reindex(columns=urutan_label, fill_value=0)
+    pivot["Total"] = pivot.sum(axis=1)
+    pivot = pivot.sort_values("Total", ascending=False)
+    pivot.index.name = "Cabang"
+    return pivot.reset_index()
+
+
+def daftar_pekan_blok7(df_aksesoris: pd.DataFrame) -> pd.DataFrame:
+    """Daftar label pekan blok-7-hari beserta rentang tanggalnya — dipakai
+    untuk dropdown pemilih pekan di UI (mis. drill-down rincian produk per
+    cabang untuk satu pekan tertentu). Tidak difilter brand — dari
+    SELURUH data yang dioper (biasanya df_aksesoris)."""
+    cols = ["Pekan", "Tanggal Mulai", "Tanggal Selesai"]
+    if df_aksesoris.empty:
+        return pd.DataFrame(columns=cols)
+    tanggal_mulai_data = df_aksesoris["TGL FAKTUR"].min().normalize()
+    tanggal_max = df_aksesoris["TGL FAKTUR"].max().normalize()
+    total_hari = (tanggal_max - tanggal_mulai_data).days
+    jumlah_pekan = (total_hari // 7) + 1
+
+    rows = []
+    for n in range(jumlah_pekan):
+        mulai = tanggal_mulai_data + pd.Timedelta(days=7 * n)
+        selesai = mulai + pd.Timedelta(days=6)
+        label = f"Pekan {str(n + 1).zfill(2)} ({mulai.strftime('%d %b')} – {selesai.strftime('%d %b')})"
+        rows.append({"Pekan": label, "Tanggal Mulai": mulai, "Tanggal Selesai": selesai})
+    return pd.DataFrame(rows, columns=cols)
+
+
 def omzet_cabang_per_bulan(df_aksesoris: pd.DataFrame) -> pd.DataFrame:
     """Pivot Omzet Aksesoris: baris = Cabang, kolom = Bulan ("YYYY-MM"),
     diselingi kolom "% vs Bulan Lalu" (pertumbuhan bulan-ke-bulan) setelah

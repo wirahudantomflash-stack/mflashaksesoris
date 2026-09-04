@@ -2253,6 +2253,72 @@ def render_pembelian_tab():
                 "omzet_luna_mingguan.csv", "text/csv", key="pb_dl_mingguan",
             )
 
+            st.markdown("**Kontribusi Cabang per Pekan (Omzet LUNA)**")
+            st.caption(
+                "Cabang mana yang paling mendorong omzet tinggi di pekan tertentu — kolom Total "
+                "diurutkan dari cabang dengan kontribusi TERBESAR ke TERKECIL."
+            )
+            cabang_pekan = la.omzet_luna_cabang_per_pekan_blok7(df_aks_jual, keyword_brand="LUNA")
+            if cabang_pekan.empty:
+                st.info("Tidak ada data untuk breakdown per cabang.")
+            else:
+                kolom_pekan_cp = [c for c in cabang_pekan.columns if c not in ("Cabang", "Total")]
+                tampil_cp = cabang_pekan.copy()
+                for c in kolom_pekan_cp + ["Total"]:
+                    tampil_cp[c] = cabang_pekan[c].map(la.format_rupiah_id)
+                st.dataframe(tampil_cp, use_container_width=True, height=min(80 + 38 * len(cabang_pekan), 650))
+
+                pekan_puncak = mingguan.loc[mingguan["Omzet LUNA"].idxmax(), "Pekan"]
+                top3_pekan_puncak = cabang_pekan[["Cabang", pekan_puncak]].sort_values(pekan_puncak, ascending=False).head(3)
+                daftar_top3 = ", ".join(
+                    f"**{r['Cabang']}** ({la.format_rupiah_id(r[pekan_puncak])})" for _, r in top3_pekan_puncak.iterrows()
+                )
+                st.caption(f"Pekan dengan omzet tertinggi ({pekan_puncak}) paling didorong oleh: {daftar_top3}.")
+                st.download_button(
+                    "⬇️ Unduh CSV — Kontribusi Cabang per Pekan", cabang_pekan.to_csv(index=False).encode("utf-8-sig"),
+                    "omzet_luna_cabang_per_pekan.csv", "text/csv", key="pb_dl_cabang_pekan",
+                )
+
+            st.markdown("**🔍 Rincian Produk — Pilih Cabang & Pekan**")
+            st.caption("Lihat produk LUNA apa saja (termasuk Hydrogel) yang terjual di cabang & pekan tertentu, beserta kuantitasnya.")
+            daftar_pekan_dd = la.daftar_pekan_blok7(df_aks_jual)
+            opsi_pekan_dd = ["— Seluruh Pekan —"] + daftar_pekan_dd["Pekan"].tolist()
+            daftar_cabang_dd = sorted(df_aks_jual["CABANG"].dropna().unique().tolist())
+
+            rd1, rd2 = st.columns(2)
+            with rd1:
+                cabang_rincian = st.selectbox("Pilih Cabang", daftar_cabang_dd, key="pb_mingguan_cabang")
+            with rd2:
+                pekan_rincian = st.selectbox("Pilih Pekan", opsi_pekan_dd, key="pb_mingguan_pekan")
+
+            if pekan_rincian == "— Seluruh Pekan —":
+                tgl_mulai_rincian = df_aks_jual["TGL FAKTUR"].min()
+                tgl_selesai_rincian = df_aks_jual["TGL FAKTUR"].max()
+            else:
+                baris_pekan = daftar_pekan_dd[daftar_pekan_dd["Pekan"] == pekan_rincian].iloc[0]
+                tgl_mulai_rincian = baris_pekan["Tanggal Mulai"]
+                tgl_selesai_rincian = baris_pekan["Tanggal Selesai"]
+
+            rincian_produk_mgg = la.detail_produk_brand_cabang(
+                df_aks_jual, cabang_rincian, tgl_mulai_rincian, tgl_selesai_rincian,
+                keyword="LUNA", keyword_kecuali=None,
+            )
+            if rincian_produk_mgg.empty:
+                st.info(f"Belum ada penjualan LUNA di cabang **{cabang_rincian}** pada periode ini.")
+            else:
+                tampil_rincian = rincian_produk_mgg.copy()
+                tampil_rincian["Qty"] = rincian_produk_mgg["Qty"].map(la.format_int_id)
+                tampil_rincian["Omzet"] = rincian_produk_mgg["Omzet"].map(la.format_rupiah_id)
+                st.dataframe(tampil_rincian, use_container_width=True, height=min(80 + 38 * len(rincian_produk_mgg), 400))
+                st.caption(
+                    f"Total {la.format_int_id(rincian_produk_mgg['Qty'].sum())} pcs dari "
+                    f"{len(rincian_produk_mgg)} jenis produk — Omzet {la.format_rupiah_id(rincian_produk_mgg['Omzet'].sum())}."
+                )
+                st.download_button(
+                    "⬇️ Unduh CSV — Rincian Produk Cabang Terpilih", rincian_produk_mgg.to_csv(index=False).encode("utf-8-sig"),
+                    f"rincian_produk_{cabang_rincian.lower()}.csv", "text/csv", key="pb_dl_rincian_mingguan",
+                )
+
         # --- Info tambahan: berapa transaksi Service TIDAK ada bundling aksesoris (terutama LUNA) ---
         if df_re is not None:
             bund_info, bund_detail = la.analisa_bundling_brand(df_aks_jual, df_re, keyword="LUNA")

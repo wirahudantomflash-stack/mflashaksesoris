@@ -741,6 +741,32 @@ tinggal disambungkan lagi ke `app.py`.
      sama dengan urutan kronologis untuk pekan 1–99 (lebih dari cukup
      untuk kebutuhan ini). Diverifikasi: `sorted(daftar_label) ==
      daftar_label_asli` bernilai `True` untuk seluruh 10 pekan data uji.
+   - **Baru: Kontribusi Cabang per Pekan** — tabel pivot Cabang × Pekan
+     (fungsi baru `omzet_luna_cabang_per_pekan_blok7()`) langsung di bawah
+     grafik total, supaya terlihat CABANG MANA yang paling mendorong omzet
+     tinggi di pekan tertentu (bukan cuma angka totalnya saja). Diurutkan
+     dari cabang dengan Total kontribusi terbesar. Caption otomatis
+     menyebutkan 3 cabang teratas untuk pekan dengan omzet tertinggi.
+     **Diuji dengan data asli**: jumlah tiap kolom pekan di tabel ini
+     dijamin PERSIS SAMA dengan angka di grafik total (diverifikasi untuk
+     seluruh 10 pekan) — bukan angka independen yang bisa berbeda.
+     **Temuan menarik**: pekan dengan omzet tertinggi (Pekan 09, Rp36,3jt)
+     ternyata paling didorong oleh **Dramaga** (Rp3.898.000), BUKAN
+     Radjiman yang totalnya paling besar secara keseluruhan (Rp28,8jt) —
+     menunjukkan pentingnya melihat breakdown per pekan, bukan cuma total
+     akumulasi.
+   - **Baru: Rincian Produk — Pilih Cabang & Pekan** — dua dropdown
+     (Cabang, Pekan — termasuk opsi "Seluruh Pekan") menampilkan produk
+     LUNA apa saja (termasuk Hydrogel) yang terjual di kombinasi
+     cabang+pekan terpilih, pakai fungsi `detail_produk_brand_cabang()`
+     yang SUDAH ADA (dipakai ulang dari bagian Monitoring Tahap, tidak
+     ditulis ulang). **Diuji**: rincian produk Dramaga di Pekan 09
+     menampilkan 9 jenis produk (LUNA Charging Cable Type-C terlaris,
+     70 pcs), totalnya cocok PERSIS dengan angka di tabel Kontribusi
+     Cabang per Pekan (Rp3.898.000) — begitu juga untuk opsi "Seluruh
+     Pekan" (cocok dengan kolom Total, Rp10.407.000). Termasuk kasus tepi
+     kombinasi cabang+pekan tanpa penjualan sama sekali (pesan info yang
+     jelas, bukan tabel kosong membingungkan).
    - **Info tambahan — Kepatuhan Bundling Aksesoris pada Transaksi
      Service**: 4 kartu metrik di bawah grafik, memakai fungsi
      `analisa_bundling_brand()` yang sudah ada (dipakai ulang, tidak
