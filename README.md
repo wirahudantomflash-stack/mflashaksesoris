@@ -695,6 +695,32 @@ diubah lewat parameter `kategori_barang` (default `["LAPTOP", "HANDPHONE",
 
 **Kolom sesuai spesifikasi**: Cabang, Sales, Omzet Penjualan, Gross Profit,
 Rata-rata Omzet / Bulan.
+- **Baru: kolom Kontribusi per Kategori** — untuk TIAP kategori yang
+  dipilih (default Laptop, Handphone, Aksesoris), ditambahkan sepasang
+  kolom **"Omzet {Kategori}"** (Rp) dan **"% Kontribusi {Kategori}"**
+  (persentase dari Omzet Penjualan baris tsb) — disisipkan tepat setelah
+  kolom "Omzet Penjualan", sebelum "Gross Profit". Nama kolom dibangun
+  dinamis dari daftar kategori yang dipilih user (bukan hardcode 3
+  kategori), jadi otomatis menyesuaikan kalau multiselect kategori
+  dipersempit. Diverifikasi: jumlah "Omzet {Kategori}" dari semua kategori
+  = "Omzet Penjualan", dan jumlah "% Kontribusi {Kategori}" = 100% untuk
+  SETIAP baris (bukan cuma total keseluruhan).
+  - **🐛 Bug ditemukan & diperbaiki saat membangun fitur ini**:
+    `pd.pivot_table()` (dipakai untuk pivot omzet per kategori) secara
+    DEFAULT membuang baris dengan nilai NaN di kolom index — beda
+    perilaku dari `groupby(dropna=False)` yang dipakai di baris
+    "Omzet Penjualan" total (yang sengaja mempertahankan baris tanpa nama
+    sales tercatat). Tanpa perbaikan, baris "— Tidak Tercatat —" akan
+    kehilangan breakdown kategorinya (jumlah 3 kategori tidak cocok
+    dengan totalnya). Diperbaiki dengan mengisi nilai kosong pada kolom
+    Sales dengan placeholder teks SEBELUM proses groupby/pivot, supaya
+    kedua operasi pandas memperlakukan baris itu secara konsisten.
+  - **Rekap per Cabang** dan **Rekap per Sales** juga ikut diperbarui:
+    kolom Rp dijumlahkan langsung dari tabel rincian, tapi kolom
+    **% Kontribusi DIHITUNG ULANG** dari rasio total rekap (bukan
+    dijumlah/dirata-rata dari persentase per baris) — supaya tetap akurat
+    secara matematis, sama seperti pola yang sudah dipakai di tabel
+    Scoreboard Aksesoris sebelumnya.
 - **"Rata-rata Omzet / Bulan"** dihitung dari jumlah BULAN KALENDER UNIK
   yang benar-benar ada transaksinya dalam periode terpilih (bukan dipaksa
   angka tetap) — pembagi ini SAMA untuk semua baris dalam satu tabel,

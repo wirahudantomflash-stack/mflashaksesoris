@@ -212,8 +212,10 @@ def dashboard_omzet_ldm_per_cabang_sales(
 ) -> pd.DataFrame:
     """Dashboard pencapaian omzet Laptop, Handphone, Aksesoris (LDM) per
     kombinasi CABANG + SALES ("Yang Menyerahkan/Menjual"), untuk satu
-    periode. Kolom: Cabang, Sales, Omzet Penjualan, Gross Profit,
-    Rata-rata Omzet / Bulan.
+    periode. Kolom: Cabang, Sales, Omzet Penjualan, lalu untuk TIAP
+    kategori di `kategori_barang` — "Omzet {Kategori}" (Rp) dan
+    "% Kontribusi {Kategori}" (persentase dari Omzet Penjualan baris
+    tsb) — diikuti Gross Profit, Rata-rata Omzet / Bulan.
 
     `kategori_barang` default ["LAPTOP", "HANDPHONE", "AKSESORIS"] —
     dicocokkan ke kolom KATEGORI BARANG NORM (case-insensitive, sudah
@@ -242,7 +244,12 @@ def dashboard_omzet_ldm_per_cabang_sales(
     konsisten dibanding sesama baris di tabel ini."""
     if kategori_barang is None:
         kategori_barang = ["LAPTOP", "HANDPHONE", "AKSESORIS"]
-    cols = ["Cabang", "Sales", "Omzet Penjualan", "Gross Profit", "Rata-rata Omzet / Bulan"]
+    kolom_kategori_rp = [f"Omzet {k.title()}" for k in kategori_barang]
+    kolom_kategori_pct = [f"% Kontribusi {k.title()}" for k in kategori_barang]
+    cols = ["Cabang", "Sales", "Omzet Penjualan"]
+    for rp, pct in zip(kolom_kategori_rp, kolom_kategori_pct):
+        cols += [rp, pct]
+    cols += ["Gross Profit", "Rata-rata Omzet / Bulan"]
 
     tanggal_mulai = pd.Timestamp(tanggal_mulai)
     tanggal_selesai = pd.Timestamp(tanggal_selesai)
@@ -258,12 +265,42 @@ def dashboard_omzet_ldm_per_cabang_sales(
     if d.empty:
         return pd.DataFrame(columns=cols)
 
+    # PENTING: isi NaN pada "Sales" SEBELUM groupby/pivot — pd.pivot_table()
+    # secara default MEMBUANG baris dengan NaN di kolom index (beda dari
+    # groupby(dropna=False) yang mempertahankannya), sehingga tanpa ini
+    # baris tanpa nama sales tercatat akan hilang saat pivot per kategori
+    # (Omzet Laptop/Handphone/Aksesoris jadi tidak sinkron dengan Omzet
+    # Penjualan totalnya).
+    d = d.copy()
+    d["YANG MENYERAHKAN/MENJUAL"] = d["YANG MENYERAHKAN/MENJUAL"].fillna("— Tidak Tercatat —")
+
     jumlah_bulan = d[["TAHUN", "BULAN"]].drop_duplicates().shape[0]
     jumlah_bulan = max(jumlah_bulan, 1)
 
     g = d.groupby(["CABANG", "YANG MENYERAHKAN/MENJUAL"], dropna=False).agg(
         **{"Omzet Penjualan": ("TOTAL HARGA", "sum")}, **{"Gross Profit": ("LABA", "sum")},
     ).reset_index().rename(columns={"CABANG": "Cabang", "YANG MENYERAHKAN/MENJUAL": "Sales"})
+
+    # Pivot omzet per kategori barang (Laptop/Handphone/Aksesoris), lalu
+    # gabungkan ke tabel utama — kategori yang tidak ada transaksinya untuk
+    # kombinasi Cabang+Sales tertentu otomatis terisi 0 (bukan hilang/NaN).
+    pivot_kategori = d.pivot_table(
+        index=["CABANG", "YANG MENYERAHKAN/MENJUAL"], columns="KATEGORI BARANG NORM",
+        values="TOTAL HARGA", aggfunc="sum", fill_value=0,
+    ).reset_index().rename(columns={"CABANG": "Cabang", "YANG MENYERAHKAN/MENJUAL": "Sales"})
+    for k in kategori_barang:
+        k_upper = k.upper()
+        if k_upper not in pivot_kategori.columns:
+            pivot_kategori[k_upper] = 0
+    g = g.merge(pivot_kategori, on=["Cabang", "Sales"], how="left")
+
+    for k in kategori_barang:
+        k_upper = k.upper()
+        rp_col = f"Omzet {k.title()}"
+        pct_col = f"% Kontribusi {k.title()}"
+        g[rp_col] = g[k_upper].fillna(0)
+        g[pct_col] = np.where(g["Omzet Penjualan"] != 0, g[rp_col] / g["Omzet Penjualan"] * 100, 0)
+
     g["Rata-rata Omzet / Bulan"] = g["Omzet Penjualan"] / jumlah_bulan
     g = g.sort_values("Omzet Penjualan", ascending=False).reset_index(drop=True)
     return g[cols]

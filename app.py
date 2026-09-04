@@ -2189,12 +2189,18 @@ def render_omzet_ldm_tab():
     m4.metric("Jumlah Baris (Cabang × Sales)", ljl.format_int_id(len(hasil_ldm)))
 
     st.subheader("📋 Rincian per Cabang & Sales")
-    st.caption("Diurutkan dari Omzet Penjualan tertinggi. Baris \"— Tidak Tercatat —\" berarti transaksi tanpa nama sales spesifik di data sumber.")
+    st.caption(
+        "Diurutkan dari Omzet Penjualan tertinggi. Kolom \"Omzet {Kategori}\" & \"% Kontribusi {Kategori}\" "
+        "menunjukkan porsi tiap kategori dari total Omzet Penjualan baris tsb. Baris \"— Tidak Tercatat —\" "
+        "berarti transaksi tanpa nama sales spesifik di data sumber."
+    )
     tampil_ldm = hasil_ldm.copy()
-    tampil_ldm["Sales"] = hasil_ldm["Sales"].fillna("— Tidak Tercatat —")
-    tampil_ldm["Omzet Penjualan"] = hasil_ldm["Omzet Penjualan"].map(ljl.format_rupiah_id)
-    tampil_ldm["Gross Profit"] = hasil_ldm["Gross Profit"].map(ljl.format_rupiah_id)
-    tampil_ldm["Rata-rata Omzet / Bulan"] = hasil_ldm["Rata-rata Omzet / Bulan"].map(ljl.format_rupiah_id)
+    kolom_rp_ldm = [c for c in hasil_ldm.columns if c.startswith("Omzet")] + ["Gross Profit", "Rata-rata Omzet / Bulan"]
+    kolom_pct_ldm = [c for c in hasil_ldm.columns if c.startswith("%")]
+    for c in kolom_rp_ldm:
+        tampil_ldm[c] = hasil_ldm[c].map(ljl.format_rupiah_id)
+    for c in kolom_pct_ldm:
+        tampil_ldm[c] = hasil_ldm[c].map(ljl.format_percent_id)
     st.dataframe(tampil_ldm, use_container_width=True, height=min(80 + 38 * len(hasil_ldm), 650))
     st.download_button(
         "⬇️ Unduh CSV — Omzet Laptop/Handphone/Aksesoris per Cabang & Sales",
@@ -2203,14 +2209,28 @@ def render_omzet_ldm_tab():
     )
 
     st.subheader("📊 Rekap per Cabang")
-    rekap_cabang_ldm = hasil_ldm.groupby("Cabang").agg(
-        **{"Omzet Penjualan": ("Omzet Penjualan", "sum")}, **{"Gross Profit": ("Gross Profit", "sum")},
-        **{"Rata-rata Omzet / Bulan": ("Rata-rata Omzet / Bulan", "sum")},
-    ).reset_index().sort_values("Omzet Penjualan", ascending=False).reset_index(drop=True)
+    kolom_omzet_kategori_ldm = [c for c in hasil_ldm.columns if c.startswith("Omzet") and c != "Omzet Penjualan"]
+    agg_dict_cabang = {
+        "Omzet Penjualan": ("Omzet Penjualan", "sum"), "Gross Profit": ("Gross Profit", "sum"),
+        "Rata-rata Omzet / Bulan": ("Rata-rata Omzet / Bulan", "sum"),
+    }
+    for c in kolom_omzet_kategori_ldm:
+        agg_dict_cabang[c] = (c, "sum")
+    rekap_cabang_ldm = hasil_ldm.groupby("Cabang").agg(**agg_dict_cabang).reset_index()
+    for c in kolom_omzet_kategori_ldm:
+        nama_kat = c.replace("Omzet ", "")
+        rekap_cabang_ldm[f"% Kontribusi {nama_kat}"] = np.where(
+            rekap_cabang_ldm["Omzet Penjualan"] != 0, rekap_cabang_ldm[c] / rekap_cabang_ldm["Omzet Penjualan"] * 100, 0,
+        )
+    rekap_cabang_ldm = rekap_cabang_ldm.sort_values("Omzet Penjualan", ascending=False).reset_index(drop=True)
     st.bar_chart(rekap_cabang_ldm.set_index("Cabang")["Omzet Penjualan"])
     tampil_rekap = rekap_cabang_ldm.copy()
-    for c in ["Omzet Penjualan", "Gross Profit", "Rata-rata Omzet / Bulan"]:
+    kolom_rp_rekap = [c for c in rekap_cabang_ldm.columns if c.startswith("Omzet")] + ["Gross Profit", "Rata-rata Omzet / Bulan"]
+    kolom_pct_rekap = [c for c in rekap_cabang_ldm.columns if c.startswith("%")]
+    for c in kolom_rp_rekap:
         tampil_rekap[c] = rekap_cabang_ldm[c].map(ljl.format_rupiah_id)
+    for c in kolom_pct_rekap:
+        tampil_rekap[c] = rekap_cabang_ldm[c].map(ljl.format_percent_id)
     st.dataframe(tampil_rekap, use_container_width=True, height=min(80 + 38 * len(rekap_cabang_ldm), 500))
     st.download_button(
         "⬇️ Unduh CSV — Rekap per Cabang", rekap_cabang_ldm.to_csv(index=False).encode("utf-8-sig"),
@@ -2218,14 +2238,21 @@ def render_omzet_ldm_tab():
     )
 
     st.subheader("🏆 Rekap per Sales (Seluruh Cabang)")
-    rekap_sales_ldm = hasil_ldm.groupby("Sales", dropna=False).agg(
-        **{"Omzet Penjualan": ("Omzet Penjualan", "sum")}, **{"Gross Profit": ("Gross Profit", "sum")},
-        **{"Rata-rata Omzet / Bulan": ("Rata-rata Omzet / Bulan", "sum")},
-    ).reset_index().sort_values("Omzet Penjualan", ascending=False).reset_index(drop=True)
-    rekap_sales_ldm["Sales"] = rekap_sales_ldm["Sales"].fillna("— Tidak Tercatat —")
+    agg_dict_sales = dict(agg_dict_cabang)
+    rekap_sales_ldm = hasil_ldm.groupby("Sales", dropna=False).agg(**agg_dict_sales).reset_index()
+    for c in kolom_omzet_kategori_ldm:
+        nama_kat = c.replace("Omzet ", "")
+        rekap_sales_ldm[f"% Kontribusi {nama_kat}"] = np.where(
+            rekap_sales_ldm["Omzet Penjualan"] != 0, rekap_sales_ldm[c] / rekap_sales_ldm["Omzet Penjualan"] * 100, 0,
+        )
+    rekap_sales_ldm = rekap_sales_ldm.sort_values("Omzet Penjualan", ascending=False).reset_index(drop=True)
     tampil_rekap_sales = rekap_sales_ldm.copy()
-    for c in ["Omzet Penjualan", "Gross Profit", "Rata-rata Omzet / Bulan"]:
+    kolom_rp_rekap_sales = [c for c in rekap_sales_ldm.columns if c.startswith("Omzet")] + ["Gross Profit", "Rata-rata Omzet / Bulan"]
+    kolom_pct_rekap_sales = [c for c in rekap_sales_ldm.columns if c.startswith("%")]
+    for c in kolom_rp_rekap_sales:
         tampil_rekap_sales[c] = rekap_sales_ldm[c].map(ljl.format_rupiah_id)
+    for c in kolom_pct_rekap_sales:
+        tampil_rekap_sales[c] = rekap_sales_ldm[c].map(ljl.format_percent_id)
     st.dataframe(tampil_rekap_sales, use_container_width=True, height=min(80 + 38 * len(rekap_sales_ldm), 500))
     st.download_button(
         "⬇️ Unduh CSV — Rekap per Sales", rekap_sales_ldm.to_csv(index=False).encode("utf-8-sig"),
