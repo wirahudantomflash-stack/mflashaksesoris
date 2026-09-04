@@ -3,6 +3,7 @@ import io
 import streamlit as st
 import pandas as pd
 import numpy as np
+import altair as alt
 
 import logic_persediaan as lp
 import logic_penjualan as ljl
@@ -2215,7 +2216,24 @@ def render_pembelian_tab():
             st.info("Tidak ada data untuk grafik ini.")
         else:
             st.markdown("**Omzet LUNA per Pekan (termasuk Hydrogel)**")
-            st.line_chart(mingguan.set_index("Pekan")["Omzet LUNA"])
+            chart_mgg = mingguan.copy()
+            # Label di titik grafik dibuat ringkas (format jutaan) supaya tidak
+            # berdempetan antar titik — tabel & unduhan CSV di bawah tetap
+            # pakai format Rupiah lengkap seperti biasa.
+            chart_mgg["_label_chart"] = (chart_mgg["Omzet LUNA"] / 1_000_000).apply(lambda x: la.format_decimal_id(x, 1) + " jt")
+            chart_mgg["_label_rp"] = chart_mgg["Omzet LUNA"].apply(la.format_rupiah_id)
+
+            garis = alt.Chart(chart_mgg).mark_line(point=True, color="#378ADD").encode(
+                x=alt.X("Pekan:N", sort=chart_mgg["Pekan"].tolist(), title=None),
+                y=alt.Y("Omzet LUNA:Q", title="Omzet LUNA (Rp)"),
+                tooltip=[alt.Tooltip("Pekan:N"), alt.Tooltip("_label_rp:N", title="Omzet LUNA")],
+            )
+            label = alt.Chart(chart_mgg).mark_text(dy=-12, fontSize=11, color="#1F3864").encode(
+                x=alt.X("Pekan:N", sort=chart_mgg["Pekan"].tolist()),
+                y=alt.Y("Omzet LUNA:Q"),
+                text=alt.Text("_label_chart:N"),
+            )
+            st.altair_chart((garis + label).properties(height=350), use_container_width=True)
 
             tampil_mgg = mingguan.copy()
             tampil_mgg["Omzet LUNA"] = mingguan["Omzet LUNA"].map(la.format_rupiah_id)
