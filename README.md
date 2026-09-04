@@ -799,12 +799,30 @@ Rata-rata Omzet / Bulan.
 - Tombol unduh CSV terpisah untuk ketiga tabel (rincian, rekap cabang,
   rekap sales)
 
-**Diuji: dropdown Pilih Bulan** — periode 1 Jul–31 Ags 2026 menghasilkan
-2 opsi bulan (Juli, Agustus) selain "Semua Bulan". Omzet Agustus
-Rp 1.430.984.040, Juli Rp 15.280.000 — **dijumlahkan keduanya PERSIS SAMA**
-dengan total "Semua Bulan (Gabungan)" (Rp 1.446.264.040), memastikan tidak
-ada data yang tercecer atau terhitung dobel saat dipecah per bulan. Top
-Sales Agustus: M Rizvanzah Alfath (Rp 81.810.000, 84,5% dari Laptop).
+- **🐛 Bug ditemukan & diperbaiki: dropdown "Pilih Bulan" cuma menampilkan
+  2 bulan (Juli, Agustus), padahal data sebenarnya mencakup Januari–
+  September** — akar masalahnya BUKAN di logika dropdown itu sendiri
+  (yang memang sudah otomatis mengikuti rentang tanggal aktif), tapi DUA
+  hal lain: (1) **Tanggal Mulai/Selesai default di-hardcode** ke
+  "2026-07-01"/"2026-08-31", membatasi rentang yang dilihat dropdown
+  meski datanya lebih luas; (2) **`penjualan.csv.gz` yang aktif di
+  aplikasi cuma berisi Juli–September**, belum digabung dengan data
+  Januari–Juni yang sudah pernah diproses terpisah sebelumnya. Diperbaiki
+  dengan: mengubah default Tanggal Mulai/Selesai supaya otomatis mengambil
+  `df["TGL FAKTUR"].min()`/`.max()` dari data yang dimuat (bukan tanggal
+  tetap), DAN mengganti `penjualan.csv.gz` dengan gabungan penuh
+  Januari–September 2026 (193.560 baris, 18 cabang, 0 duplikat).
+  - **Bonus temuan saat menyiapkan file gabungan ini**: proses
+    penggabungan sebelumnya (file April–Juni + file Juli–September)
+    ternyata punya **175 baris duplikasi nyata senilai Rp 14.375.000** —
+    karena kedua file sumber SAMA-SAMA mencakup tanggal 1 Juli, sehingga
+    transaksi tanggal itu terhitung dua kali. Sudah dibersihkan
+    (`drop_duplicates()`) sebelum dijadikan `penjualan.csv.gz` baru.
+  - **Diuji setelah perbaikan**: dropdown sekarang menampilkan 9 opsi
+    bulan (Januari–September 2026) selain "Semua Bulan". Total Omzet
+    "Semua Bulan (Gabungan)" = Rp 16.084.944.008, dan dijumlah satu-satu
+    dari 9 bulan terpisah menghasilkan angka **PERSIS SAMA** — memastikan
+    tidak ada data yang tercecer atau terhitung dobel.
 
 **Diuji dengan data asli** (periode default 1 Jul–31 Ags 2026, retail
 toko + aksesoris bundling Service): Total Omzet **Rp 1.446.264.040**

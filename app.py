@@ -2135,7 +2135,7 @@ def render_omzet_ldm_tab():
     st.header("💻📱🎧 Dashboard Pencapaian Omzet Penjualan Laptop, Handphone, Aksesoris")
     st.caption(
         "Gabungan 3 kategori barang: LAPTOP, HANDPHONE, AKSESORIS — dipecah per Cabang dan per Sales "
-        "(\"Yang Menyerahkan/Menjual\"). Default periode 1 Juli – 31 Agustus 2026, bisa diubah. "
+        "(\"Yang Menyerahkan/Menjual\"). Default periode mengikuti seluruh rentang tanggal pada data yang dimuat, bisa diubah. "
         "**Laptop & Handphone**: hanya transaksi Retail Toko murni (KATEGORI PENJUALAN = \"Penjualan "
         "Laptop\"/\"Penjualan HP\"/\"Penjualan Handphone\") — TIDAK termasuk Service, Corporate, Cicilan "
         "Syariah, atau Sewa. **Aksesoris**: Retail Toko murni DITAMBAH aksesoris yang terjual lewat "
@@ -2158,11 +2158,14 @@ def render_omzet_ldm_tab():
             return
         df_ldm = ljl.finalize_data(raw_aksesoris, cabang_default=nama_bersama_ldm)
 
+    tgl_data_min_ldm = df_ldm["TGL FAKTUR"].min()
+    tgl_data_max_ldm = df_ldm["TGL FAKTUR"].max()
+
     kd1, kd2 = st.columns(2)
     with kd1:
-        tgl_mulai_ldm = st.date_input("Tanggal Mulai", value=pd.Timestamp("2026-07-01"), key="ldm_tgl_mulai")
+        tgl_mulai_ldm = st.date_input("Tanggal Mulai", value=tgl_data_min_ldm, key="ldm_tgl_mulai")
     with kd2:
-        tgl_selesai_ldm = st.date_input("Tanggal Selesai", value=pd.Timestamp("2026-08-31"), key="ldm_tgl_selesai")
+        tgl_selesai_ldm = st.date_input("Tanggal Selesai", value=tgl_data_max_ldm, key="ldm_tgl_selesai")
 
     kategori_pilihan_ldm = st.multiselect(
         "Kategori Barang", ["LAPTOP", "HANDPHONE", "AKSESORIS"], default=["LAPTOP", "HANDPHONE", "AKSESORIS"],
