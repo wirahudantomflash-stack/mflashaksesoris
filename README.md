@@ -700,6 +700,29 @@ Rata-rata Omzet / Bulan.
   angka tetap) — pembagi ini SAMA untuk semua baris dalam satu tabel,
   dihitung dari keseluruhan data yang sudah difilter periode+kategori,
   supaya "rata-rata" antar baris tetap bisa dibandingkan secara adil.
+- **Filter "Retail Toko" (default aktif)** — parameter
+  `hanya_retail_toko=True` menyaring transaksi ke kolom "KATEGORI PILAR
+  Sales Invoice", TAPI **berbeda perlakuan per kategori barang** (revisi
+  dari versi awal fitur ini):
+  - **Laptop & Handphone**: HANYA "PENJUALAN RITEL" murni — TIDAK
+    termasuk SERVICE, PENGADAAN CORPORATE, CICILAN SYARIAH, MAINTENANCE
+    CORPORATE, atau SEWA.
+  - **Aksesoris**: "PENJUALAN RITEL" **DITAMBAH** baris AKSESORIS yang
+    kategori pilarnya "SERVICE" (yaitu aksesoris yang terjual lewat
+    BUNDLING pada transaksi Service) — tetap dihitung sebagai penjualan
+    aksesoris yang sah, karena bundling adalah program resmi (SE/001/
+    IN-MF/IV/2026), bukan penjualan "corporate"/lainnya yang perlu
+    dikecualikan. Baris Laptop/Handphone via Service TETAP dikecualikan,
+    tidak ikut kebijakan pengecualian aksesoris ini.
+  Set `hanya_retail_toko=False` untuk menghitung SEMUA kategori penjualan
+  tanpa pengecualian apa pun (perilaku paling longgar).
+  **Dampak nyata** (data uji, periode default): Retail murni Rp
+  1.202.907.340 + Aksesoris via bundling Service Rp 243.356.700 = **Rp
+  1.446.264.040** total — sementara Laptop/Handphone via Service
+  (Rp 102.328.000) TETAP tidak ikut terhitung, sesuai maksudnya.
+  Diverifikasi breakdown manual (retail + bundling aksesoris) cocok
+  persis dengan hasil fungsi, dan backward-compatibility
+  (`hanya_retail_toko=False` → Rp 6.989.968.478) tetap terjaga.
 
 **UI mencakup:**
 - Date picker **Tanggal Mulai** & **Tanggal Selesai** (default 1 Juli – 31
@@ -718,16 +741,18 @@ Rata-rata Omzet / Bulan.
 - Tombol unduh CSV terpisah untuk ketiga tabel (rincian, rekap cabang,
   rekap sales)
 
-**Diuji dengan data asli** (periode default 1 Jul–31 Ags 2026): Total
-Omzet Rp 6.989.968.478, Gross Profit margin 14,4% — jauh lebih rendah dari
-margin Aksesoris murni (~40%) karena Laptop & Handphone biasanya bermargin
-tipis. 157 kombinasi Cabang×Sales, direkap jadi 18 baris per Cabang dan
-130 baris per Sales — **totalnya diverifikasi cocok persis** dengan angka
-tabel rincian di ketiga level agregasi (rincian = rekap cabang = rekap
-sales = Rp 6.989.968.478). Termasuk kasus tepi: multiselect kategori
-dikosongkan (otomatis fallback ke 3 kategori default, bukan tabel kosong),
-filter ke satu kategori saja (mis. hanya AKSESORIS), data kosong, dan
-periode tanpa data — semuanya tertangani dengan pesan info yang jelas.
+**Diuji dengan data asli** (periode default 1 Jul–31 Ags 2026, retail
+toko + aksesoris bundling Service): Total Omzet **Rp 1.446.264.040**
+(naik dari Rp 1.202.907.340 versi retail-murni sebelumnya, selisih Rp
+243.356.700 persis sebesar kontribusi aksesoris via bundling Service).
+118 kombinasi Cabang×Sales — totalnya diverifikasi cocok persis di
+seluruh level agregasi. Backward-compatibility diverifikasi:
+`hanya_retail_toko=False` menghasilkan angka identik dengan versi
+sebelum perubahan ini (Rp 6.989.968.478). Termasuk kasus tepi:
+multiselect kategori dikosongkan (otomatis fallback ke 3 kategori
+default, bukan tabel kosong), filter ke satu kategori saja (mis. hanya
+AKSESORIS), data kosong, dan periode tanpa data — semuanya tertangani
+dengan pesan info yang jelas.
 
 ## 📦 Dashboard Pembelian & Perbandingan Penjualan Aksesoris (BARU)
 

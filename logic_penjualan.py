@@ -208,6 +208,7 @@ def dashboard_omzet_ldm_per_cabang_sales(
     tanggal_mulai,
     tanggal_selesai,
     kategori_barang: list[str] | None = None,
+    hanya_retail_toko: bool = True,
 ) -> pd.DataFrame:
     """Dashboard pencapaian omzet Laptop, Handphone, Aksesoris (LDM) per
     kombinasi CABANG + SALES ("Yang Menyerahkan/Menjual"), untuk satu
@@ -216,13 +217,29 @@ def dashboard_omzet_ldm_per_cabang_sales(
 
     `kategori_barang` default ["LAPTOP", "HANDPHONE", "AKSESORIS"] —
     dicocokkan ke kolom KATEGORI BARANG NORM (case-insensitive, sudah
-    dinormalisasi saat `finalize_data()`). "Rata-rata Omzet / Bulan"
-    dihitung dari jumlah BULAN KALENDER UNIK yang benar-benar ada
-    transaksinya dalam periode (bukan dipaksa 2 kalau ternyata cuma ada
-    data 1 bulan) — pembagi ini SAMA untuk semua baris (dihitung dari
-    seluruh data yang sudah difilter periode+kategori, bukan per baris/per
-    grup), supaya "rata-rata" tetap punya makna yang konsisten dibanding
-    sesama baris di tabel ini."""
+    dinormalisasi saat `finalize_data()`).
+
+    `hanya_retail_toko` (default True): filter tambahan ke kolom
+    "KATEGORI PILAR Sales Invoice" == "PENJUALAN RITEL" — berlaku untuk
+    LAPTOP & HANDPHONE (harus murni retail toko, TIDAK termasuk SERVICE/
+    PENGADAAN CORPORATE/CICILAN SYARIAH/MAINTENANCE CORPORATE/SEWA).
+
+    **Khusus AKSESORIS, filter ini TIDAK berlaku ketat** — baris AKSESORIS
+    tetap dihitung meski KATEGORI PILAR-nya "SERVICE", karena aksesoris
+    yang terjual lewat BUNDLING di transaksi Service tetap penjualan
+    aksesoris yang sah (bukan penjualan Laptop/Handphone via Service, yang
+    tidak relevan di sini). Baris AKSESORIS pada kategori pilar LAIN (mis.
+    PENGADAAN CORPORATE) tetap dikecualikan seperti biasa.
+
+    Set `hanya_retail_toko=False` untuk menghitung SEMUA kategori
+    penjualan tanpa pengecualian apa pun (perilaku paling longgar).
+
+    "Rata-rata Omzet / Bulan" dihitung dari jumlah BULAN KALENDER UNIK
+    yang benar-benar ada transaksinya dalam periode (bukan dipaksa 2 kalau
+    ternyata cuma ada data 1 bulan) — pembagi ini SAMA untuk semua baris
+    (dihitung dari seluruh data yang sudah difilter periode+kategori,
+    bukan per baris/per grup), supaya "rata-rata" tetap punya makna yang
+    konsisten dibanding sesama baris di tabel ini."""
     if kategori_barang is None:
         kategori_barang = ["LAPTOP", "HANDPHONE", "AKSESORIS"]
     cols = ["Cabang", "Sales", "Omzet Penjualan", "Gross Profit", "Rata-rata Omzet / Bulan"]
@@ -233,6 +250,11 @@ def dashboard_omzet_ldm_per_cabang_sales(
         (df["TGL FAKTUR"] >= tanggal_mulai) & (df["TGL FAKTUR"] <= tanggal_selesai) &
         (df["KATEGORI BARANG NORM"].isin([k.upper() for k in kategori_barang]))
     ]
+    if hanya_retail_toko and "KATEGORI PILAR Sales Invoice" in d.columns:
+        pilar = d["KATEGORI PILAR Sales Invoice"].astype(str).str.strip().str.upper()
+        mask_retail = pilar == "PENJUALAN RITEL"
+        mask_aksesoris_bundling = (d["KATEGORI BARANG NORM"] == "AKSESORIS") & (pilar == "SERVICE")
+        d = d[mask_retail | mask_aksesoris_bundling]
     if d.empty:
         return pd.DataFrame(columns=cols)
 
