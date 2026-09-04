@@ -37,6 +37,32 @@
 > render, dan bisa dimunculkan lagi kapan saja dengan mengubah nilai flag
 > jadi `True`.
 
+> ## ⏸️ Tiga bagian tambahan juga SEMENTARA DISEMBUNYIKAN
+>
+> Tiga flag serupa lagi, mekanisme & alasan sama:
+> ```python
+> TAMPILKAN_MONITORING_BERTAHAP = False   # "Monitoring Pencapaian Cabang — Bertahap" + "Ringkasan Kumulatif Seluruh Tahap"
+> TAMPILKAN_PROYEKSI = False              # "Analisa Penjualan & Proyeksi 5–10 Tahun"
+> TAMPILKAN_KONTRIBUSI_CABANG = False     # "Indikator Kontribusi Cabang (Terendah → Tertinggi)"
+> ```
+> **Monitoring Bertahap**: seluruh sistem Tahap 1/2/3/dst (tabel per
+> cabang, rincian produk, tombol tambah tahap baru) DAN "📊 Ringkasan
+> Kumulatif Seluruh Tahap" di bawahnya disembunyikan sebagai SATU unit —
+> keduanya digabung dalam satu flag karena Ringkasan Kumulatif dihitung
+> langsung dari hasil blok-blok Tahap di atasnya, jadi tidak masuk akal
+> dipisah jadi dua flag berbeda.
+> **Proyeksi**: HANYA bagian "📈 Analisa Penjualan & Proyeksi 5–10 Tahun"
+> (proyeksi 3 skenario, grafik garis, tabel) yang disembunyikan — bagian
+> "📌 Analisa & Rekomendasi" TEPAT DI BAWAHNYA **tetap tampil** karena
+> secara kode independen (tidak memakai variabel apa pun dari bagian
+> Proyeksi), jadi sengaja TIDAK ikut disembunyikan meski posisinya
+> berdekatan.
+> **Kontribusi Cabang**: bagian "📶 Indikator Kontribusi Cabang (Terendah
+> → Tertinggi)" — grafik & tabel kontribusi omzet per cabang — di dalam
+> bagian "📊 Penjualan Aksesoris LUNA vs Selain LUNA" tidak dirender.
+> Kode/logikanya tetap ada untuk ketiganya, bisa dimunculkan lagi kapan
+> saja dengan mengubah nilai flag jadi `True`.
+
 **Satu halaman panjang** (bukan tab terpisah — digabung sesuai permintaan),
 berisi dashboard berurutan dari atas ke bawah:
 

@@ -21,6 +21,11 @@ TAMPILKAN_PARFUM = False
 TAMPILKAN_RINGKASAN_EKSEKUTIF = False
 TAMPILKAN_MATRIX_INSENTIF = False
 
+# Flag sementara tambahan (pola sama seperti di atas):
+TAMPILKAN_MONITORING_BERTAHAP = False   # "Monitoring Pencapaian Cabang — Bertahap" + "Ringkasan Kumulatif Seluruh Tahap" (satu unit fungsional)
+TAMPILKAN_PROYEKSI = False              # "Analisa Penjualan & Proyeksi 5–10 Tahun"
+TAMPILKAN_KONTRIBUSI_CABANG = False     # "Indikator Kontribusi Cabang (Terendah → Tertinggi)"
+
 st.set_page_config(page_title="MFlash Dashboard Gadget dan Aksesoris", page_icon="flash_logo.png", layout="wide")
 
 st.logo("flash_logo.png")
@@ -1384,33 +1389,34 @@ def render_aksesoris_tab():
             "omzet_per_kelompok.csv", "text/csv", key="ak_dl_kelompok",
         )
 
-    st.subheader("📶 Indikator Kontribusi Cabang (Terendah → Tertinggi)")
-    st.caption(
-        "Total omzet Aksesoris" + (" + Parfum" if TAMPILKAN_PARFUM else "") + " per cabang, diurutkan dari "
-        "kontribusi PALING RENDAH ke PALING BESAR — cabang di paling atas grafik yang paling perlu didorong."
-    )
-    kc = la.kontribusi_cabang_gabungan(dff, df_parfum_untuk_grafik)
-    if kc.empty:
-        st.info("Tidak ada data untuk diagram ini pada filter saat ini.")
-    else:
-        st.bar_chart(kc.set_index("Cabang")["Total Omzet"])
-        tampil_kc = kc.copy()
-        tampil_kc["Omzet Aksesoris"] = kc["Omzet Aksesoris"].map(la.format_rupiah_id)
-        tampil_kc["Omzet Parfum"] = kc["Omzet Parfum"].map(la.format_rupiah_id)
-        tampil_kc["Total Omzet"] = kc["Total Omzet"].map(la.format_rupiah_id)
-        tampil_kc["Porsi Kontribusi (%)"] = kc["Porsi Kontribusi (%)"].map(la.format_percent_id)
-        if not TAMPILKAN_PARFUM:
-            tampil_kc = tampil_kc.drop(columns=["Omzet Parfum"])
-        st.dataframe(tampil_kc, use_container_width=True, height=460)
+    if TAMPILKAN_KONTRIBUSI_CABANG:
+        st.subheader("📶 Indikator Kontribusi Cabang (Terendah → Tertinggi)")
         st.caption(
-            f"Kontribusi terendah: **{kc.iloc[0]['Cabang']}** ({la.format_percent_id(kc.iloc[0]['Porsi Kontribusi (%)'])}) · "
-            f"tertinggi: **{kc.iloc[-1]['Cabang']}** ({la.format_percent_id(kc.iloc[-1]['Porsi Kontribusi (%)'])})."
+            "Total omzet Aksesoris" + (" + Parfum" if TAMPILKAN_PARFUM else "") + " per cabang, diurutkan dari "
+            "kontribusi PALING RENDAH ke PALING BESAR — cabang di paling atas grafik yang paling perlu didorong."
         )
-        st.download_button(
-            "⬇️ Unduh CSV — Kontribusi Cabang" + (" (Aksesoris + Parfum)" if TAMPILKAN_PARFUM else " (Aksesoris)"),
-            kc.to_csv(index=False).encode("utf-8-sig"),
-            "kontribusi_cabang.csv", "text/csv", key="ak_dl_kontribusi_cabang",
-        )
+        kc = la.kontribusi_cabang_gabungan(dff, df_parfum_untuk_grafik)
+        if kc.empty:
+            st.info("Tidak ada data untuk diagram ini pada filter saat ini.")
+        else:
+            st.bar_chart(kc.set_index("Cabang")["Total Omzet"])
+            tampil_kc = kc.copy()
+            tampil_kc["Omzet Aksesoris"] = kc["Omzet Aksesoris"].map(la.format_rupiah_id)
+            tampil_kc["Omzet Parfum"] = kc["Omzet Parfum"].map(la.format_rupiah_id)
+            tampil_kc["Total Omzet"] = kc["Total Omzet"].map(la.format_rupiah_id)
+            tampil_kc["Porsi Kontribusi (%)"] = kc["Porsi Kontribusi (%)"].map(la.format_percent_id)
+            if not TAMPILKAN_PARFUM:
+                tampil_kc = tampil_kc.drop(columns=["Omzet Parfum"])
+            st.dataframe(tampil_kc, use_container_width=True, height=460)
+            st.caption(
+                f"Kontribusi terendah: **{kc.iloc[0]['Cabang']}** ({la.format_percent_id(kc.iloc[0]['Porsi Kontribusi (%)'])}) · "
+                f"tertinggi: **{kc.iloc[-1]['Cabang']}** ({la.format_percent_id(kc.iloc[-1]['Porsi Kontribusi (%)'])})."
+            )
+            st.download_button(
+                "⬇️ Unduh CSV — Kontribusi Cabang" + (" (Aksesoris + Parfum)" if TAMPILKAN_PARFUM else " (Aksesoris)"),
+                kc.to_csv(index=False).encode("utf-8-sig"),
+                "kontribusi_cabang.csv", "text/csv", key="ak_dl_kontribusi_cabang",
+            )
 
     st.divider()
 
@@ -1754,178 +1760,180 @@ def render_aksesoris_tab():
 
     st.divider()
 
-    # -----------------------------------------------------------------
-    # 3c2. Monitoring Pencapaian Cabang — Tahap 1
-    # -----------------------------------------------------------------
-    st.subheader("📍 Monitoring Pencapaian Cabang — Bertahap (menuju Rp 2 Miliar)")
-    st.caption(
-        "Tanggal 20 Agustus 2026 adalah tanggal produk LUNA barang masuk/mulai didistribusikan ke "
-        "seluruh cabang, tapi transaksi riil di tiap cabang bisa mulai beberapa hari setelahnya "
-        "(mis. 20–26 Agustus 2026) — sesuaikan \"Tanggal Mulai Tahap 1\" di bawah kalau perlu. "
-        "Pencapaian tiap tahap dihitung "
-        "KUMULATIF dari tanggal mulai tahap tsb sampai tanggal evaluasi. **Semua tahap mencakup "
-        "SELURUH produk LUNA, termasuk Hydrogel.** Warna: 🔴 <85% · "
-        "🟡 85–99% · 🟢 ≥100%. Tahap 1 adalah tahap pertama dari rangkaian tahap menuju target total "
-        "Rp 2.000.000.000 — tahap berikutnya (Tahap 2, 3, dst) bisa ditambahkan di bagian bawah begitu "
-        "sudah ditentukan."
-    )
-
-    tgl_data_terakhir = df["TGL FAKTUR"].max()
-    default_tgl_evaluasi = tgl_data_terakhir if pd.notna(tgl_data_terakhir) else pd.Timestamp("2026-08-20")
-
-    dt1, dt2 = st.columns(2)
-    with dt1:
-        tahap1_tgl_mulai = st.date_input(
-            "Tanggal Mulai Tahap 1 (bisa disesuaikan ke tanggal transaksi riil, mis. 20–26 Agustus 2026)",
-            value=pd.Timestamp("2026-08-20"), key="tahap1_tgl_mulai",
-        )
-    with dt2:
-        tahap1_tgl_evaluasi = st.date_input(
-            "Tanggal Evaluasi untuk seluruh tahap (default: tanggal data terakhir)",
-            value=default_tgl_evaluasi, key="tahap1_tgl_evaluasi",
-        )
-    if pd.Timestamp(tahap1_tgl_mulai) > pd.Timestamp(tahap1_tgl_evaluasi):
-        st.warning("⚠️ Tanggal Mulai Tahap 1 lebih besar dari Tanggal Evaluasi — Result akan tampil 0 untuk semua cabang.")
-
-    daftar_cabang_tahap = sorted(la.TARGET_TAHAP1_LUNA_PER_CABANG.keys())
-
-    def _render_tahap_block(nama_tahap: str, target_per_cabang: dict, tanggal_mulai_tahap, key_prefix: str):
-        """Render satu blok tahap: tabel monitoring + total + warna + unduh
-        + rincian produk per cabang. Mengembalikan (target_total, result_total)."""
-        hasil = la.monitoring_tahap_per_cabang(
-            df, target_per_cabang, tanggal_mulai=tanggal_mulai_tahap,
-            tanggal_evaluasi=tahap1_tgl_evaluasi, keyword="LUNA", keyword_kecuali=None,
-        )
-        if hasil.empty:
-            st.info(f"Tidak ada data untuk {nama_tahap} pada periode ini.")
-            return 0.0, 0.0
-
-        hasil = hasil.sort_values("% Actual", ascending=True).reset_index(drop=True)
-        dgn_total = la.tambah_baris_total(hasil)
-        styled = dgn_total.style.map(la.warna_indikator_pencapaian, subset=["% Actual"]).format({
-            "Target": la.format_rupiah_id, "Result": la.format_rupiah_id,
-            "% Actual": la.format_percent_id, "GAP": la.format_rupiah_id,
-        })
-        st.dataframe(styled, use_container_width=True, height=min(80 + 38 * len(dgn_total), 560))
-        total_row = dgn_total.iloc[-1]
+    if TAMPILKAN_MONITORING_BERTAHAP:
+        # -----------------------------------------------------------------
+        # 3c2. Monitoring Pencapaian Cabang — Tahap 1
+        # -----------------------------------------------------------------
+        st.subheader("📍 Monitoring Pencapaian Cabang — Bertahap (menuju Rp 2 Miliar)")
         st.caption(
-            f"Total jaringan {nama_tahap}: {la.format_rupiah_id(total_row['Result'])} dari "
-            f"{la.format_rupiah_id(total_row['Target'])} target ({la.format_percent_id(total_row['% Actual'])})."
-        )
-        st.download_button(
-            f"⬇️ Unduh CSV — Monitoring {nama_tahap} per Cabang", dgn_total.to_csv(index=False).encode("utf-8-sig"),
-            f"monitoring_{key_prefix}_per_cabang.csv", "text/csv", key=f"{key_prefix}_dl",
+            "Tanggal 20 Agustus 2026 adalah tanggal produk LUNA barang masuk/mulai didistribusikan ke "
+            "seluruh cabang, tapi transaksi riil di tiap cabang bisa mulai beberapa hari setelahnya "
+            "(mis. 20–26 Agustus 2026) — sesuaikan \"Tanggal Mulai Tahap 1\" di bawah kalau perlu. "
+            "Pencapaian tiap tahap dihitung "
+            "KUMULATIF dari tanggal mulai tahap tsb sampai tanggal evaluasi. **Semua tahap mencakup "
+            "SELURUH produk LUNA, termasuk Hydrogel.** Warna: 🔴 <85% · "
+            "🟡 85–99% · 🟢 ≥100%. Tahap 1 adalah tahap pertama dari rangkaian tahap menuju target total "
+            "Rp 2.000.000.000 — tahap berikutnya (Tahap 2, 3, dst) bisa ditambahkan di bagian bawah begitu "
+            "sudah ditentukan."
         )
 
-        st.markdown(f"###### 🔍 Rincian Produk per Cabang — {nama_tahap}")
-        st.caption("Pilih cabang untuk lihat rincian jenis barang LUNA (termasuk Hydrogel) apa saja yang terjual, dan berapa kuantitasnya.")
-        cabang_pilihan_detail = st.selectbox("Pilih cabang", daftar_cabang_tahap, key=f"{key_prefix}_cabang_detail")
-        detail_produk = la.detail_produk_brand_cabang(
-            df, cabang_pilihan_detail, tanggal_mulai_tahap, tahap1_tgl_evaluasi,
-            keyword="LUNA", keyword_kecuali=None,
-        )
-        if detail_produk.empty:
-            st.info(f"Belum ada penjualan LUNA di cabang **{cabang_pilihan_detail}** pada periode {nama_tahap}.")
-        else:
-            tampil_detail = detail_produk.copy()
-            tampil_detail["Qty"] = detail_produk["Qty"].map(la.format_int_id)
-            tampil_detail["Omzet"] = detail_produk["Omzet"].map(la.format_rupiah_id)
-            st.dataframe(tampil_detail, use_container_width=True, height=min(80 + 38 * len(detail_produk), 350))
-            st.caption(
-                f"Total {la.format_int_id(detail_produk['Qty'].sum())} pcs dari "
-                f"{len(detail_produk)} jenis produk di cabang {cabang_pilihan_detail}."
+        tgl_data_terakhir = df["TGL FAKTUR"].max()
+        default_tgl_evaluasi = tgl_data_terakhir if pd.notna(tgl_data_terakhir) else pd.Timestamp("2026-08-20")
+
+        dt1, dt2 = st.columns(2)
+        with dt1:
+            tahap1_tgl_mulai = st.date_input(
+                "Tanggal Mulai Tahap 1 (bisa disesuaikan ke tanggal transaksi riil, mis. 20–26 Agustus 2026)",
+                value=pd.Timestamp("2026-08-20"), key="tahap1_tgl_mulai",
             )
-
-        return float(total_row["Target"]), float(total_row["Result"])
-
-    st.markdown("#### Tahap 1")
-    st.caption(
-        "Target per cabang bisa disesuaikan langsung di tabel bawah ini — sudah terisi dengan nilai "
-        "acuan resmi (total Rp 300.006.600), tapi bisa diedit kalau ada revisi."
-    )
-    seed_tahap1 = pd.DataFrame({
-        "Cabang": list(la.TARGET_TAHAP1_LUNA_PER_CABANG.keys()),
-        "Target": list(la.TARGET_TAHAP1_LUNA_PER_CABANG.values()),
-    })
-    edited_tahap1 = st.data_editor(
-        seed_tahap1, use_container_width=True, hide_index=True, key="tahap1_target_editor",
-        column_config={"Target": st.column_config.NumberColumn("Target (Rp)", min_value=0, step=100_000, format="%d")},
-    )
-    target_per_cabang_tahap1 = dict(zip(edited_tahap1["Cabang"], edited_tahap1["Target"]))
-    st.caption(f"Total target Tahap 1 (hasil edit): {la.format_rupiah_id(edited_tahap1['Target'].sum())}")
-
-    target_kumulatif, result_kumulatif = _render_tahap_block(
-        "Tahap 1", target_per_cabang_tahap1, tahap1_tgl_mulai, "tahap1",
-    )
-
-    st.divider()
-
-    # -----------------------------------------------------------------
-    # Tahap berikutnya (dinamis) — ditambahkan sampai maksimal Rp 2 Miliar
-    # -----------------------------------------------------------------
-    st.markdown("#### ➕ Tahap Berikutnya")
-    st.caption(
-        "Tambahkan tahap lanjutan (Tahap 2, 3, dst) begitu targetnya sudah ditentukan — "
-        "total seluruh tahap (termasuk Tahap 1) idealnya tidak melebihi Rp 2.000.000.000."
-    )
-    jumlah_tahap_tambahan = st.number_input(
-        "Jumlah tahap tambahan", min_value=0, max_value=6, value=0, step=1, key="jumlah_tahap_tambahan",
-    )
-
-    for i in range(int(jumlah_tahap_tambahan)):
-        nomor_tahap = i + 2
-        with st.expander(f"Tahap {nomor_tahap}", expanded=True):
-            n1, n2 = st.columns(2)
-            with n1:
-                nama_tahap_i = st.text_input("Nama Tahap", value=f"Tahap {nomor_tahap}", key=f"tahap{nomor_tahap}_nama")
-            with n2:
-                tanggal_mulai_i = st.date_input(
-                    "Tanggal Mulai Tahap Ini", value=pd.Timestamp("2026-08-20"), key=f"tahap{nomor_tahap}_mulai",
-                )
-            target_total_i = st.number_input(
-                f"Target Total {nama_tahap_i} (Rp)", min_value=0, value=300_000_000, step=1_000_000,
-                format="%d", key=f"tahap{nomor_tahap}_target_total",
+        with dt2:
+            tahap1_tgl_evaluasi = st.date_input(
+                "Tanggal Evaluasi untuk seluruh tahap (default: tanggal data terakhir)",
+                value=default_tgl_evaluasi, key="tahap1_tgl_evaluasi",
             )
-            st.caption("Sesuaikan target per cabang di tabel bawah kalau tidak ingin dibagi rata (baris bisa diedit langsung):")
-            seed_target_i = pd.DataFrame({
-                "Cabang": daftar_cabang_tahap,
-                "Target": [target_total_i / len(daftar_cabang_tahap)] * len(daftar_cabang_tahap),
+        if pd.Timestamp(tahap1_tgl_mulai) > pd.Timestamp(tahap1_tgl_evaluasi):
+            st.warning("⚠️ Tanggal Mulai Tahap 1 lebih besar dari Tanggal Evaluasi — Result akan tampil 0 untuk semua cabang.")
+
+        daftar_cabang_tahap = sorted(la.TARGET_TAHAP1_LUNA_PER_CABANG.keys())
+
+        def _render_tahap_block(nama_tahap: str, target_per_cabang: dict, tanggal_mulai_tahap, key_prefix: str):
+            """Render satu blok tahap: tabel monitoring + total + warna + unduh
+            + rincian produk per cabang. Mengembalikan (target_total, result_total)."""
+            hasil = la.monitoring_tahap_per_cabang(
+                df, target_per_cabang, tanggal_mulai=tanggal_mulai_tahap,
+                tanggal_evaluasi=tahap1_tgl_evaluasi, keyword="LUNA", keyword_kecuali=None,
+            )
+            if hasil.empty:
+                st.info(f"Tidak ada data untuk {nama_tahap} pada periode ini.")
+                return 0.0, 0.0
+
+            hasil = hasil.sort_values("% Actual", ascending=True).reset_index(drop=True)
+            dgn_total = la.tambah_baris_total(hasil)
+            styled = dgn_total.style.map(la.warna_indikator_pencapaian, subset=["% Actual"]).format({
+                "Target": la.format_rupiah_id, "Result": la.format_rupiah_id,
+                "% Actual": la.format_percent_id, "GAP": la.format_rupiah_id,
             })
-            edited_target_i = st.data_editor(
-                seed_target_i, use_container_width=True, hide_index=True, key=f"tahap{nomor_tahap}_editor",
-                column_config={"Target": st.column_config.NumberColumn("Target (Rp)", min_value=0, step=100_000, format="%d")},
+            st.dataframe(styled, use_container_width=True, height=min(80 + 38 * len(dgn_total), 560))
+            total_row = dgn_total.iloc[-1]
+            st.caption(
+                f"Total jaringan {nama_tahap}: {la.format_rupiah_id(total_row['Result'])} dari "
+                f"{la.format_rupiah_id(total_row['Target'])} target ({la.format_percent_id(total_row['% Actual'])})."
             )
-            target_per_cabang_i = dict(zip(edited_target_i["Cabang"], edited_target_i["Target"]))
+            st.download_button(
+                f"⬇️ Unduh CSV — Monitoring {nama_tahap} per Cabang", dgn_total.to_csv(index=False).encode("utf-8-sig"),
+                f"monitoring_{key_prefix}_per_cabang.csv", "text/csv", key=f"{key_prefix}_dl",
+            )
 
-            t_i, r_i = _render_tahap_block(nama_tahap_i, target_per_cabang_i, tanggal_mulai_i, f"tahap{nomor_tahap}")
-            target_kumulatif += t_i
-            result_kumulatif += r_i
+            st.markdown(f"###### 🔍 Rincian Produk per Cabang — {nama_tahap}")
+            st.caption("Pilih cabang untuk lihat rincian jenis barang LUNA (termasuk Hydrogel) apa saja yang terjual, dan berapa kuantitasnya.")
+            cabang_pilihan_detail = st.selectbox("Pilih cabang", daftar_cabang_tahap, key=f"{key_prefix}_cabang_detail")
+            detail_produk = la.detail_produk_brand_cabang(
+                df, cabang_pilihan_detail, tanggal_mulai_tahap, tahap1_tgl_evaluasi,
+                keyword="LUNA", keyword_kecuali=None,
+            )
+            if detail_produk.empty:
+                st.info(f"Belum ada penjualan LUNA di cabang **{cabang_pilihan_detail}** pada periode {nama_tahap}.")
+            else:
+                tampil_detail = detail_produk.copy()
+                tampil_detail["Qty"] = detail_produk["Qty"].map(la.format_int_id)
+                tampil_detail["Omzet"] = detail_produk["Omzet"].map(la.format_rupiah_id)
+                st.dataframe(tampil_detail, use_container_width=True, height=min(80 + 38 * len(detail_produk), 350))
+                st.caption(
+                    f"Total {la.format_int_id(detail_produk['Qty'].sum())} pcs dari "
+                    f"{len(detail_produk)} jenis produk di cabang {cabang_pilihan_detail}."
+                )
 
-    st.divider()
+            return float(total_row["Target"]), float(total_row["Result"])
 
-    # -----------------------------------------------------------------
-    # Ringkasan Kumulatif Seluruh Tahap
-    # -----------------------------------------------------------------
-    st.markdown("#### 📊 Ringkasan Kumulatif Seluruh Tahap")
-    BATAS_MAKSIMAL_LUNA = 2_000_000_000
-    k1, k2, k3, k4 = st.columns(4)
-    k1.metric("Target Kumulatif (Seluruh Tahap)", la.format_rupiah_id(target_kumulatif))
-    k2.metric("Result Kumulatif", la.format_rupiah_id(result_kumulatif))
-    k3.metric("% Pencapaian Kumulatif", la.format_percent_id(result_kumulatif / target_kumulatif * 100 if target_kumulatif else 0))
-    sisa_menuju_2m = max(BATAS_MAKSIMAL_LUNA - target_kumulatif, 0)
-    k4.metric("Sisa Ruang Target (menuju Rp 2 M)", la.format_rupiah_id(sisa_menuju_2m))
-    st.progress(min(target_kumulatif / BATAS_MAKSIMAL_LUNA, 1.0) if BATAS_MAKSIMAL_LUNA else 0)
-    if target_kumulatif > BATAS_MAKSIMAL_LUNA:
-        st.warning(
-            f"⚠️ Total target seluruh tahap ({la.format_rupiah_id(target_kumulatif)}) sudah MELEBIHI "
-            f"batas maksimal Rp 2.000.000.000 — kelebihan {la.format_rupiah_id(target_kumulatif - BATAS_MAKSIMAL_LUNA)}. "
-            "Pertimbangkan mengurangi target salah satu tahap."
-        )
-    else:
+        st.markdown("#### Tahap 1")
         st.caption(
-            f"Total target seluruh tahap masih dalam batas — sisa ruang "
-            f"{la.format_rupiah_id(sisa_menuju_2m)} untuk tahap-tahap berikutnya."
+            "Target per cabang bisa disesuaikan langsung di tabel bawah ini — sudah terisi dengan nilai "
+            "acuan resmi (total Rp 300.006.600), tapi bisa diedit kalau ada revisi."
         )
+        seed_tahap1 = pd.DataFrame({
+            "Cabang": list(la.TARGET_TAHAP1_LUNA_PER_CABANG.keys()),
+            "Target": list(la.TARGET_TAHAP1_LUNA_PER_CABANG.values()),
+        })
+        edited_tahap1 = st.data_editor(
+            seed_tahap1, use_container_width=True, hide_index=True, key="tahap1_target_editor",
+            column_config={"Target": st.column_config.NumberColumn("Target (Rp)", min_value=0, step=100_000, format="%d")},
+        )
+        target_per_cabang_tahap1 = dict(zip(edited_tahap1["Cabang"], edited_tahap1["Target"]))
+        st.caption(f"Total target Tahap 1 (hasil edit): {la.format_rupiah_id(edited_tahap1['Target'].sum())}")
+
+        target_kumulatif, result_kumulatif = _render_tahap_block(
+            "Tahap 1", target_per_cabang_tahap1, tahap1_tgl_mulai, "tahap1",
+        )
+
+        st.divider()
+
+        # -----------------------------------------------------------------
+        # Tahap berikutnya (dinamis) — ditambahkan sampai maksimal Rp 2 Miliar
+        # -----------------------------------------------------------------
+        st.markdown("#### ➕ Tahap Berikutnya")
+        st.caption(
+            "Tambahkan tahap lanjutan (Tahap 2, 3, dst) begitu targetnya sudah ditentukan — "
+            "total seluruh tahap (termasuk Tahap 1) idealnya tidak melebihi Rp 2.000.000.000."
+        )
+        jumlah_tahap_tambahan = st.number_input(
+            "Jumlah tahap tambahan", min_value=0, max_value=6, value=0, step=1, key="jumlah_tahap_tambahan",
+        )
+
+        for i in range(int(jumlah_tahap_tambahan)):
+            nomor_tahap = i + 2
+            with st.expander(f"Tahap {nomor_tahap}", expanded=True):
+                n1, n2 = st.columns(2)
+                with n1:
+                    nama_tahap_i = st.text_input("Nama Tahap", value=f"Tahap {nomor_tahap}", key=f"tahap{nomor_tahap}_nama")
+                with n2:
+                    tanggal_mulai_i = st.date_input(
+                        "Tanggal Mulai Tahap Ini", value=pd.Timestamp("2026-08-20"), key=f"tahap{nomor_tahap}_mulai",
+                    )
+                target_total_i = st.number_input(
+                    f"Target Total {nama_tahap_i} (Rp)", min_value=0, value=300_000_000, step=1_000_000,
+                    format="%d", key=f"tahap{nomor_tahap}_target_total",
+                )
+                st.caption("Sesuaikan target per cabang di tabel bawah kalau tidak ingin dibagi rata (baris bisa diedit langsung):")
+                seed_target_i = pd.DataFrame({
+                    "Cabang": daftar_cabang_tahap,
+                    "Target": [target_total_i / len(daftar_cabang_tahap)] * len(daftar_cabang_tahap),
+                })
+                edited_target_i = st.data_editor(
+                    seed_target_i, use_container_width=True, hide_index=True, key=f"tahap{nomor_tahap}_editor",
+                    column_config={"Target": st.column_config.NumberColumn("Target (Rp)", min_value=0, step=100_000, format="%d")},
+                )
+                target_per_cabang_i = dict(zip(edited_target_i["Cabang"], edited_target_i["Target"]))
+
+                t_i, r_i = _render_tahap_block(nama_tahap_i, target_per_cabang_i, tanggal_mulai_i, f"tahap{nomor_tahap}")
+                target_kumulatif += t_i
+                result_kumulatif += r_i
+
+        st.divider()
+
+        # -----------------------------------------------------------------
+        # Ringkasan Kumulatif Seluruh Tahap
+        # -----------------------------------------------------------------
+        st.markdown("#### 📊 Ringkasan Kumulatif Seluruh Tahap")
+        BATAS_MAKSIMAL_LUNA = 2_000_000_000
+        k1, k2, k3, k4 = st.columns(4)
+        k1.metric("Target Kumulatif (Seluruh Tahap)", la.format_rupiah_id(target_kumulatif))
+        k2.metric("Result Kumulatif", la.format_rupiah_id(result_kumulatif))
+        k3.metric("% Pencapaian Kumulatif", la.format_percent_id(result_kumulatif / target_kumulatif * 100 if target_kumulatif else 0))
+        sisa_menuju_2m = max(BATAS_MAKSIMAL_LUNA - target_kumulatif, 0)
+        k4.metric("Sisa Ruang Target (menuju Rp 2 M)", la.format_rupiah_id(sisa_menuju_2m))
+        st.progress(min(target_kumulatif / BATAS_MAKSIMAL_LUNA, 1.0) if BATAS_MAKSIMAL_LUNA else 0)
+        if target_kumulatif > BATAS_MAKSIMAL_LUNA:
+            st.warning(
+                f"⚠️ Total target seluruh tahap ({la.format_rupiah_id(target_kumulatif)}) sudah MELEBIHI "
+                f"batas maksimal Rp 2.000.000.000 — kelebihan {la.format_rupiah_id(target_kumulatif - BATAS_MAKSIMAL_LUNA)}. "
+                "Pertimbangkan mengurangi target salah satu tahap."
+            )
+        else:
+            st.caption(
+                f"Total target seluruh tahap masih dalam batas — sisa ruang "
+                f"{la.format_rupiah_id(sisa_menuju_2m)} untuk tahap-tahap berikutnya."
+            )
+
 
     if TAMPILKAN_PARFUM:
         st.divider()
@@ -2002,40 +2010,41 @@ def render_aksesoris_tab():
 
     st.divider()
 
-    # -----------------------------------------------------------------
-    # 4. Analisa & Proyeksi 5-10 Tahun
-    # -----------------------------------------------------------------
-    st.header("📈 Analisa Penjualan & Proyeksi 5–10 Tahun")
+    if TAMPILKAN_PROYEKSI:
+        # -----------------------------------------------------------------
+        # 4. Analisa & Proyeksi 5-10 Tahun
+        # -----------------------------------------------------------------
+        st.header("📈 Analisa Penjualan & Proyeksi 5–10 Tahun")
 
-    rr = la.hitung_run_rate(dff)
-    if rr["jumlah_bulan"] == 0:
-        st.info("Data tidak cukup untuk membuat proyeksi (butuh minimal satu bulan penuh).")
-    else:
-        st.caption(
-            f"Proyeksi dihitung dari rata-rata omzet **{rr['jumlah_bulan']} bulan penuh** "
-            f"({la.format_rupiah_id(rr['omzet_bulanan'])}/bulan, margin {la.format_percent_id(rr['margin'])})."
-            + (f" Bulan **{rr['bulan_tidak_lengkap']}** dikeluarkan dari rata-rata karena datanya belum lengkap."
-               if rr["bulan_tidak_lengkap"] else "")
-        )
-        st.warning(
-            "⚠️ Data historis yang tersedia baru mencakup kurang dari 1 tahun (Jan–Ags 2026). "
-            "Proyeksi 5–10 tahun di bawah ini adalah **ekstrapolasi kasar** dari 3 skenario "
-            "pertumbuhan tahunan, bukan model statistik yang memperhitungkan musiman atau siklus "
-            "ekonomi — gunakan sebagai ilustrasi arah, bukan angka pasti untuk perencanaan keuangan."
-        )
+        rr = la.hitung_run_rate(dff)
+        if rr["jumlah_bulan"] == 0:
+            st.info("Data tidak cukup untuk membuat proyeksi (butuh minimal satu bulan penuh).")
+        else:
+            st.caption(
+                f"Proyeksi dihitung dari rata-rata omzet **{rr['jumlah_bulan']} bulan penuh** "
+                f"({la.format_rupiah_id(rr['omzet_bulanan'])}/bulan, margin {la.format_percent_id(rr['margin'])})."
+                + (f" Bulan **{rr['bulan_tidak_lengkap']}** dikeluarkan dari rata-rata karena datanya belum lengkap."
+                   if rr["bulan_tidak_lengkap"] else "")
+            )
+            st.warning(
+                "⚠️ Data historis yang tersedia baru mencakup kurang dari 1 tahun (Jan–Ags 2026). "
+                "Proyeksi 5–10 tahun di bawah ini adalah **ekstrapolasi kasar** dari 3 skenario "
+                "pertumbuhan tahunan, bukan model statistik yang memperhitungkan musiman atau siklus "
+                "ekonomi — gunakan sebagai ilustrasi arah, bukan angka pasti untuk perencanaan keuangan."
+            )
 
-        proj = la.proyeksi_tahunan(rr["omzet_bulanan"])
-        pivot = proj.pivot(index="Tahun ke-", columns="Skenario", values="Proyeksi Omzet Tahunan")
-        st.subheader("Proyeksi Omzet Tahunan per Skenario")
-        st.line_chart(pivot)
-        tampil_proj = pivot.copy()
-        for c in tampil_proj.columns:
-            tampil_proj[c] = tampil_proj[c].map(la.format_rupiah_id)
-        st.dataframe(tampil_proj, use_container_width=True)
-        st.download_button(
-            "⬇️ Unduh CSV — Proyeksi", proj.to_csv(index=False).encode("utf-8-sig"),
-            "proyeksi_omzet_aksesoris.csv", "text/csv", key="ak_dl_proyeksi",
-        )
+            proj = la.proyeksi_tahunan(rr["omzet_bulanan"])
+            pivot = proj.pivot(index="Tahun ke-", columns="Skenario", values="Proyeksi Omzet Tahunan")
+            st.subheader("Proyeksi Omzet Tahunan per Skenario")
+            st.line_chart(pivot)
+            tampil_proj = pivot.copy()
+            for c in tampil_proj.columns:
+                tampil_proj[c] = tampil_proj[c].map(la.format_rupiah_id)
+            st.dataframe(tampil_proj, use_container_width=True)
+            st.download_button(
+                "⬇️ Unduh CSV — Proyeksi", proj.to_csv(index=False).encode("utf-8-sig"),
+                "proyeksi_omzet_aksesoris.csv", "text/csv", key="ak_dl_proyeksi",
+            )
 
     st.subheader("📌 Analisa & Rekomendasi")
     catatan = []
