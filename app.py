@@ -2238,26 +2238,62 @@ def render_omzet_ldm_tab():
     )
 
     st.subheader("🏆 Rekap per Sales (Seluruh Cabang)")
-    agg_dict_sales = dict(agg_dict_cabang)
-    rekap_sales_ldm = hasil_ldm.groupby("Sales", dropna=False).agg(**agg_dict_sales).reset_index()
-    for c in kolom_omzet_kategori_ldm:
-        nama_kat = c.replace("Omzet ", "")
-        rekap_sales_ldm[f"% Kontribusi {nama_kat}"] = np.where(
-            rekap_sales_ldm["Omzet Penjualan"] != 0, rekap_sales_ldm[c] / rekap_sales_ldm["Omzet Penjualan"] * 100, 0,
-        )
-    rekap_sales_ldm = rekap_sales_ldm.sort_values("Omzet Penjualan", ascending=False).reset_index(drop=True)
-    tampil_rekap_sales = rekap_sales_ldm.copy()
-    kolom_rp_rekap_sales = [c for c in rekap_sales_ldm.columns if c.startswith("Omzet")] + ["Gross Profit", "Rata-rata Omzet / Bulan"]
-    kolom_pct_rekap_sales = [c for c in rekap_sales_ldm.columns if c.startswith("%")]
-    for c in kolom_rp_rekap_sales:
-        tampil_rekap_sales[c] = rekap_sales_ldm[c].map(ljl.format_rupiah_id)
-    for c in kolom_pct_rekap_sales:
-        tampil_rekap_sales[c] = rekap_sales_ldm[c].map(ljl.format_percent_id)
-    st.dataframe(tampil_rekap_sales, use_container_width=True, height=min(80 + 38 * len(rekap_sales_ldm), 500))
-    st.download_button(
-        "⬇️ Unduh CSV — Rekap per Sales", rekap_sales_ldm.to_csv(index=False).encode("utf-8-sig"),
-        "omzet_ldm_rekap_sales.csv", "text/csv", key="ldm_dl_rekap_sales",
+
+    NAMA_BULAN_ID = {
+        1: "Januari", 2: "Februari", 3: "Maret", 4: "April", 5: "Mei", 6: "Juni",
+        7: "Juli", 8: "Agustus", 9: "September", 10: "Oktober", 11: "November", 12: "Desember",
+    }
+    mask_periode_ldm = (df_ldm["TGL FAKTUR"] >= pd.Timestamp(tgl_mulai_ldm)) & (df_ldm["TGL FAKTUR"] <= pd.Timestamp(tgl_selesai_ldm))
+    daftar_bulan_ldm = df_ldm[mask_periode_ldm][["TAHUN", "BULAN"]].drop_duplicates().sort_values(["TAHUN", "BULAN"]).reset_index(drop=True)
+    opsi_bulan_ldm = ["Semua Bulan (Gabungan)"] + [
+        f"{NAMA_BULAN_ID[int(r['BULAN'])]} {int(r['TAHUN'])}" for _, r in daftar_bulan_ldm.iterrows()
+    ]
+    bulan_pilihan_ldm = st.selectbox(
+        "Pilih Bulan (untuk lihat omzet per Sales khusus bulan tertentu)", opsi_bulan_ldm, key="ldm_rekap_sales_bulan",
     )
+
+    if bulan_pilihan_ldm == "Semua Bulan (Gabungan)":
+        hasil_untuk_rekap_sales = hasil_ldm
+    else:
+        idx_bulan = opsi_bulan_ldm.index(bulan_pilihan_ldm) - 1
+        tahun_terpilih = int(daftar_bulan_ldm.iloc[idx_bulan]["TAHUN"])
+        bulan_terpilih = int(daftar_bulan_ldm.iloc[idx_bulan]["BULAN"])
+        tgl_mulai_bulan = pd.Timestamp(year=tahun_terpilih, month=bulan_terpilih, day=1)
+        tgl_selesai_bulan = tgl_mulai_bulan + pd.offsets.MonthEnd(0)
+        st.caption(f"Menampilkan periode: {tgl_mulai_bulan.strftime('%d %b %Y')} – {tgl_selesai_bulan.strftime('%d %b %Y')}.")
+        hasil_untuk_rekap_sales = ljl.dashboard_omzet_ldm_per_cabang_sales(
+            df_ldm, tgl_mulai_bulan, tgl_selesai_bulan, kategori_barang=kategori_pilihan_ldm or None,
+        )
+
+    if hasil_untuk_rekap_sales.empty:
+        st.info("Tidak ada data untuk bulan yang dipilih.")
+    else:
+        kolom_omzet_kategori_sales = [c for c in hasil_untuk_rekap_sales.columns if c.startswith("Omzet") and c != "Omzet Penjualan"]
+        agg_dict_sales = {
+            "Omzet Penjualan": ("Omzet Penjualan", "sum"), "Gross Profit": ("Gross Profit", "sum"),
+            "Rata-rata Omzet / Bulan": ("Rata-rata Omzet / Bulan", "sum"),
+        }
+        for c in kolom_omzet_kategori_sales:
+            agg_dict_sales[c] = (c, "sum")
+        rekap_sales_ldm = hasil_untuk_rekap_sales.groupby("Sales", dropna=False).agg(**agg_dict_sales).reset_index()
+        for c in kolom_omzet_kategori_sales:
+            nama_kat = c.replace("Omzet ", "")
+            rekap_sales_ldm[f"% Kontribusi {nama_kat}"] = np.where(
+                rekap_sales_ldm["Omzet Penjualan"] != 0, rekap_sales_ldm[c] / rekap_sales_ldm["Omzet Penjualan"] * 100, 0,
+            )
+        rekap_sales_ldm = rekap_sales_ldm.sort_values("Omzet Penjualan", ascending=False).reset_index(drop=True)
+        tampil_rekap_sales = rekap_sales_ldm.copy()
+        kolom_rp_rekap_sales = [c for c in rekap_sales_ldm.columns if c.startswith("Omzet")] + ["Gross Profit", "Rata-rata Omzet / Bulan"]
+        kolom_pct_rekap_sales = [c for c in rekap_sales_ldm.columns if c.startswith("%")]
+        for c in kolom_rp_rekap_sales:
+            tampil_rekap_sales[c] = rekap_sales_ldm[c].map(ljl.format_rupiah_id)
+        for c in kolom_pct_rekap_sales:
+            tampil_rekap_sales[c] = rekap_sales_ldm[c].map(ljl.format_percent_id)
+        st.dataframe(tampil_rekap_sales, use_container_width=True, height=min(80 + 38 * len(rekap_sales_ldm), 500))
+        st.download_button(
+            "⬇️ Unduh CSV — Rekap per Sales", rekap_sales_ldm.to_csv(index=False).encode("utf-8-sig"),
+            f"omzet_ldm_rekap_sales_{bulan_pilihan_ldm.replace(' ', '_').lower()}.csv", "text/csv", key="ldm_dl_rekap_sales",
+        )
 
 
 # ---------------------------------------------------------------------------

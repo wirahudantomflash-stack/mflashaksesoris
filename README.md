@@ -763,9 +763,27 @@ Rata-rata Omzet / Bulan.
   Sales di cabang tsb
 - **Rekap per Sales (Seluruh Cabang)** — dijumlahkan dari seluruh cabang
   tempat sales tsb bertransaksi (berguna untuk sales yang pindah cabang
-  atau bertugas di lebih dari satu cabang dalam periode yang sama)
+  atau bertugas di lebih dari satu cabang dalam periode yang sama).
+  **Baru: dropdown "Pilih Bulan"** — default "Semua Bulan (Gabungan)"
+  (pakai data yang sudah dihitung, tidak query ulang), atau pilih SATU
+  bulan kalender spesifik (mis. "Agustus 2026") untuk lihat omzet per
+  Sales KHUSUS bulan itu saja — daftar bulan pada dropdown otomatis
+  mengikuti rentang Tanggal Mulai/Selesai yang aktif (tidak hardcode).
+  Saat satu bulan dipilih, dashboard memanggil ulang
+  `dashboard_omzet_ldm_per_cabang_sales()` dengan rentang tanggal
+  awal–akhir bulan kalender tsb (bukan filter baris dari hasil yang
+  sudah ada), supaya filter Retail Toko + bundling Aksesoris tetap
+  diterapkan dengan benar per bulan. Nama file unduhan CSV otomatis
+  menyesuaikan bulan yang dipilih.
 - Tombol unduh CSV terpisah untuk ketiga tabel (rincian, rekap cabang,
   rekap sales)
+
+**Diuji: dropdown Pilih Bulan** — periode 1 Jul–31 Ags 2026 menghasilkan
+2 opsi bulan (Juli, Agustus) selain "Semua Bulan". Omzet Agustus
+Rp 1.430.984.040, Juli Rp 15.280.000 — **dijumlahkan keduanya PERSIS SAMA**
+dengan total "Semua Bulan (Gabungan)" (Rp 1.446.264.040), memastikan tidak
+ada data yang tercecer atau terhitung dobel saat dipecah per bulan. Top
+Sales Agustus: M Rizvanzah Alfath (Rp 81.810.000, 84,5% dari Laptop).
 
 **Diuji dengan data asli** (periode default 1 Jul–31 Ags 2026, retail
 toko + aksesoris bundling Service): Total Omzet **Rp 1.446.264.040**
