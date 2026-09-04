@@ -2129,6 +2129,107 @@ def render_aksesoris_tab():
 
 
 # ---------------------------------------------------------------------------
+# TAB BARU — Dashboard Pencapaian Omzet Laptop, Handphone, Aksesoris (LDM)
+# ---------------------------------------------------------------------------
+def render_omzet_ldm_tab():
+    st.header("💻📱🎧 Dashboard Pencapaian Omzet Penjualan Laptop, Handphone, Aksesoris")
+    st.caption(
+        "Gabungan 3 kategori barang: LAPTOP, HANDPHONE, AKSESORIS — dipecah per Cabang dan per Sales "
+        "(\"Yang Menyerahkan/Menjual\"). Default periode 1 Juli – 31 Agustus 2026, bisa diubah."
+    )
+
+    if raw_aksesoris is None:
+        st.info("Belum ada data penjualan. Unggah berkas penjualan di panel kiri bagian \"🧾 Data Penjualan\".")
+        return
+
+    if "CABANG" in raw_aksesoris.columns:
+        df_ldm = ljl.finalize_data(raw_aksesoris)
+    else:
+        nama_bersama_ldm = st.session_state.get("nama_cabang_bersama")
+        if not nama_bersama_ldm:
+            st.info(
+                "Berkas penjualan rincian satu cabang saja — isi dulu nama cabangnya di bagian "
+                "\"Dashboard Penjualan Aksesoris\" di bawah, dashboard ini akan otomatis terisi."
+            )
+            return
+        df_ldm = ljl.finalize_data(raw_aksesoris, cabang_default=nama_bersama_ldm)
+
+    kd1, kd2 = st.columns(2)
+    with kd1:
+        tgl_mulai_ldm = st.date_input("Tanggal Mulai", value=pd.Timestamp("2026-07-01"), key="ldm_tgl_mulai")
+    with kd2:
+        tgl_selesai_ldm = st.date_input("Tanggal Selesai", value=pd.Timestamp("2026-08-31"), key="ldm_tgl_selesai")
+
+    kategori_pilihan_ldm = st.multiselect(
+        "Kategori Barang", ["LAPTOP", "HANDPHONE", "AKSESORIS"], default=["LAPTOP", "HANDPHONE", "AKSESORIS"],
+        key="ldm_kategori",
+    )
+
+    if pd.Timestamp(tgl_mulai_ldm) > pd.Timestamp(tgl_selesai_ldm):
+        st.warning("⚠️ Tanggal Mulai lebih besar dari Tanggal Selesai — hasil akan kosong.")
+
+    hasil_ldm = ljl.dashboard_omzet_ldm_per_cabang_sales(
+        df_ldm, tgl_mulai_ldm, tgl_selesai_ldm, kategori_barang=kategori_pilihan_ldm or None,
+    )
+
+    if hasil_ldm.empty:
+        st.info("Tidak ada data untuk kombinasi periode & kategori yang dipilih.")
+        return
+
+    total_omzet_ldm = hasil_ldm["Omzet Penjualan"].sum()
+    total_gp_ldm = hasil_ldm["Gross Profit"].sum()
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Total Omzet Penjualan", ljl.format_rupiah_id(total_omzet_ldm))
+    m2.metric("Total Gross Profit", ljl.format_rupiah_id(total_gp_ldm))
+    m3.metric("Margin", ljl.format_percent_id(total_gp_ldm / total_omzet_ldm * 100 if total_omzet_ldm else 0))
+    m4.metric("Jumlah Baris (Cabang × Sales)", ljl.format_int_id(len(hasil_ldm)))
+
+    st.subheader("📋 Rincian per Cabang & Sales")
+    st.caption("Diurutkan dari Omzet Penjualan tertinggi. Baris \"— Tidak Tercatat —\" berarti transaksi tanpa nama sales spesifik di data sumber.")
+    tampil_ldm = hasil_ldm.copy()
+    tampil_ldm["Sales"] = hasil_ldm["Sales"].fillna("— Tidak Tercatat —")
+    tampil_ldm["Omzet Penjualan"] = hasil_ldm["Omzet Penjualan"].map(ljl.format_rupiah_id)
+    tampil_ldm["Gross Profit"] = hasil_ldm["Gross Profit"].map(ljl.format_rupiah_id)
+    tampil_ldm["Rata-rata Omzet / Bulan"] = hasil_ldm["Rata-rata Omzet / Bulan"].map(ljl.format_rupiah_id)
+    st.dataframe(tampil_ldm, use_container_width=True, height=min(80 + 38 * len(hasil_ldm), 650))
+    st.download_button(
+        "⬇️ Unduh CSV — Omzet Laptop/Handphone/Aksesoris per Cabang & Sales",
+        hasil_ldm.to_csv(index=False).encode("utf-8-sig"),
+        "omzet_ldm_per_cabang_sales.csv", "text/csv", key="ldm_dl_utama",
+    )
+
+    st.subheader("📊 Rekap per Cabang")
+    rekap_cabang_ldm = hasil_ldm.groupby("Cabang").agg(
+        **{"Omzet Penjualan": ("Omzet Penjualan", "sum")}, **{"Gross Profit": ("Gross Profit", "sum")},
+        **{"Rata-rata Omzet / Bulan": ("Rata-rata Omzet / Bulan", "sum")},
+    ).reset_index().sort_values("Omzet Penjualan", ascending=False).reset_index(drop=True)
+    st.bar_chart(rekap_cabang_ldm.set_index("Cabang")["Omzet Penjualan"])
+    tampil_rekap = rekap_cabang_ldm.copy()
+    for c in ["Omzet Penjualan", "Gross Profit", "Rata-rata Omzet / Bulan"]:
+        tampil_rekap[c] = rekap_cabang_ldm[c].map(ljl.format_rupiah_id)
+    st.dataframe(tampil_rekap, use_container_width=True, height=min(80 + 38 * len(rekap_cabang_ldm), 500))
+    st.download_button(
+        "⬇️ Unduh CSV — Rekap per Cabang", rekap_cabang_ldm.to_csv(index=False).encode("utf-8-sig"),
+        "omzet_ldm_rekap_cabang.csv", "text/csv", key="ldm_dl_rekap_cabang",
+    )
+
+    st.subheader("🏆 Rekap per Sales (Seluruh Cabang)")
+    rekap_sales_ldm = hasil_ldm.groupby("Sales", dropna=False).agg(
+        **{"Omzet Penjualan": ("Omzet Penjualan", "sum")}, **{"Gross Profit": ("Gross Profit", "sum")},
+        **{"Rata-rata Omzet / Bulan": ("Rata-rata Omzet / Bulan", "sum")},
+    ).reset_index().sort_values("Omzet Penjualan", ascending=False).reset_index(drop=True)
+    rekap_sales_ldm["Sales"] = rekap_sales_ldm["Sales"].fillna("— Tidak Tercatat —")
+    tampil_rekap_sales = rekap_sales_ldm.copy()
+    for c in ["Omzet Penjualan", "Gross Profit", "Rata-rata Omzet / Bulan"]:
+        tampil_rekap_sales[c] = rekap_sales_ldm[c].map(ljl.format_rupiah_id)
+    st.dataframe(tampil_rekap_sales, use_container_width=True, height=min(80 + 38 * len(rekap_sales_ldm), 500))
+    st.download_button(
+        "⬇️ Unduh CSV — Rekap per Sales", rekap_sales_ldm.to_csv(index=False).encode("utf-8-sig"),
+        "omzet_ldm_rekap_sales.csv", "text/csv", key="ldm_dl_rekap_sales",
+    )
+
+
+# ---------------------------------------------------------------------------
 # TAB BARU — Dashboard Pembelian & Perbandingan Penjualan Aksesoris
 # ---------------------------------------------------------------------------
 def render_pembelian_tab():
@@ -2457,3 +2558,9 @@ st.markdown("---")
 
 st.markdown("# 📦 Dashboard Pembelian & Perbandingan Penjualan Aksesoris")
 render_pembelian_tab()
+
+st.markdown("---")
+st.markdown("---")
+
+st.markdown("# 💻📱🎧 Dashboard Pencapaian Omzet Laptop, Handphone, Aksesoris")
+render_omzet_ldm_tab()

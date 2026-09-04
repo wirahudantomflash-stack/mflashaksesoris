@@ -676,6 +676,59 @@ Simulasi serupa untuk Tahap 1 (target Klender diubah jadi Rp20jt): total
 Tahap 1 berubah dari Rp300.006.600 jadi Rp303.316.100. Kedua tabel diuji
 render (styling + format) tanpa error setelah target diedit.
 
+## 💻📱🎧 Dashboard Pencapaian Omzet Penjualan Laptop, Handphone, Aksesoris (BARU)
+
+**Tab besar baru**, ditempatkan paling bawah halaman (setelah Dashboard
+Pembelian) — sekarang ada **5 dashboard total** dalam satu halaman.
+
+Berbeda dari dashboard-dashboard lain yang fokus ke Aksesoris (LUNA/Selain
+LUNA) saja, dashboard ini **menggabungkan 3 kategori barang sekaligus**:
+**LAPTOP, HANDPHONE, AKSESORIS** — dan menambahkan dimensi breakdown BARU
+yang belum ada di dashboard manapun sebelumnya: **per SALES** ("Yang
+Menyerahkan/Menjual"), bukan cuma per cabang.
+
+**Fungsi baru**: `dashboard_omzet_ldm_per_cabang_sales()` di
+`logic_penjualan.py` (bukan `logic_aksesoris.py`, karena cakupannya lintas
+kategori, bukan spesifik aksesoris) — generik, filter kategori barang bisa
+diubah lewat parameter `kategori_barang` (default `["LAPTOP", "HANDPHONE",
+"AKSESORIS"]`), filter periode via `tanggal_mulai`/`tanggal_selesai`.
+
+**Kolom sesuai spesifikasi**: Cabang, Sales, Omzet Penjualan, Gross Profit,
+Rata-rata Omzet / Bulan.
+- **"Rata-rata Omzet / Bulan"** dihitung dari jumlah BULAN KALENDER UNIK
+  yang benar-benar ada transaksinya dalam periode terpilih (bukan dipaksa
+  angka tetap) — pembagi ini SAMA untuk semua baris dalam satu tabel,
+  dihitung dari keseluruhan data yang sudah difilter periode+kategori,
+  supaya "rata-rata" antar baris tetap bisa dibandingkan secara adil.
+
+**UI mencakup:**
+- Date picker **Tanggal Mulai** & **Tanggal Selesai** (default 1 Juli – 31
+  Agustus 2026, sesuai permintaan awal, tapi bisa diubah bebas)
+- Multiselect **Kategori Barang** (default ketiganya dicentang, bisa
+  dipersempit mis. cuma Laptop+Handphone saja)
+- 4 kartu ringkasan: Total Omzet, Total Gross Profit, Margin, Jumlah Baris
+- **Tabel rincian per Cabang × Sales** — diurutkan dari Omzet tertinggi,
+  baris tanpa nama sales tercatat ditampilkan sebagai **"— Tidak
+  Tercatat —"** (bukan `NaN` mentah yang membingungkan)
+- **Rekap per Cabang** (grafik batang + tabel) — dijumlahkan dari seluruh
+  Sales di cabang tsb
+- **Rekap per Sales (Seluruh Cabang)** — dijumlahkan dari seluruh cabang
+  tempat sales tsb bertransaksi (berguna untuk sales yang pindah cabang
+  atau bertugas di lebih dari satu cabang dalam periode yang sama)
+- Tombol unduh CSV terpisah untuk ketiga tabel (rincian, rekap cabang,
+  rekap sales)
+
+**Diuji dengan data asli** (periode default 1 Jul–31 Ags 2026): Total
+Omzet Rp 6.989.968.478, Gross Profit margin 14,4% — jauh lebih rendah dari
+margin Aksesoris murni (~40%) karena Laptop & Handphone biasanya bermargin
+tipis. 157 kombinasi Cabang×Sales, direkap jadi 18 baris per Cabang dan
+130 baris per Sales — **totalnya diverifikasi cocok persis** dengan angka
+tabel rincian di ketiga level agregasi (rincian = rekap cabang = rekap
+sales = Rp 6.989.968.478). Termasuk kasus tepi: multiselect kategori
+dikosongkan (otomatis fallback ke 3 kategori default, bukan tabel kosong),
+filter ke satu kategori saja (mis. hanya AKSESORIS), data kosong, dan
+periode tanpa data — semuanya tertangani dengan pesan info yang jelas.
+
 ## 📦 Dashboard Pembelian & Perbandingan Penjualan Aksesoris (BARU)
 
 **Tab besar baru**, ditempatkan paling bawah halaman (setelah Dashboard

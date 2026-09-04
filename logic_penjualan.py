@@ -203,6 +203,50 @@ def top_sales_retail(df, retail_values, metric="Omzet", n=5):
     return ranking_sales(df, metric=metric, n=n, kategori_penjualan=retail_values)
 
 
+def dashboard_omzet_ldm_per_cabang_sales(
+    df: pd.DataFrame,
+    tanggal_mulai,
+    tanggal_selesai,
+    kategori_barang: list[str] | None = None,
+) -> pd.DataFrame:
+    """Dashboard pencapaian omzet Laptop, Handphone, Aksesoris (LDM) per
+    kombinasi CABANG + SALES ("Yang Menyerahkan/Menjual"), untuk satu
+    periode. Kolom: Cabang, Sales, Omzet Penjualan, Gross Profit,
+    Rata-rata Omzet / Bulan.
+
+    `kategori_barang` default ["LAPTOP", "HANDPHONE", "AKSESORIS"] —
+    dicocokkan ke kolom KATEGORI BARANG NORM (case-insensitive, sudah
+    dinormalisasi saat `finalize_data()`). "Rata-rata Omzet / Bulan"
+    dihitung dari jumlah BULAN KALENDER UNIK yang benar-benar ada
+    transaksinya dalam periode (bukan dipaksa 2 kalau ternyata cuma ada
+    data 1 bulan) — pembagi ini SAMA untuk semua baris (dihitung dari
+    seluruh data yang sudah difilter periode+kategori, bukan per baris/per
+    grup), supaya "rata-rata" tetap punya makna yang konsisten dibanding
+    sesama baris di tabel ini."""
+    if kategori_barang is None:
+        kategori_barang = ["LAPTOP", "HANDPHONE", "AKSESORIS"]
+    cols = ["Cabang", "Sales", "Omzet Penjualan", "Gross Profit", "Rata-rata Omzet / Bulan"]
+
+    tanggal_mulai = pd.Timestamp(tanggal_mulai)
+    tanggal_selesai = pd.Timestamp(tanggal_selesai)
+    d = df[
+        (df["TGL FAKTUR"] >= tanggal_mulai) & (df["TGL FAKTUR"] <= tanggal_selesai) &
+        (df["KATEGORI BARANG NORM"].isin([k.upper() for k in kategori_barang]))
+    ]
+    if d.empty:
+        return pd.DataFrame(columns=cols)
+
+    jumlah_bulan = d[["TAHUN", "BULAN"]].drop_duplicates().shape[0]
+    jumlah_bulan = max(jumlah_bulan, 1)
+
+    g = d.groupby(["CABANG", "YANG MENYERAHKAN/MENJUAL"], dropna=False).agg(
+        **{"Omzet Penjualan": ("TOTAL HARGA", "sum")}, **{"Gross Profit": ("LABA", "sum")},
+    ).reset_index().rename(columns={"CABANG": "Cabang", "YANG MENYERAHKAN/MENJUAL": "Sales"})
+    g["Rata-rata Omzet / Bulan"] = g["Omzet Penjualan"] / jumlah_bulan
+    g = g.sort_values("Omzet Penjualan", ascending=False).reset_index(drop=True)
+    return g[cols]
+
+
 # ---------------------------------------------------------------------------
 # Format angka gaya Indonesia: 68.838 / 1.234,5 / 10,3%
 # ---------------------------------------------------------------------------
