@@ -222,16 +222,26 @@ def dashboard_omzet_ldm_per_cabang_sales(
     dinormalisasi saat `finalize_data()`).
 
     `hanya_retail_toko` (default True): filter tambahan ke kolom
-    "KATEGORI PILAR Sales Invoice" == "PENJUALAN RITEL" — berlaku untuk
-    LAPTOP & HANDPHONE (harus murni retail toko, TIDAK termasuk SERVICE/
-    PENGADAAN CORPORATE/CICILAN SYARIAH/MAINTENANCE CORPORATE/SEWA).
+    **"KATEGORI PENJUALAN"** — nilai "PENJUALAN LAPTOP", "PENJUALAN HP",
+    "PENJUALAN HANDPHONE", "PENJUALAN AKSESORIS" dianggap retail toko
+    murni untuk kategori barang manapun (termasuk aksesoris yang
+    menyertai penjualan Laptop/HP dalam satu nota retail — mis. tas
+    laptop dijual bersamaan, tetap dihitung sebagai penjualan retail).
+    TIDAK termasuk SERVICE/PENGADAAN CORPORATE/CICILAN SYARIAH/dst.
 
-    **Khusus AKSESORIS, filter ini TIDAK berlaku ketat** — baris AKSESORIS
-    tetap dihitung meski KATEGORI PILAR-nya "SERVICE", karena aksesoris
-    yang terjual lewat BUNDLING di transaksi Service tetap penjualan
-    aksesoris yang sah (bukan penjualan Laptop/Handphone via Service, yang
-    tidak relevan di sini). Baris AKSESORIS pada kategori pilar LAIN (mis.
-    PENGADAAN CORPORATE) tetap dikecualikan seperti biasa.
+    **Khusus AKSESORIS, ada tambahan**: baris AKSESORIS tetap dihitung
+    kalau KATEGORI PENJUALAN mengandung kata "SERVICE" (mis. "SERVICE HP",
+    "SERVICE LAPTOP"), karena aksesoris yang terjual lewat BUNDLING di
+    transaksi Service tetap penjualan aksesoris yang sah.
+
+    **🐛 Catatan bug historis**: versi SEBELUMNYA memakai kolom "KATEGORI
+    PILAR Sales Invoice" sebagai basis filter — kolom itu ternyata BARU
+    mulai diisi sistem MFlash sejak awal Agustus 2026 (bulan Juli hampir
+    seluruhnya KOSONG/NaN: cuma 263 dari 24.389 baris terisi), sehingga
+    SEBAGIAN BESAR transaksi retail murni bulan Juli TERLEWAT dari
+    perhitungan (Rp 4.141.029.178 tidak terhitung, ditemukan lewat audit).
+    Kolom "KATEGORI PENJUALAN" jauh lebih andal (terisi 99,95% di seluruh
+    periode data) dan sekarang jadi basis filter utama.
 
     Set `hanya_retail_toko=False` untuk menghitung SEMUA kategori
     penjualan tanpa pengecualian apa pun (perilaku paling longgar).
@@ -257,11 +267,11 @@ def dashboard_omzet_ldm_per_cabang_sales(
         (df["TGL FAKTUR"] >= tanggal_mulai) & (df["TGL FAKTUR"] <= tanggal_selesai) &
         (df["KATEGORI BARANG NORM"].isin([k.upper() for k in kategori_barang]))
     ]
-    if hanya_retail_toko and "KATEGORI PILAR Sales Invoice" in d.columns:
-        pilar = d["KATEGORI PILAR Sales Invoice"].astype(str).str.strip().str.upper()
-        mask_retail = pilar == "PENJUALAN RITEL"
-        mask_aksesoris_bundling = (d["KATEGORI BARANG NORM"] == "AKSESORIS") & (pilar == "SERVICE")
-        d = d[mask_retail | mask_aksesoris_bundling]
+    if hanya_retail_toko and "KATEGORI PENJUALAN" in d.columns:
+        kp = d["KATEGORI PENJUALAN"].astype(str).str.strip().str.upper()
+        mask_retail_murni = kp.isin(["PENJUALAN LAPTOP", "PENJUALAN HP", "PENJUALAN HANDPHONE", "PENJUALAN AKSESORIS"])
+        mask_aksesoris_bundling = (d["KATEGORI BARANG NORM"] == "AKSESORIS") & kp.str.contains("SERVICE", na=False)
+        d = d[mask_retail_murni | mask_aksesoris_bundling]
     if d.empty:
         return pd.DataFrame(columns=cols)
 

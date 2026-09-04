@@ -727,28 +727,49 @@ Rata-rata Omzet / Bulan.
   dihitung dari keseluruhan data yang sudah difilter periode+kategori,
   supaya "rata-rata" antar baris tetap bisa dibandingkan secara adil.
 - **Filter "Retail Toko" (default aktif)** — parameter
-  `hanya_retail_toko=True` menyaring transaksi ke kolom "KATEGORI PILAR
-  Sales Invoice", TAPI **berbeda perlakuan per kategori barang** (revisi
-  dari versi awal fitur ini):
-  - **Laptop & Handphone**: HANYA "PENJUALAN RITEL" murni — TIDAK
-    termasuk SERVICE, PENGADAAN CORPORATE, CICILAN SYARIAH, MAINTENANCE
-    CORPORATE, atau SEWA.
-  - **Aksesoris**: "PENJUALAN RITEL" **DITAMBAH** baris AKSESORIS yang
-    kategori pilarnya "SERVICE" (yaitu aksesoris yang terjual lewat
-    BUNDLING pada transaksi Service) — tetap dihitung sebagai penjualan
-    aksesoris yang sah, karena bundling adalah program resmi (SE/001/
-    IN-MF/IV/2026), bukan penjualan "corporate"/lainnya yang perlu
-    dikecualikan. Baris Laptop/Handphone via Service TETAP dikecualikan,
-    tidak ikut kebijakan pengecualian aksesoris ini.
+  `hanya_retail_toko=True` menyaring transaksi ke kolom **"KATEGORI
+  PENJUALAN"**, dengan perlakuan berbeda per kategori barang:
+  - **Laptop & Handphone**: HANYA KATEGORI PENJUALAN = "Penjualan
+    Laptop"/"Penjualan HP"/"Penjualan Handphone" — TIDAK termasuk
+    SERVICE, PENGADAAN CORPORATE, CICILAN SYARIAH, MAINTENANCE CORPORATE,
+    atau SEWA.
+  - **Aksesoris**: "Penjualan Aksesoris" murni **DITAMBAH** baris
+    AKSESORIS yang KATEGORI PENJUALAN-nya mengandung kata "SERVICE"
+    (mis. "Service HP", "Service Laptop" — yaitu aksesoris yang terjual
+    lewat BUNDLING pada transaksi Service) — tetap dihitung sebagai
+    penjualan aksesoris yang sah, karena bundling adalah program resmi
+    (SE/001/IN-MF/IV/2026). Baris Laptop/Handphone via Service TETAP
+    dikecualikan, tidak ikut kebijakan pengecualian aksesoris ini.
   Set `hanya_retail_toko=False` untuk menghitung SEMUA kategori penjualan
   tanpa pengecualian apa pun (perilaku paling longgar).
-  **Dampak nyata** (data uji, periode default): Retail murni Rp
-  1.202.907.340 + Aksesoris via bundling Service Rp 243.356.700 = **Rp
-  1.446.264.040** total — sementara Laptop/Handphone via Service
-  (Rp 102.328.000) TETAP tidak ikut terhitung, sesuai maksudnya.
-  Diverifikasi breakdown manual (retail + bundling aksesoris) cocok
-  persis dengan hasil fungsi, dan backward-compatibility
-  (`hanya_retail_toko=False` → Rp 6.989.968.478) tetap terjaga.
+  - **🐛 BUG BESAR ditemukan & diperbaiki (via audit pengguna)**: versi
+    SEBELUMNYA memakai kolom **"KATEGORI PILAR Sales Invoice"** sebagai
+    basis filter "Retail Toko" — kolom itu ternyata **baru mulai diisi
+    sistem MFlash sejak awal Agustus 2026**. Untuk bulan **Juli, kolom
+    ini HAMPIR SELALU KOSONG** (cuma 263 dari 24.389 baris terisi;
+    Agustus 22.561/25.107, September 2.615/2.615 — jauh lebih lengkap).
+    Karena filter lama mensyaratkan nilai persis `"PENJUALAN RITEL"`
+    (bukan `None`/kosong), **seluruh baris NaN otomatis gugur dari
+    hitungan** — termasuk transaksi retail murni yang SAH tapi kebetulan
+    kolom pilarnya belum terisi. Dampaknya: **Rp 4.141.029.178 transaksi
+    retail murni (kategori barang LDM, KATEGORI PENJUALAN jelas-jelas
+    "Penjualan Laptop/HP/Handphone/Aksesoris") hilang dari perhitungan**,
+    ditemukan lewat 3.277 baris yang lolos cross-check "KATEGORI
+    PENJUALAN = retail murni" tapi gagal cross-check "KATEGORI PILAR =
+    PENJUALAN RITEL". Diperbaiki dengan mengganti basis filter ke kolom
+    **"KATEGORI PENJUALAN"** (terisi 99,95% di seluruh periode — cuma 24
+    dari 52.111 baris kosong, jauh lebih andal). **Dampak setelah
+    perbaikan** (data uji, periode default 1 Jul–31 Ags 2026): Total Omzet
+    naik dari **Rp 1.446.264.040** (versi bug) menjadi **Rp
+    6.465.042.615** (versi benar) — selisih **Rp 5.018.778.575**. Omzet
+    Juli khususnya melonjak dari Rp 15.280.000 (nyaris kosong, jelas
+    tidak masuk akal) menjadi **Rp 4.507.389.903** (masuk akal, sebanding
+    dengan bulan Agustus Rp 1.957.652.712). Diverifikasi: breakdown per
+    kategori (Laptop+Handphone+Aksesoris) tetap cocok persis dengan
+    total; Juli+Agustus terpisah = gabungan langsung; dan
+    backward-compatibility (`hanya_retail_toko=False` → tetap Rp
+    6.989.968.478, TIDAK terpengaruh perbaikan ini karena mode itu tidak
+    memfilter kategori penjualan sama sekali).
 
 **UI mencakup:**
 - Date picker **Tanggal Mulai** & **Tanggal Selesai** (default 1 Juli – 31

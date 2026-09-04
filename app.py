@@ -2136,10 +2136,10 @@ def render_omzet_ldm_tab():
     st.caption(
         "Gabungan 3 kategori barang: LAPTOP, HANDPHONE, AKSESORIS — dipecah per Cabang dan per Sales "
         "(\"Yang Menyerahkan/Menjual\"). Default periode 1 Juli – 31 Agustus 2026, bisa diubah. "
-        "**Laptop & Handphone**: hanya transaksi Retail Toko murni (kategori pilar \"PENJUALAN RITEL\") "
-        "— TIDAK termasuk Service, Corporate, Cicilan Syariah, atau Sewa. **Aksesoris**: Retail Toko "
-        "DITAMBAH aksesoris yang terjual lewat bundling di transaksi Service (tetap dihitung sebagai "
-        "penjualan aksesoris yang sah)."
+        "**Laptop & Handphone**: hanya transaksi Retail Toko murni (KATEGORI PENJUALAN = \"Penjualan "
+        "Laptop\"/\"Penjualan HP\"/\"Penjualan Handphone\") — TIDAK termasuk Service, Corporate, Cicilan "
+        "Syariah, atau Sewa. **Aksesoris**: Retail Toko murni DITAMBAH aksesoris yang terjual lewat "
+        "bundling di transaksi Service (tetap dihitung sebagai penjualan aksesoris yang sah)."
     )
 
     if raw_aksesoris is None:
