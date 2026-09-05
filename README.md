@@ -63,6 +63,28 @@
 > Kode/logikanya tetap ada untuk ketiganya, bisa dimunculkan lagi kapan
 > saja dengan mengubah nilai flag jadi `True`.
 
+> ## ⏸️ Dua bagian lagi juga SEMENTARA DISEMBUNYIKAN
+>
+> Dua flag serupa lagi, mekanisme & alasan sama:
+> ```python
+> TAMPILKAN_DATA_SELURUH_SALES = False    # "Seluruh Sales" di "Ringkasan Cabang, Produk & Sales"
+> TAMPILKAN_ANALISA_MENDALAM_LUNA = False # "Analisa Mendalam: LUNA, Selain LUNA"
+> ```
+> **Data Seluruh Sales**: sub-bagian "Seluruh Sales" (filter kategori
+> penjualan + ranking sales berdasarkan Omzet/Laba/Jumlah Nota) di dalam
+> "🧾 Ringkasan Cabang, Produk & Sales" tidak dirender — bagian "Seluruh
+> Cabang" dan "Semua Produk Aksesoris" di atasnya (dalam grup yang sama)
+> **tetap tampil**, cuma sub-bagian Sales-nya yang disembunyikan.
+> **Analisa Mendalam LUNA**: seluruh bagian "🔍 Analisa Mendalam: LUNA,
+> Selain LUNA" (kartu Nilai Stok/Qty/Omzet per kelompok, deteksi
+> kepatuhan bundling, expander temuan per cabang) tidak dirender — bagian
+> "📊 Penjualan Aksesoris LUNA vs Selain LUNA" (grafik & tabel omzet per
+> kelompok) TEPAT DI BAWAHNYA **tetap tampil**, karena diverifikasi tidak
+> ada satu pun variabel dari Analisa Mendalam yang dipakai di bagian itu
+> (kedua bagian independen secara kode meski topiknya berdekatan).
+> Kode/logikanya tetap ada untuk keduanya, bisa dimunculkan lagi kapan
+> saja dengan mengubah nilai flag jadi `True`.
+
 **Satu halaman panjang** (bukan tab terpisah — digabung sesuai permintaan),
 berisi dashboard berurutan dari atas ke bawah:
 
