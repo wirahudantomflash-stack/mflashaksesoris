@@ -2503,9 +2503,36 @@ def render_pembelian_tab():
 
         # --- Info tambahan: berapa transaksi Service TIDAK ada bundling aksesoris (terutama LUNA) ---
         if df_re is not None:
-            bund_info, bund_detail = la.analisa_bundling_brand(df_aks_jual, df_re, keyword="LUNA")
+            st.markdown("###### 📋 Kepatuhan Bundling Aksesoris pada Transaksi Service")
+            st.caption("Pilih jenis periode untuk membatasi rentang tanggal analisa bundling ini — sama seperti pemilih periode di \"🎯 Target Pencapaian Penjualan Aksesoris\".")
+
+            mode_periode_bund = st.radio(
+                "Jenis Periode", ["Periode Samurai (Kuartalan)", "Program Custom (1–12 Bulan)"],
+                horizontal=True, key="pb_bundling_mode_periode",
+                help="Periode Samurai = kuartalan tetap (Jul 2026–Des 2027). Program Custom = atur sendiri tanggal mulai & durasi (1–12 bulan).",
+            )
+            periode_samurai_bund_opsi = [
+                "Samurai 39 (Jul–Sep 2026)", "Samurai 40 (Okt–Des 2026)", "Samurai 41 (Jan–Mar 2027)",
+                "Samurai 42 (Apr–Jun 2027)", "Samurai 43 (Jul–Sep 2027)", "Samurai 44 (Okt–Des 2027)",
+            ]
+            if mode_periode_bund == "Periode Samurai (Kuartalan)":
+                periode_pilihan_bund = st.selectbox("Pilih Periode Samurai", periode_samurai_bund_opsi, key="pb_bundling_periode_samurai")
+                tgl_mulai_bund, tgl_selesai_bund = la.PERIODE_SAMURAI[periode_pilihan_bund]
+                st.caption(f"Periode: {tgl_mulai_bund.strftime('%d %b %Y')} – {tgl_selesai_bund.strftime('%d %b %Y')} (3 bulan).")
+            else:
+                bt1, bt2 = st.columns(2)
+                with bt1:
+                    tgl_mulai_bund = pd.Timestamp(st.date_input("Mulai Program", value=pd.Timestamp("2026-08-20"), key="pb_bundling_mulai"))
+                with bt2:
+                    durasi_bund = st.slider("Durasi Program (bulan)", min_value=1, max_value=12, value=3, key="pb_bundling_durasi")
+                tgl_selesai_bund = tgl_mulai_bund + pd.DateOffset(months=int(durasi_bund)) - pd.Timedelta(days=1)
+                st.caption(f"Periode: {tgl_mulai_bund.strftime('%d %b %Y')} – {tgl_selesai_bund.strftime('%d %b %Y')} ({durasi_bund} bulan).")
+
+            df_re_bund = df_re[(df_re["TGL FAKTUR"] >= tgl_mulai_bund) & (df_re["TGL FAKTUR"] <= tgl_selesai_bund)]
+            df_aks_jual_bund = df_aks_jual[(df_aks_jual["TGL FAKTUR"] >= tgl_mulai_bund) & (df_aks_jual["TGL FAKTUR"] <= tgl_selesai_bund)] if df_aks_jual is not None else df_aks_jual
+
+            bund_info, bund_detail = la.analisa_bundling_brand(df_aks_jual_bund, df_re_bund, keyword="LUNA")
             if bund_info["jumlah_nota_service"]:
-                st.markdown("###### 📋 Kepatuhan Bundling Aksesoris pada Transaksi Service")
                 bi1, bi2, bi3, bi4 = st.columns(4)
                 bi1.metric("Total Nota Service", la.format_int_id(bund_info["jumlah_nota_service"]))
                 bi2.metric("Ada Bundling LUNA", la.format_int_id(bund_info["jumlah_service_dgn_brand"]), la.format_percent_id(bund_info["pct_bundling_brand"]))
@@ -2526,7 +2553,7 @@ def render_pembelian_tab():
 
                 st.markdown("**Porsi Tanpa Bundling per Cabang**")
                 st.caption("Diurutkan dari % Tanpa Bundling TERTINGGI (cabang paling perlu ditindaklanjuti di atas).")
-                bund_cabang = la.analisa_bundling_per_cabang(df_re, keyword="LUNA")
+                bund_cabang = la.analisa_bundling_per_cabang(df_re_bund, keyword="LUNA")
                 if bund_cabang.empty:
                     st.info("Tidak ada data per cabang untuk ditampilkan.")
                 else:
@@ -2556,6 +2583,8 @@ def render_pembelian_tab():
                         bund_detail.to_csv(index=False).encode("utf-8-sig"),
                         "rincian_nota_tanpa_bundling.csv", "text/csv", key="pb_dl_bundling_detail",
                     )
+            else:
+                st.info("Tidak ada nota Service pada periode yang dipilih.")
 
     st.divider()
 

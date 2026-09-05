@@ -962,14 +962,35 @@ tinggal disambungkan lagi ke `app.py`.
      kombinasi cabang+pekan tanpa penjualan sama sekali (pesan info yang
      jelas, bukan tabel kosong membingungkan).
    - **Info tambahan — Kepatuhan Bundling Aksesoris pada Transaksi
-     Service**: 4 kartu metrik di bawah grafik, memakai fungsi
-     `analisa_bundling_brand()` yang sudah ada (dipakai ulang, tidak
-     dihitung dari nol): Total Nota Service, Ada Bundling LUNA, Bundling
-     Brand Lain (bukan LUNA — sesuai pengecualian SE), dan **⚠️ TIDAK Ada
-     Bundling Aksesoris sama sekali** — metrik terakhir inilah yang paling
-     perlu ditindaklanjuti. **Diuji dengan data asli**: dari 15.728 nota
-     Service, 4.541 (28,9%) sudah bundling LUNA, 7.483 bundling brand lain,
-     dan **3.704 (23,6%) sama sekali tidak ada bundling aksesoris apa pun**.
+     Service**: 4 kartu metrik, memakai fungsi `analisa_bundling_brand()`
+     yang sudah ada (dipakai ulang, tidak dihitung dari nol): Total Nota
+     Service, Ada Bundling LUNA, Bundling Brand Lain (bukan LUNA — sesuai
+     pengecualian SE), dan **⚠️ TIDAK Ada Bundling Aksesoris sama sekali**
+     — metrik terakhir inilah yang paling perlu ditindaklanjuti.
+   - **Baru: Filter Periode** — sebelumnya bagian ini SELALU mengambil
+     SELURUH rentang tanggal pada data yang diunggah (tanpa filter apa
+     pun). Sekarang ditambahkan pemilih periode di ATAS 4 kartu metrik,
+     **persis meniru pola yang sudah ada di "🎯 Target Pencapaian
+     Penjualan Aksesoris"**: radio "Jenis Periode" dengan 2 opsi —
+     **"Periode Samurai (Kuartalan)"** (dropdown 6 periode Samurai 39–44,
+     otomatis 3 bulan) dan **"Program Custom (1–12 Bulan)"** (date picker
+     tanggal mulai + slider durasi 1–12 bulan). Seluruh perhitungan di
+     bawahnya (4 kartu metrik, Porsi Tanpa Bundling per Cabang, dan
+     expander Rincian Nomor Nota) otomatis mengikuti periode yang dipilih
+     — bukan cuma kartu metriknya saja. Kalau tidak ada nota Service pada
+     periode terpilih, tampil pesan info yang jelas, bukan tabel kosong
+     membingungkan.
+   - **Diuji dengan data asli** (3 skenario periode berbeda): **Samurai 39
+     (Jul–Sep 2026)** — 16.003 nota Service, 29,6% bundling LUNA, 23,5%
+     tanpa bundling. **Program Custom 1 Jan–31 Mar 2026** — 22.941 nota,
+     cuma **0,06% bundling LUNA** (13 dari 22.941 nota) — masuk akal
+     karena produk LUNA baru mulai didistribusikan ke cabang sekitar 20
+     Agustus 2026 (lihat catatan Tanggal Mulai Tahap 1). **Program Custom
+     1 bulan (Agustus 2026 saja)** — 7.725 nota, 35,8% bundling LUNA.
+     Diverifikasi juga breakdown per cabang: total "Total Nota Service"
+     dari tabel Porsi Tanpa Bundling per Cabang cocok PERSIS dengan angka
+     di kartu metrik ringkasan untuk periode yang sama. Termasuk kasus
+     tepi periode tanpa data sama sekali (mengembalikan 0, bukan error).
    - **Baru: Porsi Tanpa Bundling per Cabang** — tabel + grafik batang
      memakai fungsi `analisa_bundling_per_cabang()` yang SUDAH ADA di
      `logic_aksesoris.py` sejak sebelumnya tapi belum pernah dipakai di
