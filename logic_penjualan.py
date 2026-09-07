@@ -97,6 +97,16 @@ def finalize_data(df: pd.DataFrame, cabang_default: str | None = None) -> pd.Dat
     # Tipe data
     df["TGL FAKTUR"] = pd.to_datetime(df["TGL FAKTUR"], errors="coerce", dayfirst=False)
     for col in ["HARGA BELI", "QTY", "@HARGA", "TOTAL HARGA"]:
+        # PENTING: sebagian nilai di kolom ini memakai format desimal
+        # Indonesia (koma, mis. "210937,5" = Rp210.937,5), yang GAGAL
+        # dibaca `pd.to_numeric()` standar (mengharapkan titik) — hasilnya
+        # NaN lalu diam-diam jadi 0 lewat fillna(0), MENGHILANGKAN nilai
+        # transaksi yang sebenarnya ada. Ganti koma->titik dulu (HANYA
+        # untuk kolom bertipe teks; kolom yang sudah numerik dari Excel
+        # dibiarkan apa adanya) sebelum konversi, supaya "210937,5"
+        # terbaca 210937.5, bukan hilang jadi 0.
+        if not pd.api.types.is_numeric_dtype(df[col]):
+            df[col] = df[col].astype(str).str.replace(",", ".", regex=False)
         df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
 
     # Kunci nota = CABANG + NO FAKTUR (bukan NO FAKTUR saja)
@@ -157,10 +167,13 @@ def top_cabang(df: pd.DataFrame, metric: str = "Omzet", n: int | None = 3) -> pd
 
     g = df.groupby("CABANG", dropna=False).agg(
         Omzet=("TOTAL HARGA", "sum"),
-        Modal=("MODAL", "sum"),
         Laba=("LABA", "sum"),
         **{"Jumlah Nota": ("NOTA_ID", "nunique")},
     ).reset_index()
+    # Modal = Omzet - Laba (bukan sum(MODAL) langsung) — kolom MODAL/HARGA
+    # BELI mentah belum dibersihkan dari HARGA BELI anomali, sedangkan LABA
+    # sudah dibersihkan di finalize_data(). Lihat RASIO_HARGA_BELI_ANOMALI.
+    g["Modal"] = g["Omzet"] - g["Laba"]
     g["Margin (%)"] = np.where(g["Omzet"] != 0, g["Laba"] / g["Omzet"] * 100, 0)
 
     sort_col = {"Omzet": "Omzet", "Laba": "Laba", "Jumlah Nota": "Jumlah Nota"}[metric]

@@ -90,6 +90,13 @@ def finalize_data(df: pd.DataFrame, cabang_default: str | None = None) -> pd.Dat
 
     df["TGL FAKTUR"] = pd.to_datetime(df["TGL FAKTUR"], errors="coerce")
     for col in ["HARGA BELI", "QTY", "@HARGA", "TOTAL HARGA"]:
+        # PENTING: sebagian nilai memakai format desimal Indonesia (koma,
+        # mis. "210937,5") yang gagal dibaca pd.to_numeric() standar dan
+        # diam-diam jadi 0 lewat fillna(0). Ganti koma->titik dulu (hanya
+        # untuk kolom bertipe teks) sebelum konversi. Lihat penjelasan
+        # lengkap di logic_penjualan.py.
+        if not pd.api.types.is_numeric_dtype(df[col]):
+            df[col] = df[col].astype(str).str.replace(",", ".", regex=False)
         df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
 
     df["CABANG"] = df["CABANG"].astype(str).str.strip()
@@ -459,8 +466,12 @@ def revenue_summary(df: pd.DataFrame) -> dict:
     if df.empty:
         return dict(omzet=0, modal=0, laba=0, margin=0, jumlah_nota=0, jumlah_item=0, rata_per_nota=0)
     omzet = df["TOTAL HARGA"].sum()
-    modal = df["MODAL"].sum()
     laba = df["LABA"].sum()
+    # Modal = Omzet - Laba (bukan sum(MODAL) langsung) — kolom MODAL/HARGA
+    # BELI mentah belum dibersihkan dari HARGA BELI anomali, sedangkan LABA
+    # sudah dibersihkan di finalize_data(). Lihat RASIO_HARGA_BELI_ANOMALI
+    # di logic_penjualan.py.
+    modal = omzet - laba
     jumlah_nota = df["NOTA_ID"].nunique()
     return dict(
         omzet=omzet, modal=modal, laba=laba,
@@ -477,11 +488,15 @@ def revenue_trend_bulanan(df: pd.DataFrame) -> pd.DataFrame:
         return pd.DataFrame(columns=cols)
     g = df.groupby("PERIODE").agg(
         Omzet=("TOTAL HARGA", "sum"),
-        Modal=("MODAL", "sum"),
         Laba=("LABA", "sum"),
         **{"Qty Terjual": ("QTY", "sum")},
         **{"Jumlah Nota": ("NOTA_ID", "nunique")},
     ).reset_index().rename(columns={"PERIODE": "Periode"})
+    # Modal dihitung dari Omzet - Laba (bukan sum(MODAL) langsung) — kolom
+    # MODAL/HARGA BELI mentah tidak dibersihkan dari HARGA BELI anomali,
+    # sedangkan LABA sudah dibersihkan di finalize_data(). Lihat
+    # RASIO_HARGA_BELI_ANOMALI di logic_penjualan.py.
+    g["Modal"] = g["Omzet"] - g["Laba"]
     g["Margin (%)"] = np.where(g["Omzet"] != 0, g["Laba"] / g["Omzet"] * 100, 0)
     g["Periode"] = g["Periode"].astype(str)
     return g[cols]
@@ -514,9 +529,11 @@ def top_produk(df: pd.DataFrame, metric: str = "Qty Terjual", n: int = 10) -> pd
     g = df.groupby("NAMA BARANG").agg(
         **{"Qty Terjual": ("QTY", "sum")},
         Omzet=("TOTAL HARGA", "sum"),
-        Modal=("MODAL", "sum"),
         Laba=("LABA", "sum"),
     ).reset_index()
+    # Modal = Omzet - Laba (bukan sum(MODAL) langsung) — lihat catatan di
+    # total_hpp_brand() soal HARGA BELI anomali yang belum dibersihkan.
+    g["Modal"] = g["Omzet"] - g["Laba"]
     g["Margin (%)"] = np.where(g["Omzet"] != 0, g["Laba"] / g["Omzet"] * 100, 0)
     sort_col = {"Qty Terjual": "Qty Terjual", "Omzet": "Omzet", "Laba": "Laba"}[metric]
     g = g.sort_values(sort_col, ascending=False).head(n).reset_index(drop=True)
@@ -534,10 +551,12 @@ def omzet_cabang(df: pd.DataFrame) -> pd.DataFrame:
         return pd.DataFrame(columns=cols)
     g = df.groupby("CABANG").agg(
         Omzet=("TOTAL HARGA", "sum"),
-        HPP=("MODAL", "sum"),
         Laba=("LABA", "sum"),
         **{"Jumlah Nota": ("NOTA_ID", "nunique")},
     ).reset_index().rename(columns={"CABANG": "Cabang"})
+    # HPP = Omzet - Laba (bukan sum(MODAL) langsung) — lihat catatan di
+    # total_hpp_brand() soal HARGA BELI anomali yang belum dibersihkan.
+    g["HPP"] = g["Omzet"] - g["Laba"]
     g["Margin (%)"] = np.where(g["Omzet"] != 0, g["Laba"] / g["Omzet"] * 100, 0)
     g["HPP terhadap Omzet (%)"] = np.where(g["Omzet"] != 0, g["HPP"] / g["Omzet"] * 100, 0)
     g["Rata-rata / Nota"] = np.where(g["Jumlah Nota"] != 0, g["Omzet"] / g["Jumlah Nota"], 0)
@@ -1597,7 +1616,17 @@ def total_hpp_brand(df_aksesoris: pd.DataFrame, keyword: str = "LUNA", keyword_k
     """Total HPP (Harga Pokok Penjualan = kolom MODAL/HARGA BELI) untuk
     produk brand tertentu dari data FAKTUR PENJUALAN — beda sumber dari
     Total Pembelian (yang dari faktur pembelian ke pemasok). HPP di sini
-    mencerminkan modal barang yang SUDAH TERJUAL, bukan yang dibeli."""
+    mencerminkan modal barang yang SUDAH TERJUAL, bukan yang dibeli.
+
+    PENTING: HPP dihitung sebagai `Omzet - Laba` (bukan `sum(MODAL)`
+    langsung) — kolom MODAL/HARGA BELI mentah TIDAK dibersihkan dari
+    HARGA BELI anomali (lihat RASIO_HARGA_BELI_ANOMALI di
+    logic_penjualan.py), sedangkan kolom LABA SUDAH dibersihkan (dinolkan
+    untuk baris anomali) di `finalize_data()`. Menghitung HPP langsung
+    dari `sum(MODAL)` akan ikut menjumlahkan HARGA BELI yang salah input
+    (mis. Rp6,5 miliar untuk kabel data yang dijual Rp20rb), menghasilkan
+    HPP yang absurd (pernah tercatat Rp4,4 TRILIUN untuk HPP LUNA yang
+    Omzet-nya cuma ratusan juta)."""
     hasil = dict(hpp=0, omzet=0, laba=0, margin_persen=0, qty_terjual=0, jumlah_baris=0)
     if df_aksesoris.empty:
         return hasil
@@ -1606,9 +1635,11 @@ def total_hpp_brand(df_aksesoris: pd.DataFrame, keyword: str = "LUNA", keyword_k
     if keyword_kecuali:
         mask = mask & ~nama_upper.str.contains(keyword_kecuali.upper(), na=False)
     sub = df_aksesoris[mask]
-    hasil["hpp"] = sub["MODAL"].sum() if "MODAL" in sub.columns else sub["HARGA BELI"].sum()
     hasil["omzet"] = sub["TOTAL HARGA"].sum()
-    hasil["laba"] = sub["LABA"].sum() if "LABA" in sub.columns else (hasil["omzet"] - hasil["hpp"])
+    hasil["laba"] = sub["LABA"].sum() if "LABA" in sub.columns else (
+        hasil["omzet"] - (sub["MODAL"].sum() if "MODAL" in sub.columns else sub["HARGA BELI"].sum())
+    )
+    hasil["hpp"] = hasil["omzet"] - hasil["laba"]
     hasil["margin_persen"] = (hasil["laba"] / hasil["omzet"] * 100) if hasil["omzet"] else 0
     hasil["qty_terjual"] = sub["QTY"].sum()
     hasil["jumlah_baris"] = len(sub)

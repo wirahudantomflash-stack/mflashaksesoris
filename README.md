@@ -940,6 +940,53 @@ Rata-rata Omzet / Bulan.
     Scoreboard Aksesoris juga diverifikasi bersih (Laba Rp 3,5jt – 35,9jt
     per cabang, semua positif).
 
+- **🐛 LANJUTAN — "Total HPP Aksesoris LUNA" masih menunjukkan Rp
+  4.447.499.352.479 (4,4 TRILIUN) meski perbaikan di atas sudah
+  diterapkan — dilaporkan pengguna, diselidiki ulang, ditemukan DUA
+  bug tambahan yang belum tertangkap sebelumnya:**
+  1. **`total_hpp_brand()` (dan 5 fungsi lain) menghitung HPP/Modal
+     LANGSUNG dari `sum(MODAL)`/`sum(HARGA BELI)` mentah**, bukan dari
+     `Omzet - Laba` (yang sudah bersih) — pola bug YANG SAMA seperti
+     `logic_persediaan.py` sebelumnya, tapi belum ketemu sampai
+     dilaporkan. Diaudit ulang MENYELURUH, ditemukan & diperbaiki di
+     **6 fungsi total**: `total_hpp_brand()`, `revenue_summary()`,
+     `revenue_trend_bulanan()`, `top_produk()`, `omzet_cabang()` (semua
+     di `logic_aksesoris.py`), dan `top_cabang()` (di
+     `logic_penjualan.py`) — semua diganti jadi menghitung Modal/HPP dari
+     `Omzet - Laba`, bukan agregasi langsung dari kolom mentah.
+  2. **Bug lebih dasar yang baru ketahuan saat menyelidiki fungsi
+     `top_cabang()`**: cabang "Klender" masih punya Laba **-Rp
+     13.150.132.721** meski sudah pakai `Omzet - Laba`. Ditelusuri:
+     kolom **TOTAL HARGA** (dan **HARGA BELI**) di sumber data kadang
+     memakai **format desimal Indonesia** (koma sebagai pemisah desimal,
+     mis. `"210937,5"` = Rp 210.937,5) — `pd.to_numeric()` standar GAGAL
+     membaca format ini (mengharapkan titik), hasilnya `NaN`, lalu
+     **diam-diam di-fillna(0)** di `finalize_data()`. Akibatnya transaksi
+     senilai ratusan ribu rupiah tercatat **TOTAL HARGA = 0**, dan karena
+     rasio HARGA BELI/TOTAL HARGA jadi tidak terhitung (pembagian oleh
+     nol → `NaN` → `.fillna(False)` di deteksi anomali), baris seperti
+     ini LOLOS dari deteksi `HARGA_BELI_ANOMALI` meski HARGA BELI-nya
+     tetap besar (mis. Rp 1,57 miliar). **Skala**: 403 baris di HARGA
+     BELI, 36 baris di TOTAL HARGA (dan `@HARGA`) di seluruh dataset.
+     Diperbaiki dengan mengganti koma→titik SEBELUM `pd.to_numeric()`
+     (khusus kolom yang belum bertipe numerik) di `finalize_data()` KEDUA
+     modul. **Deteksi kondisi tipe kolom sempat SALAH juga**: percobaan
+     pertama pakai `df[col].dtype == object`, tapi kolom bertipe `str`
+     (pandas nullable string dtype, beda dari `object` tradisional) lolos
+     dari kondisi ini — diperbaiki jadi
+     `not pd.api.types.is_numeric_dtype(df[col])` yang lebih robust.
+  - **Dampak akhir setelah KEDUA perbaikan (parser + 6 fungsi HPP)**:
+    Total HPP LUNA turun dari **Rp 4.447.499.352.479** jadi **Rp
+    147.569.123** (Omzet Rp 292.690.760, margin 49,6%) — akhirnya masuk
+    akal. Total LABA seluruh dataset naik dari Rp 5.203.794.148 (setelah
+    perbaikan sebelumnya) jadi **Rp 22.369.157.586** (setelah perbaikan
+    parser koma — banyak transaksi yang tadinya salah tercatat Rp0 kini
+    terhitung dengan nilai sebenarnya). Diverifikasi: seluruh 18 cabang
+    di `top_cabang()` kini bermargin wajar (30–50%), tidak ada lagi
+    `|Laba| > Omzet` di cabang manapun; kedua modul (`logic_penjualan.py`
+    & `logic_aksesoris.py`) tetap konsisten satu sama lain (22.369.157.586
+    & 8.962 baris anomali, identik di keduanya).
+
 - **🐛 Bug ditemukan & diperbaiki: dropdown "Pilih Bulan" cuma menampilkan
   2 bulan (Juli, Agustus), padahal data sebenarnya mencakup Januari–
   September** — akar masalahnya BUKAN di logika dropdown itu sendiri
