@@ -832,14 +832,35 @@ Rata-rata Omzet / Bulan.
 - **Rekap per Sales (Seluruh Cabang)** — dijumlahkan dari seluruh cabang
   tempat sales tsb bertransaksi (berguna untuk sales yang pindah cabang
   atau bertugas di lebih dari satu cabang dalam periode yang sama).
-  **Baru: dropdown "Pilih Bulan"** — default "Semua Bulan (Gabungan)",
-  atau pilih SATU bulan kalender spesifik (mis. "Agustus 2026") untuk
-  lihat omzet per Sales KHUSUS bulan itu saja. Saat satu bulan dipilih,
-  dashboard memanggil ulang `dashboard_omzet_ldm_per_cabang_sales()`
-  dengan rentang tanggal awal–akhir bulan kalender tsb, supaya filter
-  Retail Toko + bundling Aksesoris tetap diterapkan dengan benar per
-  bulan. Nama file unduhan CSV otomatis menyesuaikan bulan yang dipilih.
-  - **Diperbarui — basis tanggal khusus section ini SENGAJA independen
+  **Diperbarui: dropdown "Pilih Bulan" jadi MULTISELECT** — sebelumnya
+  cuma bisa pilih satu bulan atau "Semua Bulan (Gabungan)"; sekarang bisa
+  pilih **beberapa bulan sekaligus** (mis. Januari–Agustus untuk lihat
+  rata-rata dari 8 bulan itu saja, MENGECUALIKAN September) — default
+  SEMUA bulan tercentang (setara "Semua Bulan (Gabungan)" versi lama).
+  **Mendukung pilihan non-kontigu** juga (mis. hanya Januari + Agustus,
+  melompati bulan-bulan di tengah) — data DIFILTER berdasarkan kombinasi
+  (Tahun, Bulan) yang benar-benar dipilih (bukan sekadar rentang tanggal
+  kalender), sehingga bulan yang TIDAK dicentang di TENGAH rentang
+  terpilih otomatis tidak ikut kehitung. Kolom **"Rata-rata Omzet /
+  Bulan"** otomatis membagi dengan JUMLAH BULAN YANG DIPILIH (bukan
+  selalu 1 atau seluruh data) — inilah yang menjawab kebutuhan "rata-rata
+  dari Januari sampai Agustus saja". Caption otomatis menjelaskan bulan
+  mana saja yang tergabung; kalau ≤3 bulan dipilih ditampilkan
+  "Bulan A + Bulan B", kalau lebih ditampilkan "Bulan Awal – Bulan Akhir
+  (N bulan)". Nama file unduhan CSV disanitasi otomatis (karakter non-
+  alfanumerik diganti underscore) supaya tetap valid untuk kombinasi
+  bulan apa pun.
+  - **Diuji dengan data asli**: pilih Januari–Agustus 2026 (8 bulan,
+    kecualikan September) → Total Omzet Rp 15.964.790.009, Rata-rata
+    Omzet/Bulan Sales teratas Rp 120.001.819,5 — **diverifikasi cocok
+    persis** dengan `Omzet Penjualan / 8`. **Kasus non-kontigu**: pilih
+    HANYA Januari + Agustus (melompati Februari–Juli) → Total Omzet
+    Rp 3.367.320.795, **cocok persis** dengan penjumlahan manual
+    (Omzet Januari saja + Omzet Agustus saja secara terpisah) — membukti-
+    kan bulan-bulan di tengah yang tidak dicentang benar-benar tidak ikut
+    tercampur; Rata-rata Omzet/Bulan dibagi 2 (bukan 8), sesuai jumlah
+    bulan yang benar-benar dipilih.
+  - **Basis tanggal khusus section ini SENGAJA independen
     dari date picker global**: baik daftar bulan pada dropdown MAUPUN
     opsi "Semua Bulan (Gabungan)" SEKARANG SELALU memakai rentang PENUH
     data yang dimuat (`tgl_data_min_ldm`–`tgl_data_max_ldm`, mis. 1

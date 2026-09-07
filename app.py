@@ -2261,33 +2261,46 @@ def render_omzet_ldm_tab():
     }
     # PENTING: bagian "Rekap per Sales" ini SENGAJA memakai rentang PENUH
     # data yang dimuat (tgl_data_min_ldm/tgl_data_max_ldm), BUKAN date
-    # picker "Tanggal Mulai"/"Tanggal Selesai" di atas — supaya opsi "Semua
-    # Bulan (Gabungan)" selalu konsisten mencakup seluruh histori data,
-    # terlepas dari rentang yang sedang dipilih user untuk bagian lain di
-    # dashboard ini (Rincian per Cabang & Sales, Rekap per Cabang, dst).
+    # picker "Tanggal Mulai"/"Tanggal Selesai" di atas — supaya daftar
+    # bulan yang tersedia untuk dipilih selalu mencakup seluruh histori
+    # data, terlepas dari rentang yang sedang dipilih user untuk bagian
+    # lain di dashboard ini (Rincian per Cabang & Sales, Rekap per Cabang, dst).
     mask_periode_ldm = (df_ldm["TGL FAKTUR"] >= tgl_data_min_ldm) & (df_ldm["TGL FAKTUR"] <= tgl_data_max_ldm)
     daftar_bulan_ldm = df_ldm[mask_periode_ldm][["TAHUN", "BULAN"]].drop_duplicates().sort_values(["TAHUN", "BULAN"]).reset_index(drop=True)
-    opsi_bulan_ldm = ["Semua Bulan (Gabungan)"] + [
-        f"{NAMA_BULAN_ID[int(r['BULAN'])]} {int(r['TAHUN'])}" for _, r in daftar_bulan_ldm.iterrows()
-    ]
-    bulan_pilihan_ldm = st.selectbox(
-        "Pilih Bulan (untuk lihat omzet per Sales khusus bulan tertentu)", opsi_bulan_ldm, key="ldm_rekap_sales_bulan",
+    opsi_bulan_ldm = [f"{NAMA_BULAN_ID[int(r['BULAN'])]} {int(r['TAHUN'])}" for _, r in daftar_bulan_ldm.iterrows()]
+    bulan_pilihan_multi = st.multiselect(
+        "Pilih Bulan (untuk lihat omzet per Sales pada satu bulan, atau gabungan beberapa bulan — "
+        "mis. Januari–Agustus untuk lihat rata-rata dari 8 bulan itu saja). Kosongkan/pilih semua untuk seluruh data.",
+        opsi_bulan_ldm, default=opsi_bulan_ldm, key="ldm_rekap_sales_bulan",
     )
 
-    if bulan_pilihan_ldm == "Semua Bulan (Gabungan)":
-        st.caption(f"Menampilkan seluruh periode data: {tgl_data_min_ldm.strftime('%d %b %Y')} – {tgl_data_max_ldm.strftime('%d %b %Y')}.")
-        hasil_untuk_rekap_sales = ljl.dashboard_omzet_ldm_per_cabang_sales(
-            df_ldm, tgl_data_min_ldm, tgl_data_max_ldm, kategori_barang=kategori_pilihan_ldm or None,
-        )
+    bulan_terpilih_set = set(bulan_pilihan_multi) if bulan_pilihan_multi else set(opsi_bulan_ldm)
+    daftar_bulan_ldm["_label"] = [f"{NAMA_BULAN_ID[int(r['BULAN'])]} {int(r['TAHUN'])}" for _, r in daftar_bulan_ldm.iterrows()]
+    tahun_bulan_terpilih = set(
+        (int(r["TAHUN"]), int(r["BULAN"])) for _, r in daftar_bulan_ldm[daftar_bulan_ldm["_label"].isin(bulan_terpilih_set)].iterrows()
+    )
+
+    if not tahun_bulan_terpilih:
+        st.info("Pilih minimal satu bulan.")
+        hasil_untuk_rekap_sales = hasil_ldm.iloc[0:0]
+        bulan_pilihan_ldm = "Tidak Ada Bulan Dipilih"
+        df_ldm_terpilih = df_ldm.iloc[0:0]
+        tgl_mulai_subset, tgl_selesai_subset = tgl_data_min_ldm, tgl_data_max_ldm
     else:
-        idx_bulan = opsi_bulan_ldm.index(bulan_pilihan_ldm) - 1
-        tahun_terpilih = int(daftar_bulan_ldm.iloc[idx_bulan]["TAHUN"])
-        bulan_terpilih = int(daftar_bulan_ldm.iloc[idx_bulan]["BULAN"])
-        tgl_mulai_bulan = pd.Timestamp(year=tahun_terpilih, month=bulan_terpilih, day=1)
-        tgl_selesai_bulan = tgl_mulai_bulan + pd.offsets.MonthEnd(0)
-        st.caption(f"Menampilkan periode: {tgl_mulai_bulan.strftime('%d %b %Y')} – {tgl_selesai_bulan.strftime('%d %b %Y')}.")
+        mask_bulan_terpilih = df_ldm.set_index(["TAHUN", "BULAN"]).index.isin(tahun_bulan_terpilih)
+        df_ldm_terpilih = df_ldm[mask_bulan_terpilih]
+        n_bulan_terpilih = len(tahun_bulan_terpilih)
+        if n_bulan_terpilih == len(daftar_bulan_ldm):
+            bulan_pilihan_ldm = "Semua Bulan (Gabungan)"
+            st.caption(f"Menampilkan seluruh periode data: {tgl_data_min_ldm.strftime('%d %b %Y')} – {tgl_data_max_ldm.strftime('%d %b %Y')} ({n_bulan_terpilih} bulan).")
+        else:
+            label_terpilih_urut = [r["_label"] for _, r in daftar_bulan_ldm.iterrows() if (int(r["TAHUN"]), int(r["BULAN"])) in tahun_bulan_terpilih]
+            bulan_pilihan_ldm = " + ".join(label_terpilih_urut) if n_bulan_terpilih <= 3 else f"{label_terpilih_urut[0]} – {label_terpilih_urut[-1]} ({n_bulan_terpilih} bulan)"
+            st.caption(f"Menampilkan gabungan {n_bulan_terpilih} bulan: {', '.join(label_terpilih_urut)}.")
+        tgl_mulai_subset = df_ldm_terpilih["TGL FAKTUR"].min()
+        tgl_selesai_subset = df_ldm_terpilih["TGL FAKTUR"].max()
         hasil_untuk_rekap_sales = ljl.dashboard_omzet_ldm_per_cabang_sales(
-            df_ldm, tgl_mulai_bulan, tgl_selesai_bulan, kategori_barang=kategori_pilihan_ldm or None,
+            df_ldm_terpilih, tgl_mulai_subset, tgl_selesai_subset, kategori_barang=kategori_pilihan_ldm or None,
         )
 
     if hasil_untuk_rekap_sales.empty:
@@ -2352,19 +2365,18 @@ def render_omzet_ldm_tab():
             for c in kolom_pct_rekap_sales:
                 tampil_rekap_sales[c] = rekap_sales_ldm[c].map(ljl.format_percent_id)
             st.dataframe(tampil_rekap_sales, use_container_width=True, height=min(80 + 38 * len(rekap_sales_ldm), 500))
+            nama_file_bulan = "".join(c if c.isalnum() else "_" for c in bulan_pilihan_ldm.lower()).strip("_")
+            while "__" in nama_file_bulan:
+                nama_file_bulan = nama_file_bulan.replace("__", "_")
             st.download_button(
                 "⬇️ Unduh CSV — Rekap per Sales", rekap_sales_ldm.to_csv(index=False).encode("utf-8-sig"),
-                f"omzet_ldm_rekap_sales_{bulan_pilihan_ldm.replace(' ', '_').lower()}.csv", "text/csv", key="ldm_dl_rekap_sales",
+                f"omzet_ldm_rekap_sales_{nama_file_bulan}.csv", "text/csv", key="ldm_dl_rekap_sales",
             )
 
             with st.expander("🔍 Rincian Penjualan — Produk apa saja yang terjual", expanded=False):
                 st.caption("Rincian produk (Nama Barang, Kategori, Qty, Omzet) untuk kombinasi periode & filter Cabang/Sales di atas.")
-                if bulan_pilihan_ldm == "Semua Bulan (Gabungan)":
-                    tgl_mulai_detail, tgl_selesai_detail = tgl_mulai_ldm, tgl_selesai_ldm
-                else:
-                    tgl_mulai_detail, tgl_selesai_detail = tgl_mulai_bulan, tgl_selesai_bulan
                 detail_produk_sales = ljl.detail_produk_ldm(
-                    df_ldm, tgl_mulai_detail, tgl_selesai_detail, kategori_barang=kategori_pilihan_ldm or None,
+                    df_ldm_terpilih, tgl_mulai_subset, tgl_selesai_subset, kategori_barang=kategori_pilihan_ldm or None,
                     cabang=cabang_pilihan_sales or None, sales=sales_pilihan_sales or None,
                 )
                 if detail_produk_sales.empty:
