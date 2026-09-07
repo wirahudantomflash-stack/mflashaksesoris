@@ -832,17 +832,31 @@ Rata-rata Omzet / Bulan.
 - **Rekap per Sales (Seluruh Cabang)** — dijumlahkan dari seluruh cabang
   tempat sales tsb bertransaksi (berguna untuk sales yang pindah cabang
   atau bertugas di lebih dari satu cabang dalam periode yang sama).
-  **Baru: dropdown "Pilih Bulan"** — default "Semua Bulan (Gabungan)"
-  (pakai data yang sudah dihitung, tidak query ulang), atau pilih SATU
-  bulan kalender spesifik (mis. "Agustus 2026") untuk lihat omzet per
-  Sales KHUSUS bulan itu saja — daftar bulan pada dropdown otomatis
-  mengikuti rentang Tanggal Mulai/Selesai yang aktif (tidak hardcode).
-  Saat satu bulan dipilih, dashboard memanggil ulang
-  `dashboard_omzet_ldm_per_cabang_sales()` dengan rentang tanggal
-  awal–akhir bulan kalender tsb (bukan filter baris dari hasil yang
-  sudah ada), supaya filter Retail Toko + bundling Aksesoris tetap
-  diterapkan dengan benar per bulan. Nama file unduhan CSV otomatis
-  menyesuaikan bulan yang dipilih.
+  **Baru: dropdown "Pilih Bulan"** — default "Semua Bulan (Gabungan)",
+  atau pilih SATU bulan kalender spesifik (mis. "Agustus 2026") untuk
+  lihat omzet per Sales KHUSUS bulan itu saja. Saat satu bulan dipilih,
+  dashboard memanggil ulang `dashboard_omzet_ldm_per_cabang_sales()`
+  dengan rentang tanggal awal–akhir bulan kalender tsb, supaya filter
+  Retail Toko + bundling Aksesoris tetap diterapkan dengan benar per
+  bulan. Nama file unduhan CSV otomatis menyesuaikan bulan yang dipilih.
+  - **Diperbarui — basis tanggal khusus section ini SENGAJA independen
+    dari date picker global**: baik daftar bulan pada dropdown MAUPUN
+    opsi "Semua Bulan (Gabungan)" SEKARANG SELALU memakai rentang PENUH
+    data yang dimuat (`tgl_data_min_ldm`–`tgl_data_max_ldm`, mis. 1
+    Januari–6 September 2026), **TIDAK ikut** date picker "Tanggal
+    Mulai"/"Tanggal Selesai" di bagian atas dashboard (yang mempengaruhi
+    bagian lain: Rincian per Cabang & Sales, Rekap per Cabang, 4 kartu
+    ringkasan). Sebelumnya "Semua Bulan (Gabungan)" ikut rentang date
+    picker atas, yang bisa membingungkan kalau date picker itu sedang
+    dipersempit (mis. cuma Juli–Agustus) — opsi "Gabungan" pun ikut
+    kepotong ke Juli–Agustus saja, padahal namanya menyiratkan
+    "seluruh data". Sekarang "Gabungan" konsisten selalu berarti
+    seluruh histori data, apa pun rentang date picker atas.
+    **Diuji**: dengan date picker atas diset ke Jul–Ags 2026, opsi
+    "Semua Bulan (Gabungan)" tetap menghasilkan Rp 16.169.262.095 (utuh
+    Jan–Sep) — BUKAN Rp 6.387.644.502 (kalau salah ikut date picker
+    Jul–Ags). Dropdown tetap menampilkan 9 opsi bulan (Jan–Sep), tidak
+    terpotong jadi 2.
   - **Baru: Filter Cabang & Nama Sales** — dua multiselect ("Cabang",
     "Nama Yang Menyerahkan/Menjual") di atas tabel Rekap per Sales,
     kosongkan untuk semua. Memfilter `hasil_untuk_rekap_sales`

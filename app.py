@@ -2259,7 +2259,13 @@ def render_omzet_ldm_tab():
         1: "Januari", 2: "Februari", 3: "Maret", 4: "April", 5: "Mei", 6: "Juni",
         7: "Juli", 8: "Agustus", 9: "September", 10: "Oktober", 11: "November", 12: "Desember",
     }
-    mask_periode_ldm = (df_ldm["TGL FAKTUR"] >= pd.Timestamp(tgl_mulai_ldm)) & (df_ldm["TGL FAKTUR"] <= pd.Timestamp(tgl_selesai_ldm))
+    # PENTING: bagian "Rekap per Sales" ini SENGAJA memakai rentang PENUH
+    # data yang dimuat (tgl_data_min_ldm/tgl_data_max_ldm), BUKAN date
+    # picker "Tanggal Mulai"/"Tanggal Selesai" di atas — supaya opsi "Semua
+    # Bulan (Gabungan)" selalu konsisten mencakup seluruh histori data,
+    # terlepas dari rentang yang sedang dipilih user untuk bagian lain di
+    # dashboard ini (Rincian per Cabang & Sales, Rekap per Cabang, dst).
+    mask_periode_ldm = (df_ldm["TGL FAKTUR"] >= tgl_data_min_ldm) & (df_ldm["TGL FAKTUR"] <= tgl_data_max_ldm)
     daftar_bulan_ldm = df_ldm[mask_periode_ldm][["TAHUN", "BULAN"]].drop_duplicates().sort_values(["TAHUN", "BULAN"]).reset_index(drop=True)
     opsi_bulan_ldm = ["Semua Bulan (Gabungan)"] + [
         f"{NAMA_BULAN_ID[int(r['BULAN'])]} {int(r['TAHUN'])}" for _, r in daftar_bulan_ldm.iterrows()
@@ -2269,7 +2275,10 @@ def render_omzet_ldm_tab():
     )
 
     if bulan_pilihan_ldm == "Semua Bulan (Gabungan)":
-        hasil_untuk_rekap_sales = hasil_ldm
+        st.caption(f"Menampilkan seluruh periode data: {tgl_data_min_ldm.strftime('%d %b %Y')} – {tgl_data_max_ldm.strftime('%d %b %Y')}.")
+        hasil_untuk_rekap_sales = ljl.dashboard_omzet_ldm_per_cabang_sales(
+            df_ldm, tgl_data_min_ldm, tgl_data_max_ldm, kategori_barang=kategori_pilihan_ldm or None,
+        )
     else:
         idx_bulan = opsi_bulan_ldm.index(bulan_pilihan_ldm) - 1
         tahun_terpilih = int(daftar_bulan_ldm.iloc[idx_bulan]["TAHUN"])
