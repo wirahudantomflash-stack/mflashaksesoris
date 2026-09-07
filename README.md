@@ -1089,6 +1089,25 @@ tinggal disambungkan lagi ke `app.py`.
    Omzet, persis sebesar kontribusi Hydrogel).
 3. **Grafik Penjualan Perbandingan per Pekan**: **direvisi total** dari
    versi sebelumnya berdasarkan permintaan lanjutan —
+   - **Baru: Grafik Omzet LUNA per Hari** (BARU, ditambahkan di ATAS
+     grafik per Pekan yang sudah ada — bukan menggantikan) — fungsi baru
+     `omzet_luna_harian()` di `logic_aksesoris.py`, definisi brand SAMA
+     dengan versi mingguan (LUNA seluruh varian termasuk Hydrogel,
+     termasuk bundling Service). Label tanggal format ISO
+     "YYYY-MM-DD" (urut alfabetis = urut kronologis secara alami, tidak
+     perlu zero-pad manual). **Dilengkapi date picker "Dari
+     tanggal"/"Sampai tanggal"** (default 30 hari terakhir dari data) —
+     data harian mentah bisa sampai 172 titik untuk histori 8-9 bulan,
+     terlalu padat untuk label angka di SETIAP titik sekaligus tetap
+     terbaca, jadi pengguna bisa mempersempit rentang sesuai kebutuhan.
+     Grafik garis + label angka (format jutaan, sama gaya dengan grafik
+     mingguan), tooltip saat hover menampilkan Rupiah lengkap + nama hari
+     (Senin/Selasa/dst). **Diuji dengan data asli**: 172 hari total data
+     (2 Jan–6 Sep 2026), total Omzet harian **cocok persis** dengan total
+     mingguan (Rp 292.690.760) — memverifikasi kedua granularitas
+     konsisten satu sama lain. Default filter 30 hari terakhir teruji
+     benar (8 Ags–6 Sep 2026, 30 baris). Kasus tepi rentang tanggal tanpa
+     data tertangani (pesan info, bukan error).
    - **Khusus produk LUNA** (seluruh varian, **TERMASUK Hydrogel**) —
      bukan lagi seluruh kategori Aksesoris (Tertarget+Non Tertarget).
      Grafik "Perbandingan Tertarget vs Non Tertarget" yang sebelumnya ada
@@ -1303,6 +1322,11 @@ masih memakainya tidak rusak).
 3. **Grafik Rata-rata Penjualan per Hari per Cabang** — dihitung dari
    Total Omzet ÷ jumlah HARI dalam periode (bukan cuma hari yang ada
    transaksi), supaya representatif untuk perencanaan ke depan.
+   **Diperbarui: diagram garis + label angka** (sebelumnya diagram
+   batang polos) — memakai Altair (`mark_line` + `mark_text`), label di
+   setiap titik memakai format ringkas jutaan (mis. "2,5 jt"), tooltip
+   saat hover menampilkan Rupiah lengkap. Konsisten dengan gaya grafik
+   LUNA mingguan yang sudah ada sebelumnya.
 4. **Monitoring Margin Cabang < 40%** — otomatis menyaring & menghitung
    ulang cabang mana saja yang marginnya di bawah 40% pada periode ini,
    dengan pesan sukses kalau ternyata semua cabang sudah ≥40%.

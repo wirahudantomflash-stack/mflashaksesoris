@@ -1740,6 +1740,34 @@ def omzet_luna_mingguan_blok7(df_aksesoris: pd.DataFrame, keyword_brand: str = "
     return g[cols]
 
 
+def omzet_luna_harian(df_aksesoris: pd.DataFrame, keyword_brand: str = "LUNA") -> pd.DataFrame:
+    """Omzet LUNA (SELURUH varian, TERMASUK Hydrogel — sama definisinya
+    dengan `omzet_luna_mingguan_blok7()`) per HARI KALENDER — granularitas
+    lebih detail dari versi mingguan (blok 7 hari). Label tanggal memakai
+    format ISO "YYYY-MM-DD" (urut alfabetis = urut kronologis secara
+    alami, tidak perlu zero-pad manual seperti versi Pekan)."""
+    cols = ["Tanggal", "Hari", "Omzet LUNA", "Qty Terjual"]
+    if df_aksesoris.empty:
+        return pd.DataFrame(columns=cols)
+
+    nama_upper = df_aksesoris["NAMA BARANG"].astype(str).str.upper()
+    mask_luna = nama_upper.str.contains(keyword_brand.upper(), na=False)
+    df_luna = df_aksesoris[mask_luna]
+    if df_luna.empty:
+        return pd.DataFrame(columns=cols)
+
+    tmp = df_luna.copy()
+    tmp["_tgl"] = tmp["TGL FAKTUR"].dt.normalize()
+    g = tmp.groupby("_tgl").agg(
+        **{"Omzet LUNA": ("TOTAL HARGA", "sum")}, **{"Qty Terjual": ("QTY", "sum")},
+    ).reset_index()
+    g["Tanggal"] = g["_tgl"].dt.strftime("%Y-%m-%d")
+    HARI_ID = {0: "Senin", 1: "Selasa", 2: "Rabu", 3: "Kamis", 4: "Jumat", 5: "Sabtu", 6: "Minggu"}
+    g["Hari"] = g["_tgl"].dt.dayofweek.map(HARI_ID)
+    g = g.sort_values("_tgl").reset_index(drop=True)
+    return g[cols]
+
+
 def omzet_luna_cabang_per_pekan_blok7(df_aksesoris: pd.DataFrame, keyword_brand: str = "LUNA") -> pd.DataFrame:
     """Breakdown Omzet LUNA (SELURUH varian, termasuk Hydrogel) per CABANG
     per pekan (blok 7 hari tetap, sama persis dengan

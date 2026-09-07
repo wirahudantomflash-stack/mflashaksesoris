@@ -1013,7 +1013,20 @@ def render_aksesoris_tab():
         )
 
         st.markdown("##### 3️⃣ Rata-rata Penjualan per Hari per Cabang")
-        st.bar_chart(scoreboard.set_index("Cabang")["Rata-rata Omzet / Hari"])
+        chart_rrh = scoreboard[["Cabang", "Rata-rata Omzet / Hari"]].copy()
+        chart_rrh["_label"] = (chart_rrh["Rata-rata Omzet / Hari"] / 1_000_000).apply(lambda x: la.format_decimal_id(x, 1) + " jt")
+        chart_rrh["_label_rp"] = chart_rrh["Rata-rata Omzet / Hari"].apply(la.format_rupiah_id)
+        garis_rrh = alt.Chart(chart_rrh).mark_line(point=True, color="#378ADD").encode(
+            x=alt.X("Cabang:N", sort=chart_rrh["Cabang"].tolist(), title=None),
+            y=alt.Y("Rata-rata Omzet / Hari:Q", title="Rata-rata Omzet / Hari (Rp)"),
+            tooltip=[alt.Tooltip("Cabang:N"), alt.Tooltip("_label_rp:N", title="Rata-rata Omzet / Hari")],
+        )
+        label_rrh = alt.Chart(chart_rrh).mark_text(dy=-12, fontSize=10, color="#1F3864").encode(
+            x=alt.X("Cabang:N", sort=chart_rrh["Cabang"].tolist()),
+            y=alt.Y("Rata-rata Omzet / Hari:Q"),
+            text=alt.Text("_label:N"),
+        )
+        st.altair_chart((garis_rrh + label_rrh).properties(height=380), use_container_width=True)
 
         st.markdown("##### 4️⃣ Monitoring Margin Cabang — Aksesoris di Bawah 40%")
         margin_rendah = scoreboard[scoreboard["Margin (%)"] < 40].sort_values("Margin (%)", ascending=True).reset_index(drop=True)
@@ -2498,6 +2511,54 @@ def render_pembelian_tab():
         if mingguan.empty:
             st.info("Tidak ada data untuk grafik ini.")
         else:
+            st.markdown("**Omzet LUNA per Hari**")
+            st.caption("Rentang tanggal bisa dipersempit di bawah supaya label angka pada grafik tetap terbaca (data harian bisa sangat padat untuk rentang panjang).")
+            harian_full = la.omzet_luna_harian(df_aks_jual, keyword_brand="LUNA")
+            if harian_full.empty:
+                st.info("Tidak ada data harian untuk grafik ini.")
+            else:
+                hd1, hd2 = st.columns(2)
+                tgl_harian_min = pd.Timestamp(harian_full["Tanggal"].min())
+                tgl_harian_max = pd.Timestamp(harian_full["Tanggal"].max())
+                tgl_default_mulai = max(tgl_harian_min, tgl_harian_max - pd.Timedelta(days=29))
+                with hd1:
+                    tgl_mulai_harian = st.date_input("Dari tanggal", value=tgl_default_mulai, min_value=tgl_harian_min, max_value=tgl_harian_max, key="pb_harian_mulai")
+                with hd2:
+                    tgl_selesai_harian = st.date_input("Sampai tanggal", value=tgl_harian_max, min_value=tgl_harian_min, max_value=tgl_harian_max, key="pb_harian_selesai")
+
+                harian = harian_full[
+                    (pd.to_datetime(harian_full["Tanggal"]) >= pd.Timestamp(tgl_mulai_harian)) &
+                    (pd.to_datetime(harian_full["Tanggal"]) <= pd.Timestamp(tgl_selesai_harian))
+                ].reset_index(drop=True)
+
+                if harian.empty:
+                    st.info("Tidak ada data LUNA pada rentang tanggal ini.")
+                else:
+                    chart_hr = harian.copy()
+                    chart_hr["_label_chart"] = (chart_hr["Omzet LUNA"] / 1_000_000).apply(lambda x: la.format_decimal_id(x, 1) + " jt")
+                    chart_hr["_label_rp"] = chart_hr["Omzet LUNA"].apply(la.format_rupiah_id)
+
+                    garis_hr = alt.Chart(chart_hr).mark_line(point=True, color="#378ADD").encode(
+                        x=alt.X("Tanggal:N", sort=chart_hr["Tanggal"].tolist(), title=None),
+                        y=alt.Y("Omzet LUNA:Q", title="Omzet LUNA (Rp)"),
+                        tooltip=[alt.Tooltip("Tanggal:N"), alt.Tooltip("Hari:N"), alt.Tooltip("_label_rp:N", title="Omzet LUNA")],
+                    )
+                    label_hr = alt.Chart(chart_hr).mark_text(dy=-12, fontSize=9, color="#1F3864").encode(
+                        x=alt.X("Tanggal:N", sort=chart_hr["Tanggal"].tolist()),
+                        y=alt.Y("Omzet LUNA:Q"),
+                        text=alt.Text("_label_chart:N"),
+                    )
+                    st.altair_chart((garis_hr + label_hr).properties(height=350), use_container_width=True)
+
+                    tampil_hr = harian.copy()
+                    tampil_hr["Omzet LUNA"] = harian["Omzet LUNA"].map(la.format_rupiah_id)
+                    tampil_hr["Qty Terjual"] = harian["Qty Terjual"].map(la.format_int_id)
+                    st.dataframe(tampil_hr, use_container_width=True, height=min(80 + 38 * len(harian), 400))
+                    st.download_button(
+                        "⬇️ Unduh CSV — Omzet LUNA per Hari (rentang terpilih)", harian.to_csv(index=False).encode("utf-8-sig"),
+                        "omzet_luna_harian.csv", "text/csv", key="pb_dl_harian",
+                    )
+
             st.markdown("**Omzet LUNA per Pekan (termasuk Hydrogel)**")
             chart_mgg = mingguan.copy()
             # Label di titik grafik dibuat ringkas (format jutaan) supaya tidak
