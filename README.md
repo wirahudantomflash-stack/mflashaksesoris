@@ -818,8 +818,51 @@ Rata-rata Omzet / Bulan.
   sudah ada), supaya filter Retail Toko + bundling Aksesoris tetap
   diterapkan dengan benar per bulan. Nama file unduhan CSV otomatis
   menyesuaikan bulan yang dipilih.
+  - **Baru: Filter Cabang & Nama Sales** — dua multiselect ("Cabang",
+    "Nama Yang Menyerahkan/Menjual") di atas tabel Rekap per Sales,
+    kosongkan untuk semua. Memfilter `hasil_untuk_rekap_sales`
+    (level Cabang×Sales) SEBELUM di-groupby ke level Sales-saja, supaya
+    seorang sales yang bertugas di banyak cabang bisa dipersempit ke
+    cabang tertentu saja kalau perlu.
+  - **Baru: Expander "🔍 Rincian Penjualan"** — menjawab "rincian
+    penjualan apa" (produk apa saja yang terjual), dengan fungsi baru
+    `detail_produk_ldm()` di `logic_penjualan.py` yang memakai filter
+    periode/kategori/Retail-Toko **PERSIS SAMA** dengan
+    `dashboard_omzet_ldm_per_cabang_sales()` (supaya totalnya konsisten),
+    lalu di-groupby ke level Nama Barang (Qty, Omzet) — bukan level
+    Cabang/Sales. Otomatis mengikuti filter Cabang/Sales/Bulan yang
+    sedang aktif di atasnya.
+  - **Diuji dengan data asli**: filter Cabang=[Bintara, Ceger] → 30 sales
+    berbeda, total Omzet Rp 2.065.695.245 — **cocok persis** antara tabel
+    Rekap per Sales, tabel Rincian Penjualan (728 jenis produk), dan hasil
+    filter tambahan Sales=1 orang spesifik (Rp 479.250.500 di ketiganya).
+    Termasuk kasus tepi kombinasi filter tanpa hasil sama sekali (pesan
+    info yang jelas, bukan tabel kosong membingungkan).
 - Tombol unduh CSV terpisah untuk ketiga tabel (rincian, rekap cabang,
   rekap sales)
+
+- **🐛 TEMUAN BARU (data quality, BUKAN bug dashboard) — Gross Profit
+  ekstrem negatif ditemukan saat menguji fitur di atas**: satu baris
+  "BATERAI SAMSUNG S22 ULTRA" tercatat HARGA BELI **Rp 9.975.434.000**
+  (hampir 10 miliar) untuk 1 unit yang dijual cuma Rp 125.000 — jelas
+  kesalahan input di sistem sumber MFlash, bukan kesalahan perhitungan
+  dashboard. **Diselidiki skalanya lebih luas**: ditemukan **8.114 baris**
+  di SELURUH data (bukan cuma kategori LDM) dengan HARGA BELI antara
+  Rp 1–10 miliar untuk barang-barang kecil (4.010 baris Aksesoris, 3.948
+  Sparepart, 94 Parfum, 28 baris kategori lain, termasuk 22 Handphone dan
+  6 Laptop) — total dampaknya ke Gross Profit/Laba SELURUH dataset
+  mencapai **-Rp 25 TRILIUN** (dibandingkan -Rp 154 miliar kalau baris
+  anomali ini dikecualikan — masih negatif tapi jauh lebih masuk akal).
+  **Ini bukan bug di kode dashboard** — kolom LABA dihitung dengan rumus
+  yang benar (`TOTAL HARGA - HARGA BELI`) dari `logic_penjualan.py`;
+  akar masalahnya murni dari nilai HARGA BELI yang salah di sumber data.
+  **Berlaku untuk SEMUA bagian dashboard yang menghitung Gross
+  Profit/Laba/Margin** — tidak dibatasi ke Dashboard Omzet LDM ini saja.
+  Belum diperbaiki secara otomatis (tidak mengubah data tanpa
+  konfirmasi) — perlu ditindaklanjuti oleh tim MFlash di sistem sumber,
+  atau beri tahu Claude kalau ingin baris dengan HARGA BELI di luar
+  wajar (mis. > beberapa kali lipat harga jual) dikecualikan secara
+  eksplisit dari perhitungan Gross Profit di seluruh dashboard.
 
 - **🐛 Bug ditemukan & diperbaiki: dropdown "Pilih Bulan" cuma menampilkan
   2 bulan (Juli, Agustus), padahal data sebenarnya mencakup Januari–

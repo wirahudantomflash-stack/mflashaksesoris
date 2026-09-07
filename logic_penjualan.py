@@ -316,6 +316,56 @@ def dashboard_omzet_ldm_per_cabang_sales(
     return g[cols]
 
 
+def detail_produk_ldm(
+    df: pd.DataFrame,
+    tanggal_mulai,
+    tanggal_selesai,
+    kategori_barang: list[str] | None = None,
+    hanya_retail_toko: bool = True,
+    cabang: list[str] | None = None,
+    sales: list[str] | None = None,
+) -> pd.DataFrame:
+    """Rincian PRODUK (bukan agregat Cabang/Sales) untuk Dashboard Omzet
+    LDM — memakai filter periode/kategori/retail-toko yang PERSIS SAMA
+    dengan `dashboard_omzet_ldm_per_cabang_sales()`, supaya kalau
+    dijumlahkan, hasilnya konsisten dengan tabel rekap. Bisa dipersempit
+    lagi dengan `cabang`/`sales` (list, opsional — None/kosong = semua).
+    Kolom hasil: Nama Barang, Kategori Barang, Qty, Omzet."""
+    cols = ["Nama Barang", "Kategori Barang", "Qty", "Omzet"]
+    if kategori_barang is None:
+        kategori_barang = ["LAPTOP", "HANDPHONE", "AKSESORIS"]
+
+    tanggal_mulai = pd.Timestamp(tanggal_mulai)
+    tanggal_selesai = pd.Timestamp(tanggal_selesai)
+    d = df[
+        (df["TGL FAKTUR"] >= tanggal_mulai) & (df["TGL FAKTUR"] <= tanggal_selesai) &
+        (df["KATEGORI BARANG NORM"].isin([k.upper() for k in kategori_barang]))
+    ]
+    if hanya_retail_toko and "KATEGORI PENJUALAN" in d.columns:
+        kp = d["KATEGORI PENJUALAN"].astype(str).str.strip().str.upper()
+        mask_retail_murni = kp.isin(["PENJUALAN LAPTOP", "PENJUALAN HP", "PENJUALAN HANDPHONE", "PENJUALAN AKSESORIS"])
+        mask_aksesoris_bundling = (d["KATEGORI BARANG NORM"] == "AKSESORIS") & kp.str.contains("SERVICE", na=False)
+        d = d[mask_retail_murni | mask_aksesoris_bundling]
+    if d.empty:
+        return pd.DataFrame(columns=cols)
+
+    d = d.copy()
+    d["YANG MENYERAHKAN/MENJUAL"] = d["YANG MENYERAHKAN/MENJUAL"].fillna("— Tidak Tercatat —")
+
+    if cabang:
+        d = d[d["CABANG"].isin(cabang)]
+    if sales:
+        d = d[d["YANG MENYERAHKAN/MENJUAL"].isin(sales)]
+    if d.empty:
+        return pd.DataFrame(columns=cols)
+
+    g = d.groupby(["NAMA BARANG", "KATEGORI BARANG NORM"], dropna=False).agg(
+        **{"Qty": ("QTY", "sum")}, **{"Omzet": ("TOTAL HARGA", "sum")},
+    ).reset_index().rename(columns={"NAMA BARANG": "Nama Barang", "KATEGORI BARANG NORM": "Kategori Barang"})
+    g = g.sort_values("Omzet", ascending=False).reset_index(drop=True)
+    return g[cols]
+
+
 # ---------------------------------------------------------------------------
 # Format angka gaya Indonesia: 68.838 / 1.234,5 / 10,3%
 # ---------------------------------------------------------------------------

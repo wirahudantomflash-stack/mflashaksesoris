@@ -2277,32 +2277,81 @@ def render_omzet_ldm_tab():
     if hasil_untuk_rekap_sales.empty:
         st.info("Tidak ada data untuk bulan yang dipilih.")
     else:
-        kolom_omzet_kategori_sales = [c for c in hasil_untuk_rekap_sales.columns if c.startswith("Omzet") and c != "Omzet Penjualan"]
-        agg_dict_sales = {
-            "Omzet Penjualan": ("Omzet Penjualan", "sum"), "Gross Profit": ("Gross Profit", "sum"),
-            "Rata-rata Omzet / Bulan": ("Rata-rata Omzet / Bulan", "sum"),
-        }
-        for c in kolom_omzet_kategori_sales:
-            agg_dict_sales[c] = (c, "sum")
-        rekap_sales_ldm = hasil_untuk_rekap_sales.groupby("Sales", dropna=False).agg(**agg_dict_sales).reset_index()
-        for c in kolom_omzet_kategori_sales:
-            nama_kat = c.replace("Omzet ", "")
-            rekap_sales_ldm[f"% Kontribusi {nama_kat}"] = np.where(
-                rekap_sales_ldm["Omzet Penjualan"] != 0, rekap_sales_ldm[c] / rekap_sales_ldm["Omzet Penjualan"] * 100, 0,
+        st.markdown("**Filter**")
+        f1, f2 = st.columns(2)
+        with f1:
+            cabang_opsi_sales = sorted(hasil_untuk_rekap_sales["Cabang"].dropna().unique().tolist())
+            cabang_pilihan_sales = st.multiselect(
+                "Cabang (kosongkan untuk semua cabang)", cabang_opsi_sales, default=[], key="ldm_rekap_sales_cabang",
             )
-        rekap_sales_ldm = rekap_sales_ldm.sort_values("Omzet Penjualan", ascending=False).reset_index(drop=True)
-        tampil_rekap_sales = rekap_sales_ldm.copy()
-        kolom_rp_rekap_sales = [c for c in rekap_sales_ldm.columns if c.startswith("Omzet")] + ["Gross Profit", "Rata-rata Omzet / Bulan"]
-        kolom_pct_rekap_sales = [c for c in rekap_sales_ldm.columns if c.startswith("%")]
-        for c in kolom_rp_rekap_sales:
-            tampil_rekap_sales[c] = rekap_sales_ldm[c].map(ljl.format_rupiah_id)
-        for c in kolom_pct_rekap_sales:
-            tampil_rekap_sales[c] = rekap_sales_ldm[c].map(ljl.format_percent_id)
-        st.dataframe(tampil_rekap_sales, use_container_width=True, height=min(80 + 38 * len(rekap_sales_ldm), 500))
-        st.download_button(
-            "⬇️ Unduh CSV — Rekap per Sales", rekap_sales_ldm.to_csv(index=False).encode("utf-8-sig"),
-            f"omzet_ldm_rekap_sales_{bulan_pilihan_ldm.replace(' ', '_').lower()}.csv", "text/csv", key="ldm_dl_rekap_sales",
-        )
+        with f2:
+            sales_opsi_sales = sorted(hasil_untuk_rekap_sales["Sales"].dropna().unique().tolist())
+            sales_pilihan_sales = st.multiselect(
+                "Nama Yang Menyerahkan/Menjual (kosongkan untuk semua sales)", sales_opsi_sales, default=[], key="ldm_rekap_sales_nama",
+            )
+
+        hasil_terfilter_sales = hasil_untuk_rekap_sales.copy()
+        if cabang_pilihan_sales:
+            hasil_terfilter_sales = hasil_terfilter_sales[hasil_terfilter_sales["Cabang"].isin(cabang_pilihan_sales)]
+        if sales_pilihan_sales:
+            hasil_terfilter_sales = hasil_terfilter_sales[hasil_terfilter_sales["Sales"].isin(sales_pilihan_sales)]
+
+        if hasil_terfilter_sales.empty:
+            st.info("Tidak ada data untuk kombinasi filter Cabang/Sales ini.")
+        else:
+            kolom_omzet_kategori_sales = [c for c in hasil_terfilter_sales.columns if c.startswith("Omzet") and c != "Omzet Penjualan"]
+            agg_dict_sales = {
+                "Omzet Penjualan": ("Omzet Penjualan", "sum"), "Gross Profit": ("Gross Profit", "sum"),
+                "Rata-rata Omzet / Bulan": ("Rata-rata Omzet / Bulan", "sum"),
+            }
+            for c in kolom_omzet_kategori_sales:
+                agg_dict_sales[c] = (c, "sum")
+            rekap_sales_ldm = hasil_terfilter_sales.groupby("Sales", dropna=False).agg(**agg_dict_sales).reset_index()
+            for c in kolom_omzet_kategori_sales:
+                nama_kat = c.replace("Omzet ", "")
+                rekap_sales_ldm[f"% Kontribusi {nama_kat}"] = np.where(
+                    rekap_sales_ldm["Omzet Penjualan"] != 0, rekap_sales_ldm[c] / rekap_sales_ldm["Omzet Penjualan"] * 100, 0,
+                )
+            rekap_sales_ldm = rekap_sales_ldm.sort_values("Omzet Penjualan", ascending=False).reset_index(drop=True)
+            tampil_rekap_sales = rekap_sales_ldm.copy()
+            kolom_rp_rekap_sales = [c for c in rekap_sales_ldm.columns if c.startswith("Omzet")] + ["Gross Profit", "Rata-rata Omzet / Bulan"]
+            kolom_pct_rekap_sales = [c for c in rekap_sales_ldm.columns if c.startswith("%")]
+            for c in kolom_rp_rekap_sales:
+                tampil_rekap_sales[c] = rekap_sales_ldm[c].map(ljl.format_rupiah_id)
+            for c in kolom_pct_rekap_sales:
+                tampil_rekap_sales[c] = rekap_sales_ldm[c].map(ljl.format_percent_id)
+            st.dataframe(tampil_rekap_sales, use_container_width=True, height=min(80 + 38 * len(rekap_sales_ldm), 500))
+            st.download_button(
+                "⬇️ Unduh CSV — Rekap per Sales", rekap_sales_ldm.to_csv(index=False).encode("utf-8-sig"),
+                f"omzet_ldm_rekap_sales_{bulan_pilihan_ldm.replace(' ', '_').lower()}.csv", "text/csv", key="ldm_dl_rekap_sales",
+            )
+
+            with st.expander("🔍 Rincian Penjualan — Produk apa saja yang terjual", expanded=False):
+                st.caption("Rincian produk (Nama Barang, Kategori, Qty, Omzet) untuk kombinasi periode & filter Cabang/Sales di atas.")
+                if bulan_pilihan_ldm == "Semua Bulan (Gabungan)":
+                    tgl_mulai_detail, tgl_selesai_detail = tgl_mulai_ldm, tgl_selesai_ldm
+                else:
+                    tgl_mulai_detail, tgl_selesai_detail = tgl_mulai_bulan, tgl_selesai_bulan
+                detail_produk_sales = ljl.detail_produk_ldm(
+                    df_ldm, tgl_mulai_detail, tgl_selesai_detail, kategori_barang=kategori_pilihan_ldm or None,
+                    cabang=cabang_pilihan_sales or None, sales=sales_pilihan_sales or None,
+                )
+                if detail_produk_sales.empty:
+                    st.info("Tidak ada rincian produk untuk kombinasi filter ini.")
+                else:
+                    st.caption(
+                        f"Total {ljl.format_int_id(len(detail_produk_sales))} jenis produk, "
+                        f"{ljl.format_int_id(int(detail_produk_sales['Qty'].sum()))} pcs, "
+                        f"Omzet {ljl.format_rupiah_id(detail_produk_sales['Omzet'].sum())}."
+                    )
+                    tampil_detail_produk = detail_produk_sales.copy()
+                    tampil_detail_produk["Qty"] = detail_produk_sales["Qty"].map(ljl.format_int_id)
+                    tampil_detail_produk["Omzet"] = detail_produk_sales["Omzet"].map(ljl.format_rupiah_id)
+                    st.dataframe(tampil_detail_produk, use_container_width=True, height=min(80 + 38 * len(detail_produk_sales), 500))
+                    st.download_button(
+                        "⬇️ Unduh CSV — Rincian Penjualan", detail_produk_sales.to_csv(index=False).encode("utf-8-sig"),
+                        "omzet_ldm_rincian_penjualan.csv", "text/csv", key="ldm_dl_rincian_produk",
+                    )
 
 
 # ---------------------------------------------------------------------------
