@@ -365,9 +365,8 @@ def produk_favorit_per_cabang(df_jual: pd.DataFrame, df_stok: pd.DataFrame, top_
     jumlah_bulan = _jumlah_bulan_data(df_jual)
 
     agg = df_jual.groupby(["CABANG", "NAMA BARANG"], dropna=False).agg(
-        **{"Qty Terjual": ("QTY", "sum")}, Omzet=("TOTAL HARGA", "sum"), Modal=("HARGA BELI", "sum"),
+        **{"Qty Terjual": ("QTY", "sum")}, Omzet=("TOTAL HARGA", "sum"), **{"Potensi Laba": ("LABA", "sum")},
     ).reset_index()
-    agg["Potensi Laba"] = agg["Omzet"] - agg["Modal"]
     agg["Peringkat"] = agg.groupby("CABANG")["Qty Terjual"].rank(method="first", ascending=False).astype(int)
     top = agg[agg["Peringkat"] <= top_n].sort_values(["CABANG", "Peringkat"]).reset_index(drop=True)
     top["Rata-rata Terjual/Bulan"] = top["Qty Terjual"] / jumlah_bulan
@@ -412,10 +411,9 @@ def produk_favorit_semua_cabang(
     jumlah_bulan = _jumlah_bulan_data(df_jual)
 
     agg = df_jual.groupby("NAMA BARANG", dropna=False).agg(
-        **{"Qty Terjual": ("QTY", "sum")}, Omzet=("TOTAL HARGA", "sum"), Modal=("HARGA BELI", "sum"),
+        **{"Qty Terjual": ("QTY", "sum")}, Omzet=("TOTAL HARGA", "sum"), **{"Potensi Laba": ("LABA", "sum")},
         **{"Jumlah Cabang Menjual": ("CABANG", "nunique")},
     ).reset_index()
-    agg["Potensi Laba"] = agg["Omzet"] - agg["Modal"]
     agg["Rata-rata Terjual/Bulan"] = agg["Qty Terjual"] / jumlah_bulan
     agg = agg.rename(columns={"Omzet": "Potensi Omzet", "NAMA BARANG": "Nama Barang"})
 

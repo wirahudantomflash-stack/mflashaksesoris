@@ -27,6 +27,18 @@ REQUIRED_COLUMNS = [
     "NAMA TEKNISI (FINAL)", "YANG MENYERAHKAN/MENJUAL",
 ]
 
+# Ambang deteksi HARGA BELI anomali/di luar wajar: kalau HARGA BELI lebih
+# dari N kali lipat harga jual (TOTAL HARGA), baris itu dianggap kesalahan
+# input data di sumber (mis. HARGA BELI Rp9,9 miliar untuk baterai HP yang
+# dijual Rp125.000) — BUKAN transaksi rugi besar yang wajar. Ditentukan dari
+# analisa distribusi data nyata: 99% baris berada di rasio ≤ ~1,1x, lalu
+# langsung melompat ke ribuan–ratusan ribu kali lipat pada baris anomali
+# (jurang jelas, bukan distribusi kontinu), sehingga ambang 5x aman dipakai
+# tanpa memotong data wajar. Dipakai di `finalize_data()` — HARGA BELI/
+# TOTAL HARGA mentah TIDAK diubah, hanya kolom LABA turunan yang dinolkan
+# untuk baris yang kena flag, supaya Omzet/Qty tetap terhitung normal.
+RASIO_HARGA_BELI_ANOMALI = 5
+
 
 class MissingCabangColumn(Exception):
     """Berkas terbaca sukses tapi tidak punya kolom CABANG (file 1 cabang)."""
@@ -98,6 +110,21 @@ def finalize_data(df: pd.DataFrame, cabang_default: str | None = None) -> pd.Dat
     # Modal & laba per baris (HARGA BELI sudah total, jangan dikalikan QTY lagi)
     df["MODAL"] = df["HARGA BELI"]
     df["LABA"] = df["TOTAL HARGA"] - df["MODAL"]
+
+    # Kecualikan baris dengan HARGA BELI di luar wajar dari perhitungan Gross
+    # Profit/Laba — data mentah (HARGA BELI, TOTAL HARGA) TIDAK diubah sama
+    # sekali, cuma kolom LABA turunan yang di-nol-kan untuk baris ini, supaya
+    # Omzet/Qty tetap terhitung normal, hanya Gross Profit yang tidak
+    # terdampak. Ambang RASIO_HARGA_BELI_ANOMALI ditentukan dari analisa
+    # distribusi data nyata: 99% baris berada di rasio ≤ ~1,1x (modal wajar
+    # di bawah/mendekati harga jual), lalu langsung melompat ke ribuan–
+    # ratusan ribu kali lipat pada baris anomali — bukan distribusi
+    # kontinu, ada jurang jelas, sehingga ambang 5x aman dipakai tanpa
+    # memotong data wajar (termasuk transaksi rugi besar yang legitimate).
+    total_harga_safe = df["TOTAL HARGA"].replace(0, np.nan)
+    rasio_modal = df["MODAL"] / total_harga_safe
+    df["HARGA_BELI_ANOMALI"] = (rasio_modal > RASIO_HARGA_BELI_ANOMALI).fillna(False)
+    df.loc[df["HARGA_BELI_ANOMALI"], "LABA"] = 0
 
     df["TAHUN"] = df["TGL FAKTUR"].dt.year
     df["BULAN"] = df["TGL FAKTUR"].dt.month

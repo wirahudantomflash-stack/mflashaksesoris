@@ -102,6 +102,20 @@ def finalize_data(df: pd.DataFrame, cabang_default: str | None = None) -> pd.Dat
     df["MODAL"] = df["HARGA BELI"]
     df["LABA"] = df["TOTAL HARGA"] - df["MODAL"]
 
+    # Kecualikan baris dengan HARGA BELI di luar wajar dari perhitungan Gross
+    # Profit/Laba — konsisten dengan `logic_penjualan.py`. HARGA BELI/TOTAL
+    # HARGA mentah TIDAK diubah, cuma kolom LABA dinolkan untuk baris ini.
+    # Lihat RASIO_HARGA_BELI_ANOMALI di logic_penjualan.py untuk penjelasan
+    # lengkap penentuan ambang 5x (diverifikasi manual: seluruh baris yang
+    # kena flag, termasuk yang HARGA BELI-nya "cuma" ratusan ribu, terbukti
+    # anomali kesalahan input — bukan transaksi rugi legitimate — mis. kabel
+    # data biasa tercatat modal jutaan rupiah untuk item yang dijual Rp20rb).
+    RASIO_HARGA_BELI_ANOMALI = 5
+    total_harga_safe = df["TOTAL HARGA"].replace(0, np.nan)
+    rasio_modal = df["MODAL"] / total_harga_safe
+    df["HARGA_BELI_ANOMALI"] = (rasio_modal > RASIO_HARGA_BELI_ANOMALI).fillna(False)
+    df.loc[df["HARGA_BELI_ANOMALI"], "LABA"] = 0
+
     df["TAHUN"] = df["TGL FAKTUR"].dt.year
     df["BULAN"] = df["TGL FAKTUR"].dt.month
     df["PERIODE"] = df["TGL FAKTUR"].dt.to_period("M")

@@ -841,28 +841,48 @@ Rata-rata Omzet / Bulan.
 - Tombol unduh CSV terpisah untuk ketiga tabel (rincian, rekap cabang,
   rekap sales)
 
-- **🐛 TEMUAN BARU (data quality, BUKAN bug dashboard) — Gross Profit
-  ekstrem negatif ditemukan saat menguji fitur di atas**: satu baris
-  "BATERAI SAMSUNG S22 ULTRA" tercatat HARGA BELI **Rp 9.975.434.000**
-  (hampir 10 miliar) untuk 1 unit yang dijual cuma Rp 125.000 — jelas
-  kesalahan input di sistem sumber MFlash, bukan kesalahan perhitungan
-  dashboard. **Diselidiki skalanya lebih luas**: ditemukan **8.114 baris**
-  di SELURUH data (bukan cuma kategori LDM) dengan HARGA BELI antara
-  Rp 1–10 miliar untuk barang-barang kecil (4.010 baris Aksesoris, 3.948
-  Sparepart, 94 Parfum, 28 baris kategori lain, termasuk 22 Handphone dan
-  6 Laptop) — total dampaknya ke Gross Profit/Laba SELURUH dataset
-  mencapai **-Rp 25 TRILIUN** (dibandingkan -Rp 154 miliar kalau baris
-  anomali ini dikecualikan — masih negatif tapi jauh lebih masuk akal).
-  **Ini bukan bug di kode dashboard** — kolom LABA dihitung dengan rumus
-  yang benar (`TOTAL HARGA - HARGA BELI`) dari `logic_penjualan.py`;
-  akar masalahnya murni dari nilai HARGA BELI yang salah di sumber data.
-  **Berlaku untuk SEMUA bagian dashboard yang menghitung Gross
-  Profit/Laba/Margin** — tidak dibatasi ke Dashboard Omzet LDM ini saja.
-  Belum diperbaiki secara otomatis (tidak mengubah data tanpa
-  konfirmasi) — perlu ditindaklanjuti oleh tim MFlash di sistem sumber,
-  atau beri tahu Claude kalau ingin baris dengan HARGA BELI di luar
-  wajar (mis. > beberapa kali lipat harga jual) dikecualikan secara
-  eksplisit dari perhitungan Gross Profit di seluruh dashboard.
+- **🐛 TEMUAN & PERBAIKAN — HARGA BELI di luar wajar sekarang DIKECUALIKAN
+  secara eksplisit dari perhitungan Gross Profit di SELURUH dashboard**
+  (data quality, bukan bug perhitungan): satu baris "BATERAI SAMSUNG S22
+  ULTRA" tercatat HARGA BELI **Rp 9.975.434.000** (hampir 10 miliar) untuk
+  1 unit yang dijual cuma Rp 125.000 — jelas kesalahan input di sistem
+  sumber MFlash. Diselidiki lebih luas: **8.948 baris** di seluruh data
+  punya rasio HARGA BELI/harga jual **> 5x lipat** — 90,5% di antaranya
+  HARGA BELI-nya ≥ Rp 1 miliar (jelas ekstrem), sisanya diperiksa satu per
+  satu dan SEMUA terbukti anomali juga (mis. "LUNA Data Cable" modal
+  Rp 6.546.875 untuk kabel yang dijual Rp 20.000 — rasio 327x; "VIVAN Data
+  Cable" modal Rp 442,5 juta untuk item Rp 50–70rb).
+  - **Ambang ditentukan dari analisa distribusi nyata** (bukan angka
+    sembarangan): 99% baris data punya rasio HARGA BELI/TOTAL HARGA ≤
+    ~1,1x (modal wajar), lalu langsung MELOMPAT ke ribuan–ratusan ribu
+    kali lipat pada baris anomali — jurang jelas, bukan distribusi
+    kontinu — sehingga ambang **`RASIO_HARGA_BELI_ANOMALI = 5`** aman
+    dipakai tanpa memotong transaksi rugi yang legitimate.
+  - **Diterapkan di `finalize_data()`** pada KEDUA modul yang menghitung
+    LABA independen — `logic_penjualan.py` DAN `logic_aksesoris.py`
+    (masing-masing punya `finalize_data()` sendiri, jadi perlu diperbaiki
+    di keduanya secara terpisah, sudah diverifikasi hasilnya identik:
+    8.948 baris anomali & Rp 5.203.794.148 total LABA di kedua modul).
+  - **Kolom mentah (HARGA BELI, TOTAL HARGA) TIDAK diubah sama sekali** —
+    cuma kolom turunan `LABA` yang dinolkan untuk baris anomali (ditandai
+    kolom baru `HARGA_BELI_ANOMALI`), supaya Omzet/Qty tetap terhitung
+    normal, hanya Gross Profit yang tidak terdampak.
+  - **Bonus perbaikan yang ditemukan saat audit ini**: `logic_persediaan.py`
+    (fungsi `produk_favorit_per_cabang()` dan `produk_favorit_semua_cabang()`)
+    ternyata menghitung "Potensi Laba" dengan MENGHITUNG ULANG dari
+    `HARGA BELI` mentah (`Omzet - sum(HARGA BELI)`), BUKAN memakai kolom
+    `LABA` yang sudah dibersihkan — sehingga masih rentan terhadap anomali
+    yang sama meski kedua modul sumbernya sudah diperbaiki. Diperbaiki
+    dengan mengganti agregasi langsung ke `sum(LABA)`.
+  - **Dampak setelah perbaikan**: Total LABA seluruh dataset naik dari
+    **-Rp 25.029.211.019.029** (sebelum perbaikan) menjadi **Rp
+    5.203.794.148** (setelah perbaikan) — dari angka yang jelas absurd
+    jadi masuk akal untuk bisnis retail gadget. Diverifikasi khusus pada
+    Dashboard Omzet LDM (yang sebelumnya sempat menunjukkan Gross Profit
+    -Rp 566 miliar untuk satu sales): sekarang seluruh 155 baris
+    Cabang×Sales bernilai POSITIF dan wajar (Rp 2.000 – Rp 56,2 juta).
+    Scoreboard Aksesoris juga diverifikasi bersih (Laba Rp 3,5jt – 35,9jt
+    per cabang, semua positif).
 
 - **🐛 Bug ditemukan & diperbaiki: dropdown "Pilih Bulan" cuma menampilkan
   2 bulan (Juli, Agustus), padahal data sebenarnya mencakup Januari–
