@@ -849,6 +849,23 @@ Rata-rata Omzet / Bulan.
     (level Cabang×Sales) SEBELUM di-groupby ke level Sales-saja, supaya
     seorang sales yang bertugas di banyak cabang bisa dipersempit ke
     cabang tertentu saja kalau perlu.
+    - **Filter berjenjang (BARU)**: opsi dropdown "Nama Yang Menyerahkan/
+      Menjual" OTOMATIS MENYESUAIKAN Cabang yang sudah dipilih — pilih
+      Cabang="Bintara" dan dropdown Sales hanya menampilkan nama-nama
+      yang benar-benar terdaftar/bertransaksi di Bintara (bukan semua
+      197 nama sales se-jaringan). **Diuji dengan data asli**: tanpa
+      filter cabang → 197 opsi sales; filter Cabang=Bintara → turun jadi
+      18 opsi, semuanya diverifikasi memang tercatat bertransaksi di
+      Bintara (termasuk kasus sales yang aktif di 2 cabang sekaligus,
+      mis. "M Ramadhan Pratama" di Bintara & Cilangkap — tetap muncul
+      karena benar tercatat di Bintara juga).
+    - **Penanganan kasus tepi perpindahan cabang**: kalau user sudah
+      memilih nama sales tertentu, lalu MENGGANTI pilihan Cabang sehingga
+      nama itu tidak lagi valid untuk cabang baru (mis. sales itu cuma
+      ada di cabang lama, bukan yang baru dipilih), Streamlit akan error
+      "value not in options" tanpa penanganan khusus — dicegah dengan
+      membersihkan `st.session_state` pilihan Sales yang sudah tidak
+      valid SEBELUM widget dropdown dibuat ulang.
   - **Baru: Expander "🔍 Rincian Penjualan"** — menjawab "rincian
     penjualan apa" (produk apa saja yang terjual), dengan fungsi baru
     `detail_produk_ldm()` di `logic_penjualan.py` yang memakai filter

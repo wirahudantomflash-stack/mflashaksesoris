@@ -2292,7 +2292,22 @@ def render_omzet_ldm_tab():
                 "Cabang (kosongkan untuk semua cabang)", cabang_opsi_sales, default=[], key="ldm_rekap_sales_cabang",
             )
         with f2:
-            sales_opsi_sales = sorted(hasil_untuk_rekap_sales["Sales"].dropna().unique().tolist())
+            # Opsi nama sales otomatis mengikuti cabang yang sudah dipilih di atas
+            # — kalau Cabang=Bintara dipilih, dropdown ini hanya menampilkan nama
+            # sales yang benar-benar terdaftar/bertransaksi di Bintara.
+            data_untuk_opsi_sales = (
+                hasil_untuk_rekap_sales[hasil_untuk_rekap_sales["Cabang"].isin(cabang_pilihan_sales)]
+                if cabang_pilihan_sales else hasil_untuk_rekap_sales
+            )
+            sales_opsi_sales = sorted(data_untuk_opsi_sales["Sales"].dropna().unique().tolist())
+            # Bersihkan pilihan Sales yang sudah tersimpan tapi tidak lagi valid
+            # untuk cabang yang baru dipilih (mis. user ganti Cabang setelah
+            # sebelumnya memilih nama sales dari cabang lain) — supaya
+            # st.multiselect tidak error "value not in options".
+            if "ldm_rekap_sales_nama" in st.session_state:
+                st.session_state["ldm_rekap_sales_nama"] = [
+                    s for s in st.session_state["ldm_rekap_sales_nama"] if s in sales_opsi_sales
+                ]
             sales_pilihan_sales = st.multiselect(
                 "Nama Yang Menyerahkan/Menjual (kosongkan untuk semua sales)", sales_opsi_sales, default=[], key="ldm_rekap_sales_nama",
             )
