@@ -30,6 +30,10 @@ TAMPILKAN_KONTRIBUSI_CABANG = False     # "Indikator Kontribusi Cabang (Terendah
 TAMPILKAN_DATA_SELURUH_SALES = False    # "Seluruh Sales" di dalam "Ringkasan Cabang, Produk & Sales"
 TAMPILKAN_ANALISA_MENDALAM_LUNA = False # "Analisa Mendalam: LUNA, Selain LUNA"
 
+# Flag sementara tambahan lagi (pola sama):
+TAMPILKAN_KEBUTUHAN_BELUM_TERPENUHI = False  # "3. Kebutuhan Konsumen yang Belum Terpenuhi"
+TAMPILKAN_ANALISA_LOKASI_CABANG = False      # "4. Analisa Lokasi Cabang MFlash"
+
 st.set_page_config(page_title="MFlash Dashboard Gadget dan Aksesoris", page_icon="flash_logo.png", layout="wide")
 
 st.logo("flash_logo.png")
@@ -467,7 +471,7 @@ def render_persediaan_tab():
                 "produk_favorit_semua_cabang.csv", "text/csv", key="pd_dl_produk_favorit_gabungan",
             )
 
-    if not produk_favorit.empty:
+    if TAMPILKAN_KEBUTUHAN_BELUM_TERPENUHI and not produk_favorit.empty:
         st.divider()
         st.header("📢 3. Kebutuhan Konsumen yang Belum Terpenuhi")
         kebutuhan = lp.kebutuhan_belum_terpenuhi(produk_favorit)
@@ -505,50 +509,53 @@ def render_persediaan_tab():
 
     st.divider()
 
-    # -----------------------------------------------------------------
-    # 4. Analisa Lokasi Cabang MFlash
-    # -----------------------------------------------------------------
-    st.header("📍 4. Analisa Lokasi Cabang MFlash")
-    st.caption(
-        "Lokasi 18 cabang MFlash (dicari langsung dari data lokasi asli — alamat, koordinat, "
-        "dan rating), disandingkan dengan nilai persediaan aksesoris per cabang."
-    )
+    ring_wilayah = pd.DataFrame()
 
-    lokasi = lp.data_lokasi_cabang()
-    if not nv_banding.empty:
-        lokasi_gabung = lokasi.merge(nv_banding, on="Cabang", how="left")
-    else:
-        lokasi_gabung = lokasi.copy()
-        lokasi_gabung["Total Nilai"] = np.nan
+    if TAMPILKAN_ANALISA_LOKASI_CABANG:
+        # -----------------------------------------------------------------
+        # 4. Analisa Lokasi Cabang MFlash
+        # -----------------------------------------------------------------
+        st.header("📍 4. Analisa Lokasi Cabang MFlash")
+        st.caption(
+            "Lokasi 18 cabang MFlash (dicari langsung dari data lokasi asli — alamat, koordinat, "
+            "dan rating), disandingkan dengan nilai persediaan aksesoris per cabang."
+        )
 
-    peta_df = lokasi_gabung.rename(columns={"Lat": "lat", "Lon": "lon"})[["lat", "lon"]]
-    st.map(peta_df, size=60)
+        lokasi = lp.data_lokasi_cabang()
+        if not nv_banding.empty:
+            lokasi_gabung = lokasi.merge(nv_banding, on="Cabang", how="left")
+        else:
+            lokasi_gabung = lokasi.copy()
+            lokasi_gabung["Total Nilai"] = np.nan
 
-    st.subheader("Sebaran Wilayah")
-    ring_wilayah = lp.ringkasan_wilayah(nv_banding) if not nv_banding.empty else pd.DataFrame()
-    if not ring_wilayah.empty:
-        st.bar_chart(ring_wilayah.set_index("Wilayah")["Jumlah Cabang"])
-        tampil_wil = ring_wilayah.copy()
-        tampil_wil["Total Nilai Persediaan"] = ring_wilayah["Total Nilai Persediaan"].map(lp.format_rupiah_id)
-        tampil_wil["Rata-rata Nilai / Cabang"] = ring_wilayah["Rata-rata Nilai / Cabang"].map(lp.format_rupiah_id)
-        st.dataframe(tampil_wil, use_container_width=True)
+        peta_df = lokasi_gabung.rename(columns={"Lat": "lat", "Lon": "lon"})[["lat", "lon"]]
+        st.map(peta_df, size=60)
 
-    with st.expander(f"Lihat detail lokasi ({len(lokasi_gabung)} cabang)"):
-        tampil_lokasi = lokasi_gabung.copy()
-        if "Total Nilai" in tampil_lokasi.columns:
-            tampil_lokasi["Total Nilai"] = tampil_lokasi["Total Nilai"].apply(
-                lambda x: lp.format_rupiah_id(x) if pd.notna(x) else "-"
+        st.subheader("Sebaran Wilayah")
+        ring_wilayah = lp.ringkasan_wilayah(nv_banding) if not nv_banding.empty else pd.DataFrame()
+        if not ring_wilayah.empty:
+            st.bar_chart(ring_wilayah.set_index("Wilayah")["Jumlah Cabang"])
+            tampil_wil = ring_wilayah.copy()
+            tampil_wil["Total Nilai Persediaan"] = ring_wilayah["Total Nilai Persediaan"].map(lp.format_rupiah_id)
+            tampil_wil["Rata-rata Nilai / Cabang"] = ring_wilayah["Rata-rata Nilai / Cabang"].map(lp.format_rupiah_id)
+            st.dataframe(tampil_wil, use_container_width=True)
+
+        with st.expander(f"Lihat detail lokasi ({len(lokasi_gabung)} cabang)"):
+            tampil_lokasi = lokasi_gabung.copy()
+            if "Total Nilai" in tampil_lokasi.columns:
+                tampil_lokasi["Total Nilai"] = tampil_lokasi["Total Nilai"].apply(
+                    lambda x: lp.format_rupiah_id(x) if pd.notna(x) else "-"
+                )
+            st.dataframe(
+                tampil_lokasi[["Cabang", "Wilayah", "Alamat", "Rating", "Jumlah Ulasan", "Total Nilai"]] if "Total Nilai" in tampil_lokasi.columns else tampil_lokasi,
+                use_container_width=True, height=460,
             )
-        st.dataframe(
-            tampil_lokasi[["Cabang", "Wilayah", "Alamat", "Rating", "Jumlah Ulasan", "Total Nilai"]] if "Total Nilai" in tampil_lokasi.columns else tampil_lokasi,
-            use_container_width=True, height=460,
-        )
-        st.download_button(
-            "⬇️ Unduh CSV — Lokasi Cabang", lokasi_gabung.to_csv(index=False).encode("utf-8-sig"),
-            "lokasi_cabang.csv", "text/csv", key="pd_dl_lokasi",
-        )
+            st.download_button(
+                "⬇️ Unduh CSV — Lokasi Cabang", lokasi_gabung.to_csv(index=False).encode("utf-8-sig"),
+                "lokasi_cabang.csv", "text/csv", key="pd_dl_lokasi",
+            )
 
-    st.divider()
+        st.divider()
 
     # -----------------------------------------------------------------
     # Peta Stok — Cabang × Produk (SATU-SATUNYA tempat pakai indikator 🔴🟡🟢)

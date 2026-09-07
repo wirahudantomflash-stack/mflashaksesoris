@@ -85,6 +85,31 @@
 > Kode/logikanya tetap ada untuk keduanya, bisa dimunculkan lagi kapan
 > saja dengan mengubah nilai flag jadi `True`.
 
+> ## ⏸️ Dua bagian tambahan lagi juga SEMENTARA DISEMBUNYIKAN
+>
+> Dua flag serupa lagi, mekanisme & alasan sama, di dalam Dashboard
+> Persediaan Aksesoris:
+> ```python
+> TAMPILKAN_KEBUTUHAN_BELUM_TERPENUHI = False  # "3. Kebutuhan Konsumen yang Belum Terpenuhi"
+> TAMPILKAN_ANALISA_LOKASI_CABANG = False      # "4. Analisa Lokasi Cabang MFlash"
+> ```
+> **Kebutuhan Konsumen yang Belum Terpenuhi**: seluruh bagian "📢 3.
+> Kebutuhan Konsumen yang Belum Terpenuhi" (tabel produk favorit yang
+> stoknya kosong/rendah, 2 kartu Total Potensi Omzet/Laba) tidak
+> dirender.
+> **Analisa Lokasi Cabang MFlash**: seluruh bagian "📍 4. Analisa Lokasi
+> Cabang MFlash" (peta 18 cabang, Sebaran Wilayah, expander detail lokasi)
+> tidak dirender — bagian "🗺️ Peta Stok — Cabang × Produk" dan "📌 Analisa
+> & Tindak Lanjut" di bawahnya **tetap tampil**.
+> **Catatan teknis**: variabel `ring_wilayah` (dihitung di dalam blok
+> Analisa Lokasi Cabang) ternyata dipakai lagi jauh di bawah di bagian
+> "Analisa & Tindak Lanjut" — diberi nilai default `pd.DataFrame()`
+> SEBELUM blok if-nya, supaya kalau blok disembunyikan, bagian Analisa &
+> Tindak Lanjut tetap berjalan aman (kondisi `if not ring_wilayah.empty`
+> otomatis `False`, bagian itu cuma dilewati, bukan error).
+> Kode/logikanya tetap ada untuk keduanya, bisa dimunculkan lagi kapan
+> saja dengan mengubah nilai flag jadi `True`.
+
 **Satu halaman panjang** (bukan tab terpisah — digabung sesuai permintaan),
 berisi dashboard berurutan dari atas ke bawah:
 
