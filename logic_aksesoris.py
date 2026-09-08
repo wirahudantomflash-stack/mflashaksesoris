@@ -400,12 +400,22 @@ def analisa_bundling_per_cabang(df_jual_semua_kategori: pd.DataFrame, keyword: s
     """Breakdown per CABANG dari `analisa_bundling_brand()` — porsi nota
     Service yang TIDAK ada bundling aksesoris sama sekali, per cabang.
     Diurutkan dari **% Tanpa Bundling TERTINGGI** (cabang paling perlu
-    ditindaklanjuti ada di paling atas)."""
+    ditindaklanjuti ada di paling atas).
+
+    Kolom tambahan "Nota {Brand} Organik (Non-Service)" menghitung NOTA
+    UNIK yang mengandung brand target (mis. LUNA) TAPI SEGMEN-nya BUKAN
+    "Service" — yaitu penjualan brand tsb secara murni/organik lewat
+    transaksi retail langsung (mis. KATEGORI PENJUALAN "Penjualan
+    Aksesoris"), BUKAN hasil bundling pada kunjungan Service ataupun
+    kategori transaksi lain (Corporate, Cicilan, Sewa, dst). Kolom ini
+    berdiri sendiri dari breakdown Service di atas — TIDAK dijumlahkan ke
+    "Total Nota Service" (karena memang bukan nota Service)."""
     kolom_brand = f"Nota Bundling {keyword.title()}"
     kolom_pct_brand = f"% Bundling {keyword.title()}"
     kolom_pct_tanpa_brand = f"% Tanpa Bundling {keyword.title()}"
+    kolom_organik = f"Nota {keyword.title()} Organik (Non-Service)"
     cols = ["Cabang", "Total Nota Service", kolom_brand, "Nota Bundling Brand Lain",
-            "Nota Tanpa Bundling", kolom_pct_brand, kolom_pct_tanpa_brand, "% Tanpa Bundling"]
+            "Nota Tanpa Bundling", kolom_pct_brand, kolom_pct_tanpa_brand, "% Tanpa Bundling", kolom_organik]
     if df_jual_semua_kategori.empty:
         return pd.DataFrame(columns=cols)
 
@@ -440,6 +450,14 @@ def analisa_bundling_per_cabang(df_jual_semua_kategori: pd.DataFrame, keyword: s
     g[kolom_pct_brand] = np.where(g["Total Nota Service"] != 0, g[kolom_brand] / g["Total Nota Service"] * 100, 0)
     g[kolom_pct_tanpa_brand] = np.where(g["Total Nota Service"] != 0, 100 - g[kolom_pct_brand], 0)
     g["% Tanpa Bundling"] = np.where(g["Total Nota Service"] != 0, g["Nota Tanpa Bundling"] / g["Total Nota Service"] * 100, 0)
+
+    # Nota brand ORGANIK: mengandung brand target, SEGMEN != "Service"
+    # (murni penjualan retail langsung, bukan bundling di kunjungan Service).
+    non_service_df = df_jual_semua_kategori[df_jual_semua_kategori["SEGMEN"] != "Service"]
+    nota_organik = non_service_df[non_service_df["NOTA_ID"].isin(notas_dgn_keyword)].drop_duplicates(subset=["NOTA_ID"])
+    organik_per_cabang = nota_organik.groupby("CABANG").size()
+    g[kolom_organik] = organik_per_cabang.reindex(g.index, fill_value=0)
+
     g = g.reset_index().rename(columns={"CABANG": "Cabang"})
     g = g.sort_values("% Tanpa Bundling", ascending=False).reset_index(drop=True)
     return g[cols]

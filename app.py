@@ -2705,7 +2705,12 @@ def render_pembelian_tab():
                 )
 
                 st.markdown("**Porsi Tanpa Bundling per Cabang**")
-                st.caption("Diurutkan dari % Tanpa Bundling TERTINGGI (cabang paling perlu ditindaklanjuti di atas).")
+                st.caption(
+                    "Diurutkan dari % Tanpa Bundling TERTINGGI (cabang paling perlu ditindaklanjuti di atas). "
+                    "Kolom \"Nota Luna Organik (Non-Service)\" terpisah dari breakdown Service di atas — "
+                    "menghitung nota yang mengandung LUNA dari penjualan RETAIL LANGSUNG (bukan lewat "
+                    "bundling saat kunjungan Service), jadi TIDAK dijumlahkan ke Total Nota Service."
+                )
                 bund_cabang = la.analisa_bundling_per_cabang(df_re_bund, keyword="LUNA")
                 if bund_cabang.empty:
                     st.info("Tidak ada data per cabang untuk ditampilkan.")

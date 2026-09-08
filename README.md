@@ -1221,6 +1221,24 @@ tinggal disambungkan lagi ke `app.py`.
        diformat otomatis berdasarkan awalan nama kolom (`%`), bukan
        daftar nama kolom hardcode, supaya tetap benar meski nama kolom
        brand berubah.
+     - **Baru: kolom "Nota Luna Organik (Non-Service)"** — menjawab
+       kebutuhan melihat transaksi LUNA yang murni dari penjualan retail
+       langsung (KATEGORI PENJUALAN spt "Penjualan Aksesoris"), BUKAN
+       hasil bundling saat kunjungan Service. Dihitung dari NOTA UNIK
+       yang mengandung item LUNA (kategori AKSESORIS) DAN `SEGMEN != 
+       "Service"` — kolom ini BERDIRI SENDIRI dari breakdown Service di
+       atas (tidak dijumlahkan ke "Total Nota Service", karena memang
+       bukan nota Service). Kolom & nama-nya dibangun dinamis mengikuti
+       parameter `keyword` (mis. jadi "Nota Handphone Organik
+       (Non-Service)" kalau dipanggil dengan brand lain). Diverifikasi
+       manual: hitung independen untuk satu cabang cocok persis dengan
+       hasil fungsi (Jatibening: 40 nota). **Diuji dengan data asli**:
+       total 710 nota LUNA organik di seluruh 18 cabang untuk periode
+       penuh data; diuji juga dengan filter periode (Samurai 39, Jul–Sep
+       2026) untuk memastikan kolom ini ikut terpengaruh filter periode
+       yang sama seperti kolom lain di tabel ini. Kolom otomatis
+       terformat sebagai integer di UI (deteksi kolom dinamis yang sudah
+       ada sebelumnya, tidak perlu perubahan kode tampilan).
    - **Baru: Rincian Nomor Nota** — expander "🔍 Lihat Rincian Nomor Nota"
      berisi daftar lengkap NO FAKTUR + tanggal untuk nota Service yang
      sama sekali tidak ada bundling aksesoris, dengan dropdown filter per
