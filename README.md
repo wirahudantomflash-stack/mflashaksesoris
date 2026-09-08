@@ -1371,6 +1371,19 @@ masih memakainya tidak rusak).
 5. **Produk Terlaris Aksesoris** — diurutkan dari Qty Terjual tertinggi,
    slider untuk atur berapa banyak ditampilkan (5–50), tombol unduh CSV
    berisi SELURUH produk (tidak dipotong slider).
+   **Baru: kolom "Harga Modal / Pcs"** — harga modal RATA-RATA per unit
+   untuk produk tsb pada periode ini, supaya langsung terlihat harga
+   satuan (bukan cuma total). Dihitung dari `(Omzet - Laba) / Qty
+   Terjual` — BUKAN `sum(HARGA BELI) / Qty` langsung, karena kolom HARGA
+   BELI mentah belum dibersihkan dari HARGA BELI anomali (lihat
+   `RASIO_HARGA_BELI_ANOMALI`), sementara LABA sudah dibersihkan di
+   `finalize_data()` — pendekatan yang sama dengan `total_hpp_brand()`
+   dan 5 fungsi lain yang sudah diperbaiki sebelumnya. **Diverifikasi
+   manual**: untuk produk "Voucher Ticket MLF 2026", Harga Modal/Pcs
+   dari fungsi (Rp 16.204,28) cocok PERSIS dengan hitungan manual
+   independen. **Diuji dengan data asli**: harga modal per pcs berkisar
+   Rp 8.400–16.367 untuk 10 produk teratas — masuk akal untuk kabel data/
+   voucher (jauh dari anomali miliaran), tidak ada nilai negatif ekstrem.
 6. **Monitoring Stok Tertarget vs Non Tertarget** — nilai & qty stok per
    cabang untuk kedua kelompok berdampingan, dari data Persediaan yang
    diunggah terpisah di sidebar.

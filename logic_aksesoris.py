@@ -1598,8 +1598,15 @@ def produk_terlaris_aksesoris_scoreboard(df_aksesoris: pd.DataFrame, tanggal_mul
     """Ranking produk AKSESORIS (Tertarget + Non Tertarget digabung) dari
     Qty terjual TERTINGGI ke TERENDAH, dalam satu periode — dengan kolom
     Margin (%) per produk sekaligus (dipakai juga untuk kriteria #7,
-    tinggal diurutkan ulang berdasar kolom Margin (%) di sisi tampilan)."""
-    cols = ["Nama Barang", "Kelompok", "Qty Terjual", "Omzet", "Laba", "Margin (%)"]
+    tinggal diurutkan ulang berdasar kolom Margin (%) di sisi tampilan).
+
+    "Harga Modal / Pcs" = rata-rata modal PER UNIT untuk produk tsb pada
+    periode ini, dihitung dari `(Omzet - Laba) / Qty Terjual` — BUKAN
+    `sum(HARGA BELI) / Qty` langsung, karena kolom HARGA BELI mentah
+    belum dibersihkan dari HARGA BELI anomali (lihat
+    RASIO_HARGA_BELI_ANOMALI), sementara LABA sudah dibersihkan di
+    `finalize_data()`."""
+    cols = ["Nama Barang", "Kelompok", "Qty Terjual", "Omzet", "Harga Modal / Pcs", "Laba", "Margin (%)"]
     if df_aksesoris.empty:
         return pd.DataFrame(columns=cols)
 
@@ -1618,6 +1625,7 @@ def produk_terlaris_aksesoris_scoreboard(df_aksesoris: pd.DataFrame, tanggal_mul
     kelompok_map = df_periode.assign(_tertarget=mask_tertarget).groupby("NAMA BARANG")["_tertarget"].first()
     g["Kelompok"] = g["NAMA BARANG"].map(lambda n: "Tertarget" if kelompok_map.get(n, False) else "Non Tertarget")
     g["Margin (%)"] = g.apply(lambda r: (r["Laba"] / r["Omzet"] * 100) if r["Omzet"] else 0, axis=1)
+    g["Harga Modal / Pcs"] = np.where(g["Qty Terjual"] != 0, (g["Omzet"] - g["Laba"]) / g["Qty Terjual"], 0)
     g = g.rename(columns={"NAMA BARANG": "Nama Barang"})
     g = g.sort_values("Qty Terjual", ascending=False).reset_index(drop=True)
     return g[cols]
