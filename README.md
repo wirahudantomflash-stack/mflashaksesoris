@@ -1087,6 +1087,26 @@ tinggal disambungkan lagi ke `app.py`.
    naik dari Rp 59.600.526/Rp 115.632.860 di versi sebelumnya yang
    mengecualikan Hydrogel (selisih Rp 4.949.765 HPP dan Rp 25.985.000
    Omzet, persis sebesar kontribusi Hydrogel).
+   - **Baru: Filter Periode** — sebelumnya bagian ini SELALU mengambil
+     SELURUH rentang tanggal pada data yang diunggah (tanpa filter apa
+     pun), yang membuat angkanya berbeda jauh dari "🎯 Target Pencapaian
+     Penjualan Aksesoris" (yang selalu dibatasi periode tertentu) —
+     ditanyakan pengguna karena kebingungan soal selisih ini. Sekarang
+     ditambahkan **checkbox "Batasi ke periode tertentu"** (default OFF
+     = tetap SELURUH data, perilaku lama tidak berubah kalau tidak
+     diaktifkan). Saat diaktifkan, muncul pemilih periode **PERSIS SAMA**
+     dengan pola di "🎯 Target Pencapaian" dan "📋 Kepatuhan Bundling":
+     radio "Periode Samurai (Kuartalan)" (dropdown 6 periode Samurai
+     39–44) vs "Program Custom (1–12 Bulan)" (date picker tanggal mulai +
+     slider durasi). **Diuji dengan data asli**: checkbox OFF (seluruh
+     data, 1 Jan–7 Sep 2026) → Omzet LUNA Rp 298.798.760 — cocok persis
+     dengan angka sebelum fitur ini ditambahkan (tidak ada regresi).
+     Checkbox ON + Samurai 39 (Jul–Sep 2026) → Omzet Rp 171.031.260;
+     Checkbox ON + Custom (20 Agustus, 3 bulan) → Omzet Rp 91.897.900 —
+     kedua angka ini SEKARANG bisa langsung dibandingkan apple-to-apple
+     dengan angka "Tercapai" di Target Pencapaian untuk periode yang
+     sama, menjawab pertanyaan pengguna soal selisih. Kasus tepi periode
+     tanpa data sama sekali menghasilkan 0 di semua metrik (bukan error).
 3. **Grafik Penjualan Perbandingan per Pekan**: **direvisi total** dari
    versi sebelumnya berdasarkan permintaan lanjutan —
    - **Baru: Grafik Omzet LUNA per Hari** (BARU, ditambahkan di ATAS

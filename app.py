@@ -2483,7 +2483,45 @@ def render_pembelian_tab():
             "bagian \"🧾 Data Penjualan\"."
         )
     else:
-        hpp = la.total_hpp_brand(df_aks_jual, keyword="LUNA", keyword_kecuali=None)
+        st.markdown("**Filter Periode**")
+        st.caption("Sama seperti pemilih periode di \"🎯 Target Pencapaian Penjualan Aksesoris\" dan \"📋 Kepatuhan Bundling\" — default mencakup SELURUH data (tidak dibatasi).")
+
+        gunakan_filter_periode_hpp = st.checkbox(
+            "Batasi ke periode tertentu (kosongkan untuk SELURUH data)", value=False, key="pb_hpp_gunakan_filter",
+        )
+
+        if not gunakan_filter_periode_hpp:
+            tgl_mulai_hpp = df_aks_jual["TGL FAKTUR"].min()
+            tgl_selesai_hpp = df_aks_jual["TGL FAKTUR"].max()
+            st.caption(f"Periode: SELURUH data — {tgl_mulai_hpp.strftime('%d %b %Y')} – {tgl_selesai_hpp.strftime('%d %b %Y')}.")
+        else:
+            mode_periode_hpp = st.radio(
+                "Jenis Periode", ["Periode Samurai (Kuartalan)", "Program Custom (1–12 Bulan)"],
+                horizontal=True, key="pb_hpp_mode_periode",
+                help="Periode Samurai = kuartalan tetap (Jul 2026–Des 2027). Program Custom = atur sendiri tanggal mulai & durasi (1–12 bulan).",
+            )
+            periode_samurai_hpp_opsi = [
+                "Samurai 39 (Jul–Sep 2026)", "Samurai 40 (Okt–Des 2026)", "Samurai 41 (Jan–Mar 2027)",
+                "Samurai 42 (Apr–Jun 2027)", "Samurai 43 (Jul–Sep 2027)", "Samurai 44 (Okt–Des 2027)",
+            ]
+            if mode_periode_hpp == "Periode Samurai (Kuartalan)":
+                periode_pilihan_hpp = st.selectbox("Pilih Periode Samurai", periode_samurai_hpp_opsi, key="pb_hpp_periode_samurai")
+                tgl_mulai_hpp, tgl_selesai_hpp = la.PERIODE_SAMURAI[periode_pilihan_hpp]
+                st.caption(f"Periode: {tgl_mulai_hpp.strftime('%d %b %Y')} – {tgl_selesai_hpp.strftime('%d %b %Y')} (3 bulan).")
+            else:
+                ht1, ht2 = st.columns(2)
+                with ht1:
+                    tgl_mulai_hpp = pd.Timestamp(st.date_input("Mulai Program", value=pd.Timestamp("2026-08-20"), key="pb_hpp_mulai"))
+                with ht2:
+                    durasi_hpp = st.slider("Durasi Program (bulan)", min_value=1, max_value=12, value=3, key="pb_hpp_durasi")
+                tgl_selesai_hpp = tgl_mulai_hpp + pd.DateOffset(months=int(durasi_hpp)) - pd.Timedelta(days=1)
+                st.caption(f"Periode: {tgl_mulai_hpp.strftime('%d %b %Y')} – {tgl_selesai_hpp.strftime('%d %b %Y')} ({durasi_hpp} bulan).")
+
+        df_aks_jual_hpp = df_aks_jual[
+            (df_aks_jual["TGL FAKTUR"] >= tgl_mulai_hpp) & (df_aks_jual["TGL FAKTUR"] <= tgl_selesai_hpp)
+        ]
+
+        hpp = la.total_hpp_brand(df_aks_jual_hpp, keyword="LUNA", keyword_kecuali=None)
         h1, h2, h3, h4 = st.columns(4)
         h1.metric("Total HPP LUNA", la.format_rupiah_id(hpp["hpp"]))
         h2.metric("Total Omzet LUNA", la.format_rupiah_id(hpp["omzet"]))
