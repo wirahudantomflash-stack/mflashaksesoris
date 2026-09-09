@@ -2785,7 +2785,21 @@ def render_pembelian_tab():
                 else:
                     kolom_int_bc = [c for c in bund_cabang.columns if c not in ("Cabang",) and not c.startswith("%")]
                     kolom_pct_bc = [c for c in bund_cabang.columns if c.startswith("%")]
-                    st.bar_chart(bund_cabang.set_index("Cabang")["% Tanpa Bundling"])
+
+                    chart_tb = bund_cabang[["Cabang", "% Tanpa Bundling"]].copy()
+                    chart_tb["_label"] = chart_tb["% Tanpa Bundling"].apply(la.format_percent_id)
+                    batang_tb = alt.Chart(chart_tb).mark_bar(color="#378ADD").encode(
+                        x=alt.X("Cabang:N", sort=chart_tb["Cabang"].tolist(), title=None),
+                        y=alt.Y("% Tanpa Bundling:Q", title="% Tanpa Bundling"),
+                        tooltip=[alt.Tooltip("Cabang:N"), alt.Tooltip("_label:N", title="% Tanpa Bundling")],
+                    )
+                    label_tb = alt.Chart(chart_tb).mark_text(dy=-8, fontSize=10, color="#1F3864").encode(
+                        x=alt.X("Cabang:N", sort=chart_tb["Cabang"].tolist()),
+                        y=alt.Y("% Tanpa Bundling:Q"),
+                        text=alt.Text("_label:N"),
+                    )
+                    st.altair_chart((batang_tb + label_tb).properties(height=380), use_container_width=True)
+
                     tampil_bc = bund_cabang.copy()
                     for c in kolom_pct_bc:
                         tampil_bc[c] = bund_cabang[c].map(la.format_percent_id)

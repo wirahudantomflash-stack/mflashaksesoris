@@ -1242,6 +1242,16 @@ tinggal disambungkan lagi ke `app.py`.
      Bundling TERTINGGI (cabang paling perlu ditindaklanjuti di atas).
      Data uji: **Jatibening** paling tinggi (54,7% tanpa bundling),
      **Dramaga** paling rendah (5,9%).
+     - **Diperbarui: grafik jadi Altair + label angka persentase** —
+       sebelumnya `st.bar_chart()` polos (tanpa label), sekarang diganti
+       chart Altair (`mark_bar` + `mark_text`) supaya angka % Tanpa
+       Bundling langsung terlihat di atas tiap batang, bukan cuma bisa
+       dibaca dari tabel di bawahnya. Orientasi tetap vertikal (sama
+       seperti sebelumnya, cuma ditambah label — tidak diubah ke
+       horizontal), font label 10px supaya tetap muat untuk 18 kategori
+       cabang. Tooltip saat hover menampilkan angka yang sama.
+       **Diuji dengan data asli**: label "36,1%" untuk Jatibening, "7,0%"
+       untuk Dramaga — cocok persis dengan angka di tabel.
      - **Diperbarui**: kolom "Nota Bundling Brand" diganti nama jadi
        **"Nota Bundling Luna"** (dibangun dinamis dari parameter
        `keyword.title()`, jadi otomatis menyesuaikan kalau suatu saat
