@@ -1786,6 +1786,34 @@ def render_aksesoris_tab():
             f"paling unggul: **{per_cabang_luna.iloc[-1]['Cabang']}** "
             f"({la.format_percent_id(per_cabang_luna.iloc[-1]['% Actual'])} actual)."
         )
+
+        st.markdown(f"**Grafik % Pencapaian per Cabang — {label_target}**")
+        chart_pcl = per_cabang_luna.copy()
+        chart_pcl["_warna"] = np.where(
+            chart_pcl["% Actual"] < 85, "🔴 <85%",
+            np.where(chart_pcl["% Actual"] < 100, "🟡 85–99%", "🟢 ≥100%"),
+        )
+        chart_pcl["_label"] = chart_pcl["% Actual"].apply(lambda x: la.format_percent_id(x))
+        batang_pcl = alt.Chart(chart_pcl).mark_bar().encode(
+            y=alt.Y("Cabang:N", sort=chart_pcl["Cabang"].tolist(), title=None),
+            x=alt.X("% Actual:Q", title="% Pencapaian"),
+            color=alt.Color(
+                "_warna:N", title="Status",
+                scale=alt.Scale(domain=["🔴 <85%", "🟡 85–99%", "🟢 ≥100%"], range=["#E15759", "#F1C232", "#59A14F"]),
+            ),
+            tooltip=[
+                alt.Tooltip("Cabang:N"), alt.Tooltip("_label:N", title="% Actual"),
+                alt.Tooltip("Result:Q", title="Result", format=","), alt.Tooltip("Target:Q", title="Target", format=","),
+            ],
+        )
+        label_pcl = alt.Chart(chart_pcl).mark_text(align="left", dx=4, fontSize=10, color="#1F3864").encode(
+            y=alt.Y("Cabang:N", sort=chart_pcl["Cabang"].tolist()),
+            x=alt.X("% Actual:Q"),
+            text=alt.Text("_label:N"),
+        )
+        garis_100 = alt.Chart(pd.DataFrame({"x": [100]})).mark_rule(color="#666", strokeDash=[4, 4]).encode(x="x:Q")
+        st.altair_chart((batang_pcl + label_pcl + garis_100).properties(height=max(320, 28 * len(chart_pcl))), use_container_width=True)
+
         st.download_button(
             f"⬇️ Unduh CSV — Monitoring Pencapaian {label_target} per Cabang", pcl_dgn_total.to_csv(index=False).encode("utf-8-sig"),
             f"monitoring_target_{'luna' if keyword_target else 'semua_aksesoris'}_per_cabang.csv", "text/csv", key="ak_dl_target_per_cabang",

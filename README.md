@@ -570,6 +570,24 @@ otomatis menyesuaikan.
 - **Warna indikator berbasis AMBANG BATAS** (bukan gradasi kontinu
   seperti sebelumnya) — fungsi `warna_indikator_pencapaian()`: 🔴 Merah
   jika % Actual < 85%, 🟡 Kuning jika 85–99%, 🟢 Hijau jika ≥ 100%.
+- **Baru: Grafik Batang Horizontal % Pencapaian per Cabang** — memakai
+  Altair (`mark_bar` orientasi horizontal, sumbu Y = Cabang, sumbu X =
+  % Actual), lebih mudah dibaca untuk 18 kategori dengan nama cabang
+  yang panjang dibanding grafik vertikal. Warna batang mengikuti ambang
+  YANG SAMA dengan tabel (🔴 <85% · 🟡 85–99% · 🟢 ≥100%, skema warna
+  Merah/Kuning/Hijau eksplisit — bukan default palet Altair), plus label
+  angka di ujung tiap batang dan **garis putus-putus vertikal di 100%**
+  sebagai referensi target. Urutan baris SAMA dengan tabel di atasnya
+  (cabang paling tertinggal di atas). Tooltip saat hover menampilkan
+  Result & Target juga, tidak cuma %. Tinggi grafik menyesuaikan jumlah
+  cabang secara dinamis (`max(320, 28 × jumlah_cabang)` piksel) supaya
+  tetap proporsional untuk cabang berapa pun. **Diuji dengan data asli**:
+  target default (Rp 2M/12 bulan) menghasilkan seluruh 18 cabang merah
+  (kondisi data aktual — target ambisius, periode baru berjalan sebentar
+  sejak 20 Agustus); diuji ulang dengan target/periode lain (Rp 50jt/1
+  bulan) untuk konfirmasi ketiga warna (merah/kuning/hijau) tampil benar
+  sesuai ambang — 4 cabang merah, 3 kuning, 11 hijau, breakdown sesuai
+  ekspektasi.
 
 **Diuji dengan data asli** (Samurai 39, Target Rp2M): mode **LUNA**
 tercapai Rp104.069.860 (8,4% dari target-sampai-hari-ini); mode **Semua
