@@ -2828,11 +2828,16 @@ def render_pembelian_tab():
                         )
 
                         bc_organik_top = bund_cabang.sort_values("Nota Luna Organik (Non-Service)", ascending=False).iloc[0]
+                        bc_pct_organik_top = bund_cabang.sort_values("% Nota Luna Organik", ascending=False).iloc[0]
                         catatan_bc.append(
                             f"**{bc_organik_top['Cabang']}** paling banyak menjual LUNA secara ORGANIK "
                             f"(retail langsung, di luar bundling Service) — "
                             f"{la.format_int_id(int(bc_organik_top['Nota Luna Organik (Non-Service)']))} nota — "
-                            "menunjukkan permintaan LUNA yang berdiri sendiri, bukan cuma titipan Service."
+                            "menunjukkan permintaan LUNA yang berdiri sendiri, bukan cuma titipan Service. "
+                            f"Secara PORSI (dibanding total nota LUNA cabang tsb), **{bc_pct_organik_top['Cabang']}** "
+                            f"unggul dengan {la.format_percent_id(bc_pct_organik_top['% Nota Luna Organik'])} "
+                            "organik — cabang dengan porsi tinggi biasanya sudah punya basis pelanggan LUNA "
+                            "yang loyal, tidak cuma mengandalkan bundling Service."
                         )
 
                         rata2_tanpa_bundling = bund_cabang["% Tanpa Bundling"].mean()

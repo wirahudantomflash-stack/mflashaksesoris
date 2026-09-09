@@ -409,13 +409,23 @@ def analisa_bundling_per_cabang(df_jual_semua_kategori: pd.DataFrame, keyword: s
     Aksesoris"), BUKAN hasil bundling pada kunjungan Service ataupun
     kategori transaksi lain (Corporate, Cicilan, Sewa, dst). Kolom ini
     berdiri sendiri dari breakdown Service di atas — TIDAK dijumlahkan ke
-    "Total Nota Service" (karena memang bukan nota Service)."""
+    "Total Nota Service" (karena memang bukan nota Service).
+
+    "% Nota {Brand} Organik" = porsi nota organik dibanding TOTAL nota
+    brand tsb (organik + bundling Service digabung) — `Nota Organik /
+    (Nota Organik + Nota Bundling Brand) * 100`. Menjawab pertanyaan
+    "dari seluruh penjualan LUNA (baik lewat bundling Service maupun
+    retail langsung), berapa persen yang murni organik?" — BUKAN dibagi
+    "Total Nota Service" (karena nota organik secara definisi bukan nota
+    Service, jadi tidak apple-to-apple kalau dibagi basis itu)."""
     kolom_brand = f"Nota Bundling {keyword.title()}"
     kolom_pct_brand = f"% Bundling {keyword.title()}"
     kolom_pct_tanpa_brand = f"% Tanpa Bundling {keyword.title()}"
     kolom_organik = f"Nota {keyword.title()} Organik (Non-Service)"
+    kolom_pct_organik = f"% Nota {keyword.title()} Organik"
     cols = ["Cabang", "Total Nota Service", kolom_brand, "Nota Bundling Brand Lain",
-            "Nota Tanpa Bundling", kolom_pct_brand, kolom_pct_tanpa_brand, "% Tanpa Bundling", kolom_organik]
+            "Nota Tanpa Bundling", kolom_pct_brand, kolom_pct_tanpa_brand, "% Tanpa Bundling",
+            kolom_organik, kolom_pct_organik]
     if df_jual_semua_kategori.empty:
         return pd.DataFrame(columns=cols)
 
@@ -457,6 +467,12 @@ def analisa_bundling_per_cabang(df_jual_semua_kategori: pd.DataFrame, keyword: s
     nota_organik = non_service_df[non_service_df["NOTA_ID"].isin(notas_dgn_keyword)].drop_duplicates(subset=["NOTA_ID"])
     organik_per_cabang = nota_organik.groupby("CABANG").size()
     g[kolom_organik] = organik_per_cabang.reindex(g.index, fill_value=0)
+
+    # % organik dihitung dari basis TOTAL nota brand tsb (organik + bundling
+    # Service digabung) — bukan dibagi "Total Nota Service", karena nota
+    # organik memang bukan bagian dari nota Service.
+    total_nota_brand = g[kolom_organik] + g[kolom_brand]
+    g[kolom_pct_organik] = np.where(total_nota_brand != 0, g[kolom_organik] / total_nota_brand * 100, 0)
 
     g = g.reset_index().rename(columns={"CABANG": "Cabang"})
     g = g.sort_values("% Tanpa Bundling", ascending=False).reset_index(drop=True)

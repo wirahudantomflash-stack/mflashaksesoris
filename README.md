@@ -1277,6 +1277,20 @@ tinggal disambungkan lagi ke `app.py`.
        yang sama seperti kolom lain di tabel ini. Kolom otomatis
        terformat sebagai integer di UI (deteksi kolom dinamis yang sudah
        ada sebelumnya, tidak perlu perubahan kode tampilan).
+     - **Baru: kolom "% Nota Luna Organik"** — pelengkap kolom di atas,
+       porsi nota organik dibanding TOTAL nota brand tsb (organik +
+       bundling Service digabung): `Nota Organik / (Nota Organik + Nota
+       Bundling Brand) × 100`. Menjawab "dari seluruh penjualan LUNA
+       (baik lewat bundling Service maupun retail langsung), berapa
+       persen yang murni organik?" — SENGAJA bukan dibagi "Total Nota
+       Service", karena nota organik secara definisi bukan bagian dari
+       nota Service, jadi tidak apple-to-apple kalau dibagi basis itu.
+       Diverifikasi manual: Jatibening 13,2% cocok persis dengan
+       perhitungan independen. **Diuji dengan data asli**: rentang
+       2,2%–14,6% antar 18 cabang, tidak ada kasus pembagi nol
+       (dijaga dengan `np.where`). Kotak "📌 Analisa & Tindak Lanjut" di
+       bawah tabel juga diperbarui untuk menyebut cabang dengan PORSI
+       organik tertinggi (bukan cuma jumlah absolut).
      - **Baru: Kotak "📌 Analisa & Tindak Lanjut"** — 5 catatan otomatis
        di bawah tabel (dalam `st.container(border=True)`, konsisten
        dengan pola kotak Analisa yang sudah ada di bagian lain
