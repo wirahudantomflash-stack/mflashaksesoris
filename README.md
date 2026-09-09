@@ -1205,6 +1205,23 @@ tinggal disambungkan lagi ke `app.py`.
      Pekan" (cocok dengan kolom Total, Rp10.407.000). Termasuk kasus tepi
      kombinasi cabang+pekan tanpa penjualan sama sekali (pesan info yang
      jelas, bukan tabel kosong membingungkan).
+     - **Baru: kolom "HPP" dan "% Gross Profit"** — ditambahkan ke
+       `detail_produk_brand_cabang()` (dipakai juga oleh titik
+       pemanggilan lain: "Rincian Produk per Cabang" di Monitoring
+       Bertahap, supaya konsisten di kedua tempat). HPP dihitung dari
+       `Omzet - Laba` (BUKAN `sum(HARGA BELI)` langsung), karena kolom
+       HARGA BELI mentah belum dibersihkan dari HARGA BELI anomali,
+       sementara LABA sudah dibersihkan di `finalize_data()` — pola yang
+       sama dengan `total_hpp_brand()` dan fungsi-fungsi lain yang sudah
+       diperbaiki sebelumnya. Caption ringkasan di bawah tabel juga
+       diperbarui untuk menyertakan Total HPP dan Gross Profit
+       KESELURUHAN (dihitung dari `(Total Omzet − Total HPP) / Total
+       Omzet`, bukan rata-rata mentah dari kolom % per baris — supaya
+       tetap akurat secara matematis). **Diverifikasi manual**: untuk
+       satu produk cocok persis dengan hitungan independen; untuk total
+       gabungan (11 jenis produk), Gross Profit dari rumus
+       `(Omzet−HPP)/Omzet` cocok persis dengan `Total Laba/Total Omzet`
+       yang dihitung terpisah dari data mentah (45,9% di kedua metode).
    - **Info tambahan — Kepatuhan Bundling Aksesoris pada Transaksi
      Service**: 4 kartu metrik, memakai fungsi `analisa_bundling_brand()`
      yang sudah ada (dipakai ulang, tidak dihitung dari nol): Total Nota

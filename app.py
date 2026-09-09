@@ -1898,6 +1898,8 @@ def render_aksesoris_tab():
                 tampil_detail = detail_produk.copy()
                 tampil_detail["Qty"] = detail_produk["Qty"].map(la.format_int_id)
                 tampil_detail["Omzet"] = detail_produk["Omzet"].map(la.format_rupiah_id)
+                tampil_detail["HPP"] = detail_produk["HPP"].map(la.format_rupiah_id)
+                tampil_detail["% Gross Profit"] = detail_produk["% Gross Profit"].map(la.format_percent_id)
                 st.dataframe(tampil_detail, use_container_width=True, height=min(80 + 38 * len(detail_produk), 350))
                 st.caption(
                     f"Total {la.format_int_id(detail_produk['Qty'].sum())} pcs dari "
@@ -2712,10 +2714,18 @@ def render_pembelian_tab():
                 tampil_rincian = rincian_produk_mgg.copy()
                 tampil_rincian["Qty"] = rincian_produk_mgg["Qty"].map(la.format_int_id)
                 tampil_rincian["Omzet"] = rincian_produk_mgg["Omzet"].map(la.format_rupiah_id)
+                tampil_rincian["HPP"] = rincian_produk_mgg["HPP"].map(la.format_rupiah_id)
+                tampil_rincian["% Gross Profit"] = rincian_produk_mgg["% Gross Profit"].map(la.format_percent_id)
                 st.dataframe(tampil_rincian, use_container_width=True, height=min(80 + 38 * len(rincian_produk_mgg), 400))
+                total_omzet_rincian = rincian_produk_mgg["Omzet"].sum()
+                total_hpp_rincian = rincian_produk_mgg["HPP"].sum()
+                total_gp_pct_rincian = (
+                    (total_omzet_rincian - total_hpp_rincian) / total_omzet_rincian * 100 if total_omzet_rincian else 0
+                )
                 st.caption(
                     f"Total {la.format_int_id(rincian_produk_mgg['Qty'].sum())} pcs dari "
-                    f"{len(rincian_produk_mgg)} jenis produk — Omzet {la.format_rupiah_id(rincian_produk_mgg['Omzet'].sum())}."
+                    f"{len(rincian_produk_mgg)} jenis produk — Omzet {la.format_rupiah_id(total_omzet_rincian)}, "
+                    f"HPP {la.format_rupiah_id(total_hpp_rincian)}, Gross Profit {la.format_percent_id(total_gp_pct_rincian)}."
                 )
                 st.download_button(
                     "⬇️ Unduh CSV — Rincian Produk Cabang Terpilih", rincian_produk_mgg.to_csv(index=False).encode("utf-8-sig"),

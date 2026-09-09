@@ -1467,8 +1467,14 @@ def detail_produk_brand_cabang(
     """Rincian PER JENIS PRODUK (Nama Barang) untuk satu cabang, dalam
     rentang tanggal tertentu — dipakai untuk "drill-down" dari tabel
     monitoring per cabang: pilih satu cabang, lihat barang apa saja
-    yang terjual dan berapa kuantitasnya yang menyusun angka Result-nya."""
-    cols = ["Nama Barang", "Qty", "Omzet"]
+    yang terjual dan berapa kuantitasnya yang menyusun angka Result-nya.
+
+    "HPP" dihitung dari `Omzet - Laba` (BUKAN `sum(HARGA BELI)` langsung)
+    — kolom HARGA BELI mentah belum dibersihkan dari HARGA BELI anomali
+    (lihat RASIO_HARGA_BELI_ANOMALI di logic_penjualan.py), sedangkan
+    LABA sudah dibersihkan di `finalize_data()`. "% Gross Profit" =
+    Laba / Omzet × 100."""
+    cols = ["Nama Barang", "Qty", "Omzet", "HPP", "% Gross Profit"]
     if df_aksesoris.empty:
         return pd.DataFrame(columns=cols)
 
@@ -1488,8 +1494,10 @@ def detail_produk_brand_cabang(
         return pd.DataFrame(columns=cols)
 
     g = df_brand.groupby("NAMA BARANG").agg(
-        Qty=("QTY", "sum"), Omzet=("TOTAL HARGA", "sum"),
+        Qty=("QTY", "sum"), Omzet=("TOTAL HARGA", "sum"), Laba=("LABA", "sum"),
     ).reset_index().rename(columns={"NAMA BARANG": "Nama Barang"})
+    g["HPP"] = g["Omzet"] - g["Laba"]
+    g["% Gross Profit"] = np.where(g["Omzet"] != 0, g["Laba"] / g["Omzet"] * 100, 0)
     g = g.sort_values("Omzet", ascending=False).reset_index(drop=True)
     return g[cols]
 
