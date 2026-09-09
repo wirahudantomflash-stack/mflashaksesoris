@@ -1259,6 +1259,33 @@ tinggal disambungkan lagi ke `app.py`.
        yang sama seperti kolom lain di tabel ini. Kolom otomatis
        terformat sebagai integer di UI (deteksi kolom dinamis yang sudah
        ada sebelumnya, tidak perlu perubahan kode tampilan).
+     - **Baru: Kotak "📌 Analisa & Tindak Lanjut"** — 5 catatan otomatis
+       di bawah tabel (dalam `st.container(border=True)`, konsisten
+       dengan pola kotak Analisa yang sudah ada di bagian lain
+       dashboard), dihitung DINAMIS dari `bund_cabang` (bukan hardcode)
+       supaya selalu mengikuti periode/filter yang aktif:
+       1. Cabang dengan **% Tanpa Bundling TERTINGGI** (paling perlu
+          ditindaklanjuti — baris pertama tabel, karena tabel sudah
+          terurut).
+       2. Cabang dengan **% Tanpa Bundling TERENDAH** (kepatuhan
+          terbaik — baris terakhir tabel, kandidat contoh SOP).
+       3. Cabang dengan **% Bundling LUNA tertinggi & terendah** — beda
+          dari poin 1–2 karena fokus KHUSUS ke LUNA, bukan aksesoris
+          apa pun (cabang bisa punya % Tanpa Bundling rendah tapi
+          didominasi brand lain, bukan LUNA).
+       4. Cabang dengan **Nota LUNA Organik tertinggi** — sinyal
+          permintaan LUNA yang berdiri sendiri (retail langsung, bukan
+          titipan Service).
+       5. **Rata-rata jaringan** % Tanpa Bundling + jumlah cabang yang
+          berada DI ATAS rata-rata itu (kandidat prioritas pembinaan).
+       **Diuji dengan data asli**: Jatibening teridentifikasi paling
+       perlu ditindaklanjuti (36,1%, 1.282 dari 3.552 nota), Dramaga
+       kepatuhan terbaik (7,0%), Cibubur porsi LUNA tertinggi (76,1% —
+       menarik karena volume Nota Service-nya jauh lebih kecil dari
+       cabang lain, sekaligus insight tersendiri), Warbong porsi LUNA
+       terendah (3,8%), Klender LUNA organik terbanyak (132 nota),
+       rata-rata jaringan 21,7% dengan 8 dari 18 cabang di atas
+       rata-rata itu.
    - **Baru: Rincian Nomor Nota** — expander "🔍 Lihat Rincian Nomor Nota"
      berisi daftar lengkap NO FAKTUR + tanggal untuk nota Service yang
      sama sekali tidak ada bundling aksesoris, dengan dropdown filter per

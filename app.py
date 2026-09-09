@@ -2769,6 +2769,59 @@ def render_pembelian_tab():
                         "porsi_tanpa_bundling_per_cabang.csv", "text/csv", key="pb_dl_bundling_cabang",
                     )
 
+                    with st.container(border=True):
+                        st.markdown("**📌 Analisa & Tindak Lanjut**")
+                        catatan_bc = []
+
+                        bc_terburuk = bund_cabang.iloc[0]
+                        bc_terbaik = bund_cabang.iloc[-1]
+                        catatan_bc.append(
+                            f"**{bc_terburuk['Cabang']}** paling perlu ditindaklanjuti — "
+                            f"{la.format_percent_id(bc_terburuk['% Tanpa Bundling'])} nota Service-nya "
+                            f"({la.format_int_id(int(bc_terburuk['Nota Tanpa Bundling']))} dari "
+                            f"{la.format_int_id(int(bc_terburuk['Total Nota Service']))} nota) sama sekali "
+                            "tidak ada bundling aksesoris."
+                        )
+                        catatan_bc.append(
+                            f"**{bc_terbaik['Cabang']}** kepatuhan bundling paling baik — cuma "
+                            f"{la.format_percent_id(bc_terbaik['% Tanpa Bundling'])} nota yang tanpa bundling "
+                            "sama sekali, bisa jadi contoh SOP untuk cabang lain."
+                        )
+
+                        bc_luna_top = bund_cabang.sort_values("% Bundling Luna", ascending=False).iloc[0]
+                        bc_luna_bottom = bund_cabang.sort_values("% Bundling Luna", ascending=True).iloc[0]
+                        catatan_bc.append(
+                            f"Porsi bundling KHUSUS LUNA (bukan brand lain) paling tinggi di "
+                            f"**{bc_luna_top['Cabang']}** ({la.format_percent_id(bc_luna_top['% Bundling Luna'])}), "
+                            f"paling rendah di **{bc_luna_bottom['Cabang']}** "
+                            f"({la.format_percent_id(bc_luna_bottom['% Bundling Luna'])}) — cabang dengan "
+                            "porsi LUNA rendah kemungkinan lebih sering menawarkan brand lain saat stok LUNA "
+                            "kosong, atau memang belum konsisten mengarahkan ke LUNA."
+                        )
+
+                        bc_organik_top = bund_cabang.sort_values("Nota Luna Organik (Non-Service)", ascending=False).iloc[0]
+                        catatan_bc.append(
+                            f"**{bc_organik_top['Cabang']}** paling banyak menjual LUNA secara ORGANIK "
+                            f"(retail langsung, di luar bundling Service) — "
+                            f"{la.format_int_id(int(bc_organik_top['Nota Luna Organik (Non-Service)']))} nota — "
+                            "menunjukkan permintaan LUNA yang berdiri sendiri, bukan cuma titipan Service."
+                        )
+
+                        rata2_tanpa_bundling = bund_cabang["% Tanpa Bundling"].mean()
+                        n_di_atas_rata2 = (bund_cabang["% Tanpa Bundling"] > rata2_tanpa_bundling).sum()
+                        total_nota_tanpa_bundling = int(bund_cabang["Nota Tanpa Bundling"].sum())
+                        total_nota_service = int(bund_cabang["Total Nota Service"].sum())
+                        catatan_bc.append(
+                            f"Rata-rata jaringan: {la.format_percent_id(rata2_tanpa_bundling)} nota Service "
+                            f"tanpa bundling ({la.format_int_id(total_nota_tanpa_bundling)} dari "
+                            f"{la.format_int_id(total_nota_service)} nota se-jaringan) — "
+                            f"**{n_di_atas_rata2} dari {len(bund_cabang)} cabang** berada DI ATAS rata-rata "
+                            "ini, jadi prioritas pembinaan sebaiknya difokuskan ke cabang-cabang tersebut dulu."
+                        )
+
+                        for c in catatan_bc:
+                            st.markdown("- " + c)
+
                 with st.expander(f"🔍 Lihat Rincian Nomor Nota — {la.format_int_id(bund_info['jumlah_service_tanpa_aksesoris'])} Nota Tanpa Bundling", expanded=False):
                     st.caption("Daftar nota Service yang sama sekali tidak ada aksesoris apa pun di dalamnya — bisa difilter per cabang.")
                     cabang_opsi_bund = ["— Semua Cabang —"] + sorted(bund_detail["Cabang"].dropna().unique().tolist())
