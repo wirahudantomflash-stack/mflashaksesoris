@@ -596,6 +596,81 @@ def render_persediaan_tab():
             )
 
         st.divider()
+    # -----------------------------------------------------------------
+    # 5. Monitoring Stok Persediaan — Tertarget vs Non Tertarget
+    # -----------------------------------------------------------------
+    st.header("📦 5. Monitoring Stok Persediaan — Tertarget vs Non Tertarget")
+    stok_tertarget_vs_non = lp.nilai_persediaan_tertarget_vs_non(dasar)
+    if stok_tertarget_vs_non.empty:
+        st.info("Tidak ada data stok aksesoris pada filter ini.")
+    else:
+        s1, s2 = st.columns(2)
+        s1.metric("Total Nilai Stok Tertarget", la.format_rupiah_id(stok_tertarget_vs_non["Nilai Tertarget"].sum()))
+        s2.metric("Total Nilai Stok Non Tertarget", la.format_rupiah_id(stok_tertarget_vs_non["Nilai Non Tertarget"].sum()))
+        tampil_stok = stok_tertarget_vs_non.copy()
+        for c in ["Nilai Tertarget", "Nilai Non Tertarget", "Total Nilai"]:
+            tampil_stok[c] = stok_tertarget_vs_non[c].map(la.format_rupiah_id)
+        for c in ["Qty Tertarget", "Qty Non Tertarget"]:
+            tampil_stok[c] = stok_tertarget_vs_non[c].map(la.format_int_id)
+        st.dataframe(tampil_stok, use_container_width=True, height=530)
+        st.download_button(
+            "⬇️ Unduh CSV — Monitoring Stok Tertarget vs Non Tertarget", stok_tertarget_vs_non.to_csv(index=False).encode("utf-8-sig"),
+            "monitoring_stok_tertarget_vs_non.csv", "text/csv", key="pd_dl_stok",
+        )
+
+    st.divider()
+
+    # -----------------------------------------------------------------
+    # 6. Monitoring Margin Produk Aksesoris (Tertinggi → Terendah)
+    # -----------------------------------------------------------------
+    st.header("💹 6. Monitoring Margin Produk Aksesoris (Tertinggi → Terendah)")
+    st.caption(
+        "Margin dihitung dari data PENJUALAN aksesoris (produk yang benar-benar terjual), "
+        "bukan dari nilai stok yang ada di gudang — beda sumber dari bagian Persediaan lain "
+        "di dashboard ini."
+    )
+    if raw_aksesoris is None:
+        st.info("Unggah data Penjualan di panel kiri untuk melihat bagian ini.")
+    else:
+        df_margin_src = None
+        if "CABANG" in raw_aksesoris.columns:
+            df_margin_src = la.finalize_data(raw_aksesoris)
+        else:
+            nama_bersama_margin = st.session_state.get("nama_cabang_bersama")
+            if nama_bersama_margin:
+                df_margin_src = la.finalize_data(raw_aksesoris, cabang_default=nama_bersama_margin)
+        if df_margin_src is None:
+            st.info("Berkas penjualan ini rincian satu cabang saja — isi dulu nama cabangnya di panel kiri (sidebar).")
+        else:
+            df_margin_aks = la.hanya_kategori(df_margin_src, "AKSESORIS")
+            pm1, pm2 = st.columns(2)
+            tgl_margin_min = df_margin_aks["TGL FAKTUR"].min()
+            tgl_margin_max = df_margin_aks["TGL FAKTUR"].max()
+            with pm1:
+                tgl_mulai_margin = pd.Timestamp(st.date_input("Dari tanggal", value=tgl_margin_min, min_value=tgl_margin_min, max_value=tgl_margin_max, key="pd_margin_mulai"))
+            with pm2:
+                tgl_selesai_margin = pd.Timestamp(st.date_input("Sampai tanggal", value=tgl_margin_max, min_value=tgl_margin_min, max_value=tgl_margin_max, key="pd_margin_selesai"))
+
+            produk_scoreboard_margin = la.produk_terlaris_aksesoris_scoreboard(df_margin_aks, tgl_mulai_margin, tgl_selesai_margin)
+            if produk_scoreboard_margin.empty:
+                st.info("Tidak ada data produk pada periode ini.")
+            else:
+                produk_margin = produk_scoreboard_margin.sort_values("Margin (%)", ascending=False).reset_index(drop=True)
+                top_n_margin_pd = st.slider("Tampilkan berapa produk teratas (margin)", 5, 50, 20, key="pd_top_n_margin")
+                tampil_margin_produk = produk_margin.head(top_n_margin_pd).copy()
+                tampil_margin_produk["Omzet"] = tampil_margin_produk["Omzet"].map(la.format_rupiah_id)
+                tampil_margin_produk["Harga Modal / Pcs"] = tampil_margin_produk["Harga Modal / Pcs"].map(la.format_rupiah_id)
+                tampil_margin_produk["Laba"] = tampil_margin_produk["Laba"].map(la.format_rupiah_id)
+                tampil_margin_produk["Margin (%)"] = tampil_margin_produk["Margin (%)"].map(la.format_percent_id)
+                tampil_margin_produk["Qty Terjual"] = produk_margin.head(top_n_margin_pd)["Qty Terjual"].map(la.format_int_id)
+                st.dataframe(tampil_margin_produk, use_container_width=True, height=min(80 + 38 * len(tampil_margin_produk), 500))
+                st.download_button(
+                    "⬇️ Unduh CSV — Seluruh Produk (Urut Margin)", produk_margin.to_csv(index=False).encode("utf-8-sig"),
+                    "monitoring_margin_produk_aksesoris.csv", "text/csv", key="pd_dl_margin_produk",
+                )
+
+    st.divider()
+
 
     # -----------------------------------------------------------------
     # Peta Stok — Cabang × Produk (SATU-SATUNYA tempat pakai indikator 🔴🟡🟢)
@@ -1100,47 +1175,6 @@ def render_aksesoris_tab():
                 "produk_terlaris_aksesoris.csv", "text/csv", key="dsb_dl_produk",
             )
 
-        st.markdown("##### 6️⃣ Monitoring Stok Persediaan — Tertarget vs Non Tertarget")
-        if df_persediaan is None:
-            st.info("Unggah data Persediaan di panel kiri untuk melihat bagian ini.")
-        else:
-            aks_stok_dsb = lp.apply_filters(df_persediaan, hanya_aksesoris=True, filter_luna=None)
-            stok_tertarget_vs_non = lp.nilai_persediaan_tertarget_vs_non(aks_stok_dsb)
-            if stok_tertarget_vs_non.empty:
-                st.info("Tidak ada data stok aksesoris.")
-            else:
-                s1, s2 = st.columns(2)
-                s1.metric("Total Nilai Stok Tertarget", la.format_rupiah_id(stok_tertarget_vs_non["Nilai Tertarget"].sum()))
-                s2.metric("Total Nilai Stok Non Tertarget", la.format_rupiah_id(stok_tertarget_vs_non["Nilai Non Tertarget"].sum()))
-                tampil_stok = stok_tertarget_vs_non.copy()
-                for c in ["Nilai Tertarget", "Nilai Non Tertarget", "Total Nilai"]:
-                    tampil_stok[c] = stok_tertarget_vs_non[c].map(la.format_rupiah_id)
-                for c in ["Qty Tertarget", "Qty Non Tertarget"]:
-                    tampil_stok[c] = stok_tertarget_vs_non[c].map(la.format_int_id)
-                st.dataframe(tampil_stok, use_container_width=True, height=530)
-                st.download_button(
-                    "⬇️ Unduh CSV — Monitoring Stok Tertarget vs Non Tertarget", stok_tertarget_vs_non.to_csv(index=False).encode("utf-8-sig"),
-                    "monitoring_stok_tertarget_vs_non.csv", "text/csv", key="dsb_dl_stok",
-                )
-
-        st.markdown("##### 7️⃣ Monitoring Margin Produk Aksesoris (Tertinggi → Terendah)")
-        if produk_scoreboard.empty:
-            st.info("Tidak ada data produk pada periode ini.")
-        else:
-            produk_margin = produk_scoreboard.sort_values("Margin (%)", ascending=False).reset_index(drop=True)
-            top_n_margin_dsb = st.slider("Tampilkan berapa produk teratas (margin)", 5, 50, 20, key="dsb_top_n_margin")
-            tampil_margin_produk = produk_margin.head(top_n_margin_dsb).copy()
-            tampil_margin_produk["Omzet"] = tampil_margin_produk["Omzet"].map(la.format_rupiah_id)
-            tampil_margin_produk["Harga Modal / Pcs"] = tampil_margin_produk["Harga Modal / Pcs"].map(la.format_rupiah_id)
-            tampil_margin_produk["Laba"] = tampil_margin_produk["Laba"].map(la.format_rupiah_id)
-            tampil_margin_produk["Margin (%)"] = tampil_margin_produk["Margin (%)"].map(la.format_percent_id)
-            tampil_margin_produk["Qty Terjual"] = produk_margin.head(top_n_margin_dsb)["Qty Terjual"].map(la.format_int_id)
-            st.dataframe(tampil_margin_produk, use_container_width=True, height=min(80 + 38 * len(tampil_margin_produk), 500))
-            st.download_button(
-                "⬇️ Unduh CSV — Seluruh Produk (Urut Margin)", produk_margin.to_csv(index=False).encode("utf-8-sig"),
-                "monitoring_margin_produk_aksesoris.csv", "text/csv", key="dsb_dl_margin_produk",
-            )
-
     st.divider()
     st.divider()
 
@@ -1560,6 +1594,211 @@ def render_aksesoris_tab():
             "⬇️ Unduh CSV — Perbandingan Antar Periode Samurai", perbandingan_samurai.to_csv(index=False).encode("utf-8-sig"),
             "perbandingan_periode_samurai.csv", "text/csv", key="ak_dl_samurai",
         )
+
+    st.divider()
+
+    # -----------------------------------------------------------------
+    # 3. Grafik Penjualan Perbandingan per Pekan
+    # -----------------------------------------------------------------
+    st.header("📈 Grafik Penjualan Perbandingan per Pekan (LUNA)")
+    st.caption(
+        "Khusus produk **LUNA** (seluruh varian, **termasuk Hydrogel**) — bukan seluruh kategori "
+        "Aksesoris. Menghitung SEMUA transaksi yang mengandung produk LUNA — **termasuk yang "
+        "terjual lewat bundling** di transaksi Service/lainnya. Pekan dihitung per blok 7 hari "
+        "tetap mulai dari tanggal paling awal pada data (mis. Pekan 1 = 1–7 Juli, Pekan 2 = "
+        "8–14 Juli, dst) — bukan pekan kalender ISO."
+    )
+    if df is None:
+        st.info("Belum ada data penjualan aksesoris.")
+    else:
+        mingguan = la.omzet_luna_mingguan_blok7(df, keyword_brand="LUNA")
+        if mingguan.empty:
+            st.info("Tidak ada data untuk grafik ini.")
+        else:
+            st.markdown("**Omzet LUNA per Hari**")
+            st.caption("Rentang tanggal bisa dipersempit di bawah supaya label angka pada grafik tetap terbaca (data harian bisa sangat padat untuk rentang panjang).")
+            harian_full = la.omzet_luna_harian(df, keyword_brand="LUNA")
+            if harian_full.empty:
+                st.info("Tidak ada data harian untuk grafik ini.")
+            else:
+                hd1, hd2 = st.columns(2)
+                tgl_harian_min = pd.Timestamp(harian_full["Tanggal"].min())
+                tgl_harian_max = pd.Timestamp(harian_full["Tanggal"].max())
+                tgl_default_mulai = max(tgl_harian_min, tgl_harian_max - pd.Timedelta(days=29))
+                with hd1:
+                    tgl_mulai_harian = st.date_input("Dari tanggal", value=tgl_default_mulai, min_value=tgl_harian_min, max_value=tgl_harian_max, key="ak_harian_mulai")
+                with hd2:
+                    tgl_selesai_harian = st.date_input("Sampai tanggal", value=tgl_harian_max, min_value=tgl_harian_min, max_value=tgl_harian_max, key="ak_harian_selesai")
+
+                harian = harian_full[
+                    (pd.to_datetime(harian_full["Tanggal"]) >= pd.Timestamp(tgl_mulai_harian)) &
+                    (pd.to_datetime(harian_full["Tanggal"]) <= pd.Timestamp(tgl_selesai_harian))
+                ].reset_index(drop=True)
+
+                if harian.empty:
+                    st.info("Tidak ada data LUNA pada rentang tanggal ini.")
+                else:
+                    chart_hr = harian.copy()
+                    chart_hr["_label_chart"] = (chart_hr["Omzet LUNA"] / 1_000_000).apply(lambda x: la.format_decimal_id(x, 1) + " jt")
+                    chart_hr["_label_rp"] = chart_hr["Omzet LUNA"].apply(la.format_rupiah_id)
+
+                    garis_hr = alt.Chart(chart_hr).mark_line(point=True, color="#378ADD").encode(
+                        x=alt.X("Tanggal:N", sort=chart_hr["Tanggal"].tolist(), title=None),
+                        y=alt.Y("Omzet LUNA:Q", title="Omzet LUNA (Rp)"),
+                        tooltip=[alt.Tooltip("Tanggal:N"), alt.Tooltip("Hari:N"), alt.Tooltip("_label_rp:N", title="Omzet LUNA")],
+                    )
+                    label_hr = alt.Chart(chart_hr).mark_text(dy=-12, fontSize=9, color="#1F3864").encode(
+                        x=alt.X("Tanggal:N", sort=chart_hr["Tanggal"].tolist()),
+                        y=alt.Y("Omzet LUNA:Q"),
+                        text=alt.Text("_label_chart:N"),
+                    )
+                    st.altair_chart((garis_hr + label_hr).properties(height=350), use_container_width=True)
+
+                    tampil_hr = harian.copy()
+                    tampil_hr["Omzet LUNA"] = harian["Omzet LUNA"].map(la.format_rupiah_id)
+                    tampil_hr["Qty Terjual"] = harian["Qty Terjual"].map(la.format_int_id)
+                    st.dataframe(tampil_hr, use_container_width=True, height=min(80 + 38 * len(harian), 400))
+                    st.download_button(
+                        "⬇️ Unduh CSV — Omzet LUNA per Hari (rentang terpilih)", harian.to_csv(index=False).encode("utf-8-sig"),
+                        "omzet_luna_harian.csv", "text/csv", key="ak_dl_harian",
+                    )
+
+            st.markdown("**Omzet LUNA per Pekan (termasuk Hydrogel)**")
+            chart_mgg = mingguan.copy()
+            # Label di titik grafik dibuat ringkas (format jutaan) supaya tidak
+            # berdempetan antar titik — tabel & unduhan CSV di bawah tetap
+            # pakai format Rupiah lengkap seperti biasa.
+            chart_mgg["_label_chart"] = (chart_mgg["Omzet LUNA"] / 1_000_000).apply(lambda x: la.format_decimal_id(x, 1) + " jt")
+            chart_mgg["_label_rp"] = chart_mgg["Omzet LUNA"].apply(la.format_rupiah_id)
+
+            garis = alt.Chart(chart_mgg).mark_line(point=True, color="#378ADD").encode(
+                x=alt.X("Pekan:N", sort=chart_mgg["Pekan"].tolist(), title=None),
+                y=alt.Y("Omzet LUNA:Q", title="Omzet LUNA (Rp)"),
+                tooltip=[alt.Tooltip("Pekan:N"), alt.Tooltip("_label_rp:N", title="Omzet LUNA")],
+            )
+            label = alt.Chart(chart_mgg).mark_text(dy=-12, fontSize=11, color="#1F3864").encode(
+                x=alt.X("Pekan:N", sort=chart_mgg["Pekan"].tolist()),
+                y=alt.Y("Omzet LUNA:Q"),
+                text=alt.Text("_label_chart:N"),
+            )
+            st.altair_chart((garis + label).properties(height=350), use_container_width=True)
+
+            tampil_mgg = mingguan.copy()
+            tampil_mgg["Omzet LUNA"] = mingguan["Omzet LUNA"].map(la.format_rupiah_id)
+            tampil_mgg["Qty Terjual"] = mingguan["Qty Terjual"].map(la.format_int_id)
+            st.dataframe(tampil_mgg, use_container_width=True, height=min(80 + 38 * len(mingguan), 400))
+            st.download_button(
+                "⬇️ Unduh CSV — Omzet LUNA per Pekan", mingguan.to_csv(index=False).encode("utf-8-sig"),
+                "omzet_luna_mingguan.csv", "text/csv", key="ak_dl_mingguan",
+            )
+
+            st.markdown("**Kontribusi Cabang per Pekan (Omzet LUNA)**")
+            st.caption(
+                "Cabang mana yang paling mendorong omzet tinggi di pekan tertentu — kolom Total "
+                "diurutkan dari cabang dengan kontribusi TERBESAR ke TERKECIL."
+            )
+            cabang_pekan = la.omzet_luna_cabang_per_pekan_blok7(df, keyword_brand="LUNA")
+            if cabang_pekan.empty:
+                st.info("Tidak ada data untuk breakdown per cabang.")
+            else:
+                kolom_pekan_cp = [c for c in cabang_pekan.columns if c not in ("Cabang", "Total")]
+                tampil_cp = cabang_pekan.copy()
+                for c in kolom_pekan_cp + ["Total"]:
+                    tampil_cp[c] = cabang_pekan[c].map(la.format_rupiah_id)
+                st.dataframe(tampil_cp, use_container_width=True, height=min(80 + 38 * len(cabang_pekan), 650))
+
+                pekan_puncak = mingguan.loc[mingguan["Omzet LUNA"].idxmax(), "Pekan"]
+                top3_pekan_puncak = cabang_pekan[["Cabang", pekan_puncak]].sort_values(pekan_puncak, ascending=False).head(3)
+                daftar_top3 = ", ".join(
+                    f"**{r['Cabang']}** ({la.format_rupiah_id(r[pekan_puncak])})" for _, r in top3_pekan_puncak.iterrows()
+                )
+                st.caption(f"Pekan dengan omzet tertinggi ({pekan_puncak}) paling didorong oleh: {daftar_top3}.")
+                st.download_button(
+                    "⬇️ Unduh CSV — Kontribusi Cabang per Pekan", cabang_pekan.to_csv(index=False).encode("utf-8-sig"),
+                    "omzet_luna_cabang_per_pekan.csv", "text/csv", key="ak_dl_cabang_pekan",
+                )
+
+            st.markdown("**🔍 Rincian Produk — Pilih Cabang & Pekan**")
+            st.caption("Lihat produk LUNA apa saja (termasuk Hydrogel) yang terjual di cabang & pekan tertentu, beserta kuantitasnya.")
+            daftar_pekan_dd = la.daftar_pekan_blok7(df)
+            opsi_pekan_dd = ["— Seluruh Pekan —"] + daftar_pekan_dd["Pekan"].tolist()
+            daftar_cabang_dd = sorted(df["CABANG"].dropna().unique().tolist())
+
+            rd1, rd2 = st.columns(2)
+            with rd1:
+                cabang_rincian = st.selectbox("Pilih Cabang", daftar_cabang_dd, key="ak_mingguan_cabang")
+            with rd2:
+                pekan_rincian = st.selectbox("Pilih Pekan", opsi_pekan_dd, key="ak_mingguan_pekan")
+
+            if pekan_rincian == "— Seluruh Pekan —":
+                tgl_mulai_rincian = df["TGL FAKTUR"].min()
+                tgl_selesai_rincian = df["TGL FAKTUR"].max()
+            else:
+                baris_pekan = daftar_pekan_dd[daftar_pekan_dd["Pekan"] == pekan_rincian].iloc[0]
+                tgl_mulai_rincian = baris_pekan["Tanggal Mulai"]
+                tgl_selesai_rincian = baris_pekan["Tanggal Selesai"]
+
+            rincian_produk_mgg = la.detail_produk_brand_cabang(
+                df, cabang_rincian, tgl_mulai_rincian, tgl_selesai_rincian,
+                keyword="LUNA", keyword_kecuali=None,
+            )
+            if rincian_produk_mgg.empty:
+                st.info(f"Belum ada penjualan LUNA di cabang **{cabang_rincian}** pada periode ini.")
+            else:
+                tampil_rincian = rincian_produk_mgg.copy()
+                tampil_rincian["Qty"] = rincian_produk_mgg["Qty"].map(la.format_int_id)
+                tampil_rincian["Omzet"] = rincian_produk_mgg["Omzet"].map(la.format_rupiah_id)
+                tampil_rincian["HPP"] = rincian_produk_mgg["HPP"].map(la.format_rupiah_id)
+                tampil_rincian["% Gross Profit"] = rincian_produk_mgg["% Gross Profit"].map(la.format_percent_id)
+                st.dataframe(tampil_rincian, use_container_width=True, height=min(80 + 38 * len(rincian_produk_mgg), 400))
+                total_omzet_rincian = rincian_produk_mgg["Omzet"].sum()
+                total_hpp_rincian = rincian_produk_mgg["HPP"].sum()
+                total_gp_pct_rincian = (
+                    (total_omzet_rincian - total_hpp_rincian) / total_omzet_rincian * 100 if total_omzet_rincian else 0
+                )
+                st.caption(
+                    f"Total {la.format_int_id(rincian_produk_mgg['Qty'].sum())} pcs dari "
+                    f"{len(rincian_produk_mgg)} jenis produk — Omzet {la.format_rupiah_id(total_omzet_rincian)}, "
+                    f"HPP {la.format_rupiah_id(total_hpp_rincian)}, Gross Profit {la.format_percent_id(total_gp_pct_rincian)}."
+                )
+                st.download_button(
+                    "⬇️ Unduh CSV — Rincian Produk Cabang Terpilih", rincian_produk_mgg.to_csv(index=False).encode("utf-8-sig"),
+                    f"rincian_produk_{cabang_rincian.lower()}.csv", "text/csv", key="ak_dl_rincian_mingguan",
+                )
+
+    st.divider()
+
+    # -----------------------------------------------------------------
+    # 4. Perbandingan Penjualan Aksesoris Semua Cabang per Bulan
+    # -----------------------------------------------------------------
+    st.header("📈 Perbandingan Penjualan Aksesoris Semua Cabang per Bulan")
+    st.caption(
+        "Kolom \"% Bulan A → Bulan B\" menunjukkan pertumbuhan omzet dari bulan sebelumnya ke bulan "
+        "berikutnya (🟢 naik, 🔴 turun). Bulan TERAKHIR pada data biasanya belum penuh sebulan "
+        "(tergantung tanggal data terakhir diunggah) — wajar kalau terlihat turun drastis, bukan "
+        "berarti performa anjlok."
+    )
+    if df is None:
+        st.info("Belum ada data penjualan aksesoris.")
+    else:
+        bulanan = la.omzet_cabang_per_bulan(df)
+        if bulanan.empty:
+            st.info("Tidak ada data untuk tabel ini.")
+        else:
+            kolom_rp = [c for c in bulanan.columns if c not in ("Cabang", "Total") and not c.startswith("%")]
+            kolom_persen = [c for c in bulanan.columns if c.startswith("%")]
+
+            st.bar_chart(bulanan.set_index("Cabang")[kolom_rp])
+
+            styled_bulanan = bulanan.style.map(la.warna_indikator_pencapaian_naik_turun, subset=kolom_persen) if kolom_persen else bulanan.style
+            format_dict = {c: la.format_rupiah_id for c in kolom_rp + ["Total"]}
+            format_dict.update({c: la.format_percent_id for c in kolom_persen})
+            styled_bulanan = styled_bulanan.format(format_dict)
+            st.dataframe(styled_bulanan, use_container_width=True, height=min(80 + 38 * len(bulanan), 700))
+            st.download_button(
+                "⬇️ Unduh CSV — Omzet Aksesoris per Cabang per Bulan", bulanan.to_csv(index=False).encode("utf-8-sig"),
+                "omzet_cabang_per_bulan.csv", "text/csv", key="ak_dl_bulanan",
+            )
 
     st.divider()
 
@@ -2688,370 +2927,168 @@ def render_pembelian_tab():
 
     st.divider()
 
-    # -----------------------------------------------------------------
-    # 3. Grafik Penjualan Perbandingan per Pekan
-    # -----------------------------------------------------------------
-    st.subheader("3️⃣ Grafik Penjualan Perbandingan per Pekan")
-    st.caption(
-        "Khusus produk **LUNA** (seluruh varian, **termasuk Hydrogel**) — bukan seluruh kategori "
-        "Aksesoris. Menghitung SEMUA transaksi yang mengandung produk LUNA — **termasuk yang "
-        "terjual lewat bundling** di transaksi Service/lainnya. Pekan dihitung per blok 7 hari "
-        "tetap mulai dari tanggal paling awal pada data (mis. Pekan 1 = 1–7 Juli, Pekan 2 = "
-        "8–14 Juli, dst) — bukan pekan kalender ISO."
-    )
-    if df_aks_jual is None:
-        st.info("Belum ada data penjualan aksesoris.")
-    else:
-        mingguan = la.omzet_luna_mingguan_blok7(df_aks_jual, keyword_brand="LUNA")
-        if mingguan.empty:
-            st.info("Tidak ada data untuk grafik ini.")
+    # --- Info tambahan: berapa transaksi Service TIDAK ada bundling aksesoris (terutama LUNA) ---
+    if df_re is not None:
+        st.markdown("###### 📋 Kepatuhan Bundling Aksesoris pada Transaksi Service")
+        st.caption("Pilih jenis periode untuk membatasi rentang tanggal analisa bundling ini — sama seperti pemilih periode di \"🎯 Target Pencapaian Penjualan Aksesoris\".")
+
+        mode_periode_bund = st.radio(
+            "Jenis Periode", ["Periode Samurai (Kuartalan)", "Program Custom (1–12 Bulan)"],
+            horizontal=True, key="pb_bundling_mode_periode",
+            help="Periode Samurai = kuartalan tetap (Jul 2026–Des 2027). Program Custom = atur sendiri tanggal mulai & durasi (1–12 bulan).",
+        )
+        periode_samurai_bund_opsi = [
+            "Samurai 39 (Jul–Sep 2026)", "Samurai 40 (Okt–Des 2026)", "Samurai 41 (Jan–Mar 2027)",
+            "Samurai 42 (Apr–Jun 2027)", "Samurai 43 (Jul–Sep 2027)", "Samurai 44 (Okt–Des 2027)",
+        ]
+        if mode_periode_bund == "Periode Samurai (Kuartalan)":
+            periode_pilihan_bund = st.selectbox("Pilih Periode Samurai", periode_samurai_bund_opsi, key="pb_bundling_periode_samurai")
+            tgl_mulai_bund, tgl_selesai_bund = la.PERIODE_SAMURAI[periode_pilihan_bund]
+            st.caption(f"Periode: {tgl_mulai_bund.strftime('%d %b %Y')} – {tgl_selesai_bund.strftime('%d %b %Y')} (3 bulan).")
         else:
-            st.markdown("**Omzet LUNA per Hari**")
-            st.caption("Rentang tanggal bisa dipersempit di bawah supaya label angka pada grafik tetap terbaca (data harian bisa sangat padat untuk rentang panjang).")
-            harian_full = la.omzet_luna_harian(df_aks_jual, keyword_brand="LUNA")
-            if harian_full.empty:
-                st.info("Tidak ada data harian untuk grafik ini.")
-            else:
-                hd1, hd2 = st.columns(2)
-                tgl_harian_min = pd.Timestamp(harian_full["Tanggal"].min())
-                tgl_harian_max = pd.Timestamp(harian_full["Tanggal"].max())
-                tgl_default_mulai = max(tgl_harian_min, tgl_harian_max - pd.Timedelta(days=29))
-                with hd1:
-                    tgl_mulai_harian = st.date_input("Dari tanggal", value=tgl_default_mulai, min_value=tgl_harian_min, max_value=tgl_harian_max, key="pb_harian_mulai")
-                with hd2:
-                    tgl_selesai_harian = st.date_input("Sampai tanggal", value=tgl_harian_max, min_value=tgl_harian_min, max_value=tgl_harian_max, key="pb_harian_selesai")
+            bt1, bt2 = st.columns(2)
+            with bt1:
+                tgl_mulai_bund = pd.Timestamp(st.date_input("Mulai Program", value=pd.Timestamp("2026-08-20"), key="pb_bundling_mulai"))
+            with bt2:
+                durasi_bund = st.slider("Durasi Program (bulan)", min_value=1, max_value=12, value=3, key="pb_bundling_durasi")
+            tgl_selesai_bund = tgl_mulai_bund + pd.DateOffset(months=int(durasi_bund)) - pd.Timedelta(days=1)
+            st.caption(f"Periode: {tgl_mulai_bund.strftime('%d %b %Y')} – {tgl_selesai_bund.strftime('%d %b %Y')} ({durasi_bund} bulan).")
 
-                harian = harian_full[
-                    (pd.to_datetime(harian_full["Tanggal"]) >= pd.Timestamp(tgl_mulai_harian)) &
-                    (pd.to_datetime(harian_full["Tanggal"]) <= pd.Timestamp(tgl_selesai_harian))
-                ].reset_index(drop=True)
+        df_re_bund = df_re[(df_re["TGL FAKTUR"] >= tgl_mulai_bund) & (df_re["TGL FAKTUR"] <= tgl_selesai_bund)]
+        df_aks_jual_bund = df_aks_jual[(df_aks_jual["TGL FAKTUR"] >= tgl_mulai_bund) & (df_aks_jual["TGL FAKTUR"] <= tgl_selesai_bund)] if df_aks_jual is not None else df_aks_jual
 
-                if harian.empty:
-                    st.info("Tidak ada data LUNA pada rentang tanggal ini.")
-                else:
-                    chart_hr = harian.copy()
-                    chart_hr["_label_chart"] = (chart_hr["Omzet LUNA"] / 1_000_000).apply(lambda x: la.format_decimal_id(x, 1) + " jt")
-                    chart_hr["_label_rp"] = chart_hr["Omzet LUNA"].apply(la.format_rupiah_id)
-
-                    garis_hr = alt.Chart(chart_hr).mark_line(point=True, color="#378ADD").encode(
-                        x=alt.X("Tanggal:N", sort=chart_hr["Tanggal"].tolist(), title=None),
-                        y=alt.Y("Omzet LUNA:Q", title="Omzet LUNA (Rp)"),
-                        tooltip=[alt.Tooltip("Tanggal:N"), alt.Tooltip("Hari:N"), alt.Tooltip("_label_rp:N", title="Omzet LUNA")],
-                    )
-                    label_hr = alt.Chart(chart_hr).mark_text(dy=-12, fontSize=9, color="#1F3864").encode(
-                        x=alt.X("Tanggal:N", sort=chart_hr["Tanggal"].tolist()),
-                        y=alt.Y("Omzet LUNA:Q"),
-                        text=alt.Text("_label_chart:N"),
-                    )
-                    st.altair_chart((garis_hr + label_hr).properties(height=350), use_container_width=True)
-
-                    tampil_hr = harian.copy()
-                    tampil_hr["Omzet LUNA"] = harian["Omzet LUNA"].map(la.format_rupiah_id)
-                    tampil_hr["Qty Terjual"] = harian["Qty Terjual"].map(la.format_int_id)
-                    st.dataframe(tampil_hr, use_container_width=True, height=min(80 + 38 * len(harian), 400))
-                    st.download_button(
-                        "⬇️ Unduh CSV — Omzet LUNA per Hari (rentang terpilih)", harian.to_csv(index=False).encode("utf-8-sig"),
-                        "omzet_luna_harian.csv", "text/csv", key="pb_dl_harian",
-                    )
-
-            st.markdown("**Omzet LUNA per Pekan (termasuk Hydrogel)**")
-            chart_mgg = mingguan.copy()
-            # Label di titik grafik dibuat ringkas (format jutaan) supaya tidak
-            # berdempetan antar titik — tabel & unduhan CSV di bawah tetap
-            # pakai format Rupiah lengkap seperti biasa.
-            chart_mgg["_label_chart"] = (chart_mgg["Omzet LUNA"] / 1_000_000).apply(lambda x: la.format_decimal_id(x, 1) + " jt")
-            chart_mgg["_label_rp"] = chart_mgg["Omzet LUNA"].apply(la.format_rupiah_id)
-
-            garis = alt.Chart(chart_mgg).mark_line(point=True, color="#378ADD").encode(
-                x=alt.X("Pekan:N", sort=chart_mgg["Pekan"].tolist(), title=None),
-                y=alt.Y("Omzet LUNA:Q", title="Omzet LUNA (Rp)"),
-                tooltip=[alt.Tooltip("Pekan:N"), alt.Tooltip("_label_rp:N", title="Omzet LUNA")],
+        bund_info, bund_detail = la.analisa_bundling_brand(df_aks_jual_bund, df_re_bund, keyword="LUNA")
+        if bund_info["jumlah_nota_service"]:
+            bi1, bi2, bi3, bi4 = st.columns(4)
+            bi1.metric("Total Nota Service", la.format_int_id(bund_info["jumlah_nota_service"]))
+            bi2.metric("Ada Bundling LUNA", la.format_int_id(bund_info["jumlah_service_dgn_brand"]), la.format_percent_id(bund_info["pct_bundling_brand"]))
+            bi3.metric("Bundling Brand Lain (bukan LUNA)", la.format_int_id(bund_info["jumlah_service_dgn_aksesoris_lain"]))
+            bi4.metric(
+                "⚠️ TIDAK Ada Bundling Aksesoris", la.format_int_id(bund_info["jumlah_service_tanpa_aksesoris"]),
+                la.format_percent_id(bund_info["pct_tanpa_aksesoris"]), delta_color="inverse",
             )
-            label = alt.Chart(chart_mgg).mark_text(dy=-12, fontSize=11, color="#1F3864").encode(
-                x=alt.X("Pekan:N", sort=chart_mgg["Pekan"].tolist()),
-                y=alt.Y("Omzet LUNA:Q"),
-                text=alt.Text("_label_chart:N"),
-            )
-            st.altair_chart((garis + label).properties(height=350), use_container_width=True)
-
-            tampil_mgg = mingguan.copy()
-            tampil_mgg["Omzet LUNA"] = mingguan["Omzet LUNA"].map(la.format_rupiah_id)
-            tampil_mgg["Qty Terjual"] = mingguan["Qty Terjual"].map(la.format_int_id)
-            st.dataframe(tampil_mgg, use_container_width=True, height=min(80 + 38 * len(mingguan), 400))
-            st.download_button(
-                "⬇️ Unduh CSV — Omzet LUNA per Pekan", mingguan.to_csv(index=False).encode("utf-8-sig"),
-                "omzet_luna_mingguan.csv", "text/csv", key="pb_dl_mingguan",
-            )
-
-            st.markdown("**Kontribusi Cabang per Pekan (Omzet LUNA)**")
             st.caption(
-                "Cabang mana yang paling mendorong omzet tinggi di pekan tertentu — kolom Total "
-                "diurutkan dari cabang dengan kontribusi TERBESAR ke TERKECIL."
+                f"Dari {la.format_int_id(bund_info['jumlah_nota_service'])} nota Service: "
+                f"**{la.format_int_id(bund_info['jumlah_service_tanpa_aksesoris'])} nota "
+                f"({la.format_percent_id(bund_info['pct_tanpa_aksesoris'])}) sama sekali tidak ada "
+                "aksesoris apa pun** yang di-bundling — ini yang paling perlu ditindaklanjuti. "
+                f"{la.format_int_id(bund_info['jumlah_service_dgn_aksesoris_lain'])} nota lain sudah "
+                "bundling tapi pakai brand SELAIN LUNA (sesuai pengecualian SE kalau LUNA kosong stok "
+                "— bukan pelanggaran)."
             )
-            cabang_pekan = la.omzet_luna_cabang_per_pekan_blok7(df_aks_jual, keyword_brand="LUNA")
-            if cabang_pekan.empty:
-                st.info("Tidak ada data untuk breakdown per cabang.")
-            else:
-                kolom_pekan_cp = [c for c in cabang_pekan.columns if c not in ("Cabang", "Total")]
-                tampil_cp = cabang_pekan.copy()
-                for c in kolom_pekan_cp + ["Total"]:
-                    tampil_cp[c] = cabang_pekan[c].map(la.format_rupiah_id)
-                st.dataframe(tampil_cp, use_container_width=True, height=min(80 + 38 * len(cabang_pekan), 650))
 
-                pekan_puncak = mingguan.loc[mingguan["Omzet LUNA"].idxmax(), "Pekan"]
-                top3_pekan_puncak = cabang_pekan[["Cabang", pekan_puncak]].sort_values(pekan_puncak, ascending=False).head(3)
-                daftar_top3 = ", ".join(
-                    f"**{r['Cabang']}** ({la.format_rupiah_id(r[pekan_puncak])})" for _, r in top3_pekan_puncak.iterrows()
+            st.markdown("**Porsi Tanpa Bundling per Cabang**")
+            st.caption(
+                "Diurutkan dari % Tanpa Bundling TERTINGGI (cabang paling perlu ditindaklanjuti di atas). "
+                "Kolom \"Nota Luna Organik (Non-Service)\" terpisah dari breakdown Service di atas — "
+                "menghitung nota yang mengandung LUNA dari penjualan RETAIL LANGSUNG (bukan lewat "
+                "bundling saat kunjungan Service), jadi TIDAK dijumlahkan ke Total Nota Service."
+            )
+            bund_cabang = la.analisa_bundling_per_cabang(df_re_bund, keyword="LUNA")
+            if bund_cabang.empty:
+                st.info("Tidak ada data per cabang untuk ditampilkan.")
+            else:
+                kolom_int_bc = [c for c in bund_cabang.columns if c not in ("Cabang",) and not c.startswith("%")]
+                kolom_pct_bc = [c for c in bund_cabang.columns if c.startswith("%")]
+
+                chart_tb = bund_cabang[["Cabang", "% Tanpa Bundling"]].copy()
+                chart_tb["_label"] = chart_tb["% Tanpa Bundling"].apply(la.format_percent_id)
+                batang_tb = alt.Chart(chart_tb).mark_bar(color="#378ADD").encode(
+                    x=alt.X("Cabang:N", sort=chart_tb["Cabang"].tolist(), title=None),
+                    y=alt.Y("% Tanpa Bundling:Q", title="% Tanpa Bundling"),
+                    tooltip=[alt.Tooltip("Cabang:N"), alt.Tooltip("_label:N", title="% Tanpa Bundling")],
                 )
-                st.caption(f"Pekan dengan omzet tertinggi ({pekan_puncak}) paling didorong oleh: {daftar_top3}.")
+                label_tb = alt.Chart(chart_tb).mark_text(dy=-8, fontSize=10, color="#1F3864").encode(
+                    x=alt.X("Cabang:N", sort=chart_tb["Cabang"].tolist()),
+                    y=alt.Y("% Tanpa Bundling:Q"),
+                    text=alt.Text("_label:N"),
+                )
+                st.altair_chart((batang_tb + label_tb).properties(height=380), use_container_width=True)
+
+                tampil_bc = bund_cabang.copy()
+                for c in kolom_pct_bc:
+                    tampil_bc[c] = bund_cabang[c].map(la.format_percent_id)
+                for c in kolom_int_bc:
+                    tampil_bc[c] = bund_cabang[c].map(la.format_int_id)
+                st.dataframe(tampil_bc, use_container_width=True, height=min(80 + 38 * len(bund_cabang), 650))
                 st.download_button(
-                    "⬇️ Unduh CSV — Kontribusi Cabang per Pekan", cabang_pekan.to_csv(index=False).encode("utf-8-sig"),
-                    "omzet_luna_cabang_per_pekan.csv", "text/csv", key="pb_dl_cabang_pekan",
+                    "⬇️ Unduh CSV — Porsi Tanpa Bundling per Cabang", bund_cabang.to_csv(index=False).encode("utf-8-sig"),
+                    "porsi_tanpa_bundling_per_cabang.csv", "text/csv", key="pb_dl_bundling_cabang",
                 )
 
-            st.markdown("**🔍 Rincian Produk — Pilih Cabang & Pekan**")
-            st.caption("Lihat produk LUNA apa saja (termasuk Hydrogel) yang terjual di cabang & pekan tertentu, beserta kuantitasnya.")
-            daftar_pekan_dd = la.daftar_pekan_blok7(df_aks_jual)
-            opsi_pekan_dd = ["— Seluruh Pekan —"] + daftar_pekan_dd["Pekan"].tolist()
-            daftar_cabang_dd = sorted(df_aks_jual["CABANG"].dropna().unique().tolist())
+                with st.container(border=True):
+                    st.markdown("**📌 Analisa & Tindak Lanjut**")
+                    catatan_bc = []
 
-            rd1, rd2 = st.columns(2)
-            with rd1:
-                cabang_rincian = st.selectbox("Pilih Cabang", daftar_cabang_dd, key="pb_mingguan_cabang")
-            with rd2:
-                pekan_rincian = st.selectbox("Pilih Pekan", opsi_pekan_dd, key="pb_mingguan_pekan")
+                    bc_terburuk = bund_cabang.iloc[0]
+                    bc_terbaik = bund_cabang.iloc[-1]
+                    catatan_bc.append(
+                        f"**{bc_terburuk['Cabang']}** paling perlu ditindaklanjuti — "
+                        f"{la.format_percent_id(bc_terburuk['% Tanpa Bundling'])} nota Service-nya "
+                        f"({la.format_int_id(int(bc_terburuk['Nota Tanpa Bundling']))} dari "
+                        f"{la.format_int_id(int(bc_terburuk['Total Nota Service']))} nota) sama sekali "
+                        "tidak ada bundling aksesoris."
+                    )
+                    catatan_bc.append(
+                        f"**{bc_terbaik['Cabang']}** kepatuhan bundling paling baik — cuma "
+                        f"{la.format_percent_id(bc_terbaik['% Tanpa Bundling'])} nota yang tanpa bundling "
+                        "sama sekali, bisa jadi contoh SOP untuk cabang lain."
+                    )
 
-            if pekan_rincian == "— Seluruh Pekan —":
-                tgl_mulai_rincian = df_aks_jual["TGL FAKTUR"].min()
-                tgl_selesai_rincian = df_aks_jual["TGL FAKTUR"].max()
-            else:
-                baris_pekan = daftar_pekan_dd[daftar_pekan_dd["Pekan"] == pekan_rincian].iloc[0]
-                tgl_mulai_rincian = baris_pekan["Tanggal Mulai"]
-                tgl_selesai_rincian = baris_pekan["Tanggal Selesai"]
+                    bc_luna_top = bund_cabang.sort_values("% Bundling Luna", ascending=False).iloc[0]
+                    bc_luna_bottom = bund_cabang.sort_values("% Bundling Luna", ascending=True).iloc[0]
+                    catatan_bc.append(
+                        f"Porsi bundling KHUSUS LUNA (bukan brand lain) paling tinggi di "
+                        f"**{bc_luna_top['Cabang']}** ({la.format_percent_id(bc_luna_top['% Bundling Luna'])}), "
+                        f"paling rendah di **{bc_luna_bottom['Cabang']}** "
+                        f"({la.format_percent_id(bc_luna_bottom['% Bundling Luna'])}) — cabang dengan "
+                        "porsi LUNA rendah kemungkinan lebih sering menawarkan brand lain saat stok LUNA "
+                        "kosong, atau memang belum konsisten mengarahkan ke LUNA."
+                    )
 
-            rincian_produk_mgg = la.detail_produk_brand_cabang(
-                df_aks_jual, cabang_rincian, tgl_mulai_rincian, tgl_selesai_rincian,
-                keyword="LUNA", keyword_kecuali=None,
-            )
-            if rincian_produk_mgg.empty:
-                st.info(f"Belum ada penjualan LUNA di cabang **{cabang_rincian}** pada periode ini.")
-            else:
-                tampil_rincian = rincian_produk_mgg.copy()
-                tampil_rincian["Qty"] = rincian_produk_mgg["Qty"].map(la.format_int_id)
-                tampil_rincian["Omzet"] = rincian_produk_mgg["Omzet"].map(la.format_rupiah_id)
-                tampil_rincian["HPP"] = rincian_produk_mgg["HPP"].map(la.format_rupiah_id)
-                tampil_rincian["% Gross Profit"] = rincian_produk_mgg["% Gross Profit"].map(la.format_percent_id)
-                st.dataframe(tampil_rincian, use_container_width=True, height=min(80 + 38 * len(rincian_produk_mgg), 400))
-                total_omzet_rincian = rincian_produk_mgg["Omzet"].sum()
-                total_hpp_rincian = rincian_produk_mgg["HPP"].sum()
-                total_gp_pct_rincian = (
-                    (total_omzet_rincian - total_hpp_rincian) / total_omzet_rincian * 100 if total_omzet_rincian else 0
-                )
-                st.caption(
-                    f"Total {la.format_int_id(rincian_produk_mgg['Qty'].sum())} pcs dari "
-                    f"{len(rincian_produk_mgg)} jenis produk — Omzet {la.format_rupiah_id(total_omzet_rincian)}, "
-                    f"HPP {la.format_rupiah_id(total_hpp_rincian)}, Gross Profit {la.format_percent_id(total_gp_pct_rincian)}."
-                )
+                    bc_organik_top = bund_cabang.sort_values("Nota Luna Organik (Non-Service)", ascending=False).iloc[0]
+                    bc_pct_organik_top = bund_cabang.sort_values("% Nota Luna Organik", ascending=False).iloc[0]
+                    catatan_bc.append(
+                        f"**{bc_organik_top['Cabang']}** paling banyak menjual LUNA secara ORGANIK "
+                        f"(retail langsung, di luar bundling Service) — "
+                        f"{la.format_int_id(int(bc_organik_top['Nota Luna Organik (Non-Service)']))} nota — "
+                        "menunjukkan permintaan LUNA yang berdiri sendiri, bukan cuma titipan Service. "
+                        f"Secara PORSI (dibanding total nota LUNA cabang tsb), **{bc_pct_organik_top['Cabang']}** "
+                        f"unggul dengan {la.format_percent_id(bc_pct_organik_top['% Nota Luna Organik'])} "
+                        "organik — cabang dengan porsi tinggi biasanya sudah punya basis pelanggan LUNA "
+                        "yang loyal, tidak cuma mengandalkan bundling Service."
+                    )
+
+                    rata2_tanpa_bundling = bund_cabang["% Tanpa Bundling"].mean()
+                    n_di_atas_rata2 = (bund_cabang["% Tanpa Bundling"] > rata2_tanpa_bundling).sum()
+                    total_nota_tanpa_bundling = int(bund_cabang["Nota Tanpa Bundling"].sum())
+                    total_nota_service = int(bund_cabang["Total Nota Service"].sum())
+                    catatan_bc.append(
+                        f"Rata-rata jaringan: {la.format_percent_id(rata2_tanpa_bundling)} nota Service "
+                        f"tanpa bundling ({la.format_int_id(total_nota_tanpa_bundling)} dari "
+                        f"{la.format_int_id(total_nota_service)} nota se-jaringan) — "
+                        f"**{n_di_atas_rata2} dari {len(bund_cabang)} cabang** berada DI ATAS rata-rata "
+                        "ini, jadi prioritas pembinaan sebaiknya difokuskan ke cabang-cabang tersebut dulu."
+                    )
+
+                    for c in catatan_bc:
+                        st.markdown("- " + c)
+
+            with st.expander(f"🔍 Lihat Rincian Nomor Nota — {la.format_int_id(bund_info['jumlah_service_tanpa_aksesoris'])} Nota Tanpa Bundling", expanded=False):
+                st.caption("Daftar nota Service yang sama sekali tidak ada aksesoris apa pun di dalamnya — bisa difilter per cabang.")
+                cabang_opsi_bund = ["— Semua Cabang —"] + sorted(bund_detail["Cabang"].dropna().unique().tolist())
+                cabang_pilihan_bund = st.selectbox("Filter Cabang", cabang_opsi_bund, key="pb_bundling_cabang_filter")
+                detail_tampil = bund_detail if cabang_pilihan_bund == "— Semua Cabang —" else bund_detail[bund_detail["Cabang"] == cabang_pilihan_bund]
+                st.caption(f"Menampilkan {la.format_int_id(len(detail_tampil))} dari {la.format_int_id(len(bund_detail))} nota.")
+                st.dataframe(detail_tampil, use_container_width=True, height=min(80 + 38 * len(detail_tampil), 500))
                 st.download_button(
-                    "⬇️ Unduh CSV — Rincian Produk Cabang Terpilih", rincian_produk_mgg.to_csv(index=False).encode("utf-8-sig"),
-                    f"rincian_produk_{cabang_rincian.lower()}.csv", "text/csv", key="pb_dl_rincian_mingguan",
+                    "⬇️ Unduh CSV — Rincian Nomor Nota Tanpa Bundling (lengkap)",
+                    bund_detail.to_csv(index=False).encode("utf-8-sig"),
+                    "rincian_nota_tanpa_bundling.csv", "text/csv", key="pb_dl_bundling_detail",
                 )
-
-        # --- Info tambahan: berapa transaksi Service TIDAK ada bundling aksesoris (terutama LUNA) ---
-        if df_re is not None:
-            st.markdown("###### 📋 Kepatuhan Bundling Aksesoris pada Transaksi Service")
-            st.caption("Pilih jenis periode untuk membatasi rentang tanggal analisa bundling ini — sama seperti pemilih periode di \"🎯 Target Pencapaian Penjualan Aksesoris\".")
-
-            mode_periode_bund = st.radio(
-                "Jenis Periode", ["Periode Samurai (Kuartalan)", "Program Custom (1–12 Bulan)"],
-                horizontal=True, key="pb_bundling_mode_periode",
-                help="Periode Samurai = kuartalan tetap (Jul 2026–Des 2027). Program Custom = atur sendiri tanggal mulai & durasi (1–12 bulan).",
-            )
-            periode_samurai_bund_opsi = [
-                "Samurai 39 (Jul–Sep 2026)", "Samurai 40 (Okt–Des 2026)", "Samurai 41 (Jan–Mar 2027)",
-                "Samurai 42 (Apr–Jun 2027)", "Samurai 43 (Jul–Sep 2027)", "Samurai 44 (Okt–Des 2027)",
-            ]
-            if mode_periode_bund == "Periode Samurai (Kuartalan)":
-                periode_pilihan_bund = st.selectbox("Pilih Periode Samurai", periode_samurai_bund_opsi, key="pb_bundling_periode_samurai")
-                tgl_mulai_bund, tgl_selesai_bund = la.PERIODE_SAMURAI[periode_pilihan_bund]
-                st.caption(f"Periode: {tgl_mulai_bund.strftime('%d %b %Y')} – {tgl_selesai_bund.strftime('%d %b %Y')} (3 bulan).")
-            else:
-                bt1, bt2 = st.columns(2)
-                with bt1:
-                    tgl_mulai_bund = pd.Timestamp(st.date_input("Mulai Program", value=pd.Timestamp("2026-08-20"), key="pb_bundling_mulai"))
-                with bt2:
-                    durasi_bund = st.slider("Durasi Program (bulan)", min_value=1, max_value=12, value=3, key="pb_bundling_durasi")
-                tgl_selesai_bund = tgl_mulai_bund + pd.DateOffset(months=int(durasi_bund)) - pd.Timedelta(days=1)
-                st.caption(f"Periode: {tgl_mulai_bund.strftime('%d %b %Y')} – {tgl_selesai_bund.strftime('%d %b %Y')} ({durasi_bund} bulan).")
-
-            df_re_bund = df_re[(df_re["TGL FAKTUR"] >= tgl_mulai_bund) & (df_re["TGL FAKTUR"] <= tgl_selesai_bund)]
-            df_aks_jual_bund = df_aks_jual[(df_aks_jual["TGL FAKTUR"] >= tgl_mulai_bund) & (df_aks_jual["TGL FAKTUR"] <= tgl_selesai_bund)] if df_aks_jual is not None else df_aks_jual
-
-            bund_info, bund_detail = la.analisa_bundling_brand(df_aks_jual_bund, df_re_bund, keyword="LUNA")
-            if bund_info["jumlah_nota_service"]:
-                bi1, bi2, bi3, bi4 = st.columns(4)
-                bi1.metric("Total Nota Service", la.format_int_id(bund_info["jumlah_nota_service"]))
-                bi2.metric("Ada Bundling LUNA", la.format_int_id(bund_info["jumlah_service_dgn_brand"]), la.format_percent_id(bund_info["pct_bundling_brand"]))
-                bi3.metric("Bundling Brand Lain (bukan LUNA)", la.format_int_id(bund_info["jumlah_service_dgn_aksesoris_lain"]))
-                bi4.metric(
-                    "⚠️ TIDAK Ada Bundling Aksesoris", la.format_int_id(bund_info["jumlah_service_tanpa_aksesoris"]),
-                    la.format_percent_id(bund_info["pct_tanpa_aksesoris"]), delta_color="inverse",
-                )
-                st.caption(
-                    f"Dari {la.format_int_id(bund_info['jumlah_nota_service'])} nota Service: "
-                    f"**{la.format_int_id(bund_info['jumlah_service_tanpa_aksesoris'])} nota "
-                    f"({la.format_percent_id(bund_info['pct_tanpa_aksesoris'])}) sama sekali tidak ada "
-                    "aksesoris apa pun** yang di-bundling — ini yang paling perlu ditindaklanjuti. "
-                    f"{la.format_int_id(bund_info['jumlah_service_dgn_aksesoris_lain'])} nota lain sudah "
-                    "bundling tapi pakai brand SELAIN LUNA (sesuai pengecualian SE kalau LUNA kosong stok "
-                    "— bukan pelanggaran)."
-                )
-
-                st.markdown("**Porsi Tanpa Bundling per Cabang**")
-                st.caption(
-                    "Diurutkan dari % Tanpa Bundling TERTINGGI (cabang paling perlu ditindaklanjuti di atas). "
-                    "Kolom \"Nota Luna Organik (Non-Service)\" terpisah dari breakdown Service di atas — "
-                    "menghitung nota yang mengandung LUNA dari penjualan RETAIL LANGSUNG (bukan lewat "
-                    "bundling saat kunjungan Service), jadi TIDAK dijumlahkan ke Total Nota Service."
-                )
-                bund_cabang = la.analisa_bundling_per_cabang(df_re_bund, keyword="LUNA")
-                if bund_cabang.empty:
-                    st.info("Tidak ada data per cabang untuk ditampilkan.")
-                else:
-                    kolom_int_bc = [c for c in bund_cabang.columns if c not in ("Cabang",) and not c.startswith("%")]
-                    kolom_pct_bc = [c for c in bund_cabang.columns if c.startswith("%")]
-
-                    chart_tb = bund_cabang[["Cabang", "% Tanpa Bundling"]].copy()
-                    chart_tb["_label"] = chart_tb["% Tanpa Bundling"].apply(la.format_percent_id)
-                    batang_tb = alt.Chart(chart_tb).mark_bar(color="#378ADD").encode(
-                        x=alt.X("Cabang:N", sort=chart_tb["Cabang"].tolist(), title=None),
-                        y=alt.Y("% Tanpa Bundling:Q", title="% Tanpa Bundling"),
-                        tooltip=[alt.Tooltip("Cabang:N"), alt.Tooltip("_label:N", title="% Tanpa Bundling")],
-                    )
-                    label_tb = alt.Chart(chart_tb).mark_text(dy=-8, fontSize=10, color="#1F3864").encode(
-                        x=alt.X("Cabang:N", sort=chart_tb["Cabang"].tolist()),
-                        y=alt.Y("% Tanpa Bundling:Q"),
-                        text=alt.Text("_label:N"),
-                    )
-                    st.altair_chart((batang_tb + label_tb).properties(height=380), use_container_width=True)
-
-                    tampil_bc = bund_cabang.copy()
-                    for c in kolom_pct_bc:
-                        tampil_bc[c] = bund_cabang[c].map(la.format_percent_id)
-                    for c in kolom_int_bc:
-                        tampil_bc[c] = bund_cabang[c].map(la.format_int_id)
-                    st.dataframe(tampil_bc, use_container_width=True, height=min(80 + 38 * len(bund_cabang), 650))
-                    st.download_button(
-                        "⬇️ Unduh CSV — Porsi Tanpa Bundling per Cabang", bund_cabang.to_csv(index=False).encode("utf-8-sig"),
-                        "porsi_tanpa_bundling_per_cabang.csv", "text/csv", key="pb_dl_bundling_cabang",
-                    )
-
-                    with st.container(border=True):
-                        st.markdown("**📌 Analisa & Tindak Lanjut**")
-                        catatan_bc = []
-
-                        bc_terburuk = bund_cabang.iloc[0]
-                        bc_terbaik = bund_cabang.iloc[-1]
-                        catatan_bc.append(
-                            f"**{bc_terburuk['Cabang']}** paling perlu ditindaklanjuti — "
-                            f"{la.format_percent_id(bc_terburuk['% Tanpa Bundling'])} nota Service-nya "
-                            f"({la.format_int_id(int(bc_terburuk['Nota Tanpa Bundling']))} dari "
-                            f"{la.format_int_id(int(bc_terburuk['Total Nota Service']))} nota) sama sekali "
-                            "tidak ada bundling aksesoris."
-                        )
-                        catatan_bc.append(
-                            f"**{bc_terbaik['Cabang']}** kepatuhan bundling paling baik — cuma "
-                            f"{la.format_percent_id(bc_terbaik['% Tanpa Bundling'])} nota yang tanpa bundling "
-                            "sama sekali, bisa jadi contoh SOP untuk cabang lain."
-                        )
-
-                        bc_luna_top = bund_cabang.sort_values("% Bundling Luna", ascending=False).iloc[0]
-                        bc_luna_bottom = bund_cabang.sort_values("% Bundling Luna", ascending=True).iloc[0]
-                        catatan_bc.append(
-                            f"Porsi bundling KHUSUS LUNA (bukan brand lain) paling tinggi di "
-                            f"**{bc_luna_top['Cabang']}** ({la.format_percent_id(bc_luna_top['% Bundling Luna'])}), "
-                            f"paling rendah di **{bc_luna_bottom['Cabang']}** "
-                            f"({la.format_percent_id(bc_luna_bottom['% Bundling Luna'])}) — cabang dengan "
-                            "porsi LUNA rendah kemungkinan lebih sering menawarkan brand lain saat stok LUNA "
-                            "kosong, atau memang belum konsisten mengarahkan ke LUNA."
-                        )
-
-                        bc_organik_top = bund_cabang.sort_values("Nota Luna Organik (Non-Service)", ascending=False).iloc[0]
-                        bc_pct_organik_top = bund_cabang.sort_values("% Nota Luna Organik", ascending=False).iloc[0]
-                        catatan_bc.append(
-                            f"**{bc_organik_top['Cabang']}** paling banyak menjual LUNA secara ORGANIK "
-                            f"(retail langsung, di luar bundling Service) — "
-                            f"{la.format_int_id(int(bc_organik_top['Nota Luna Organik (Non-Service)']))} nota — "
-                            "menunjukkan permintaan LUNA yang berdiri sendiri, bukan cuma titipan Service. "
-                            f"Secara PORSI (dibanding total nota LUNA cabang tsb), **{bc_pct_organik_top['Cabang']}** "
-                            f"unggul dengan {la.format_percent_id(bc_pct_organik_top['% Nota Luna Organik'])} "
-                            "organik — cabang dengan porsi tinggi biasanya sudah punya basis pelanggan LUNA "
-                            "yang loyal, tidak cuma mengandalkan bundling Service."
-                        )
-
-                        rata2_tanpa_bundling = bund_cabang["% Tanpa Bundling"].mean()
-                        n_di_atas_rata2 = (bund_cabang["% Tanpa Bundling"] > rata2_tanpa_bundling).sum()
-                        total_nota_tanpa_bundling = int(bund_cabang["Nota Tanpa Bundling"].sum())
-                        total_nota_service = int(bund_cabang["Total Nota Service"].sum())
-                        catatan_bc.append(
-                            f"Rata-rata jaringan: {la.format_percent_id(rata2_tanpa_bundling)} nota Service "
-                            f"tanpa bundling ({la.format_int_id(total_nota_tanpa_bundling)} dari "
-                            f"{la.format_int_id(total_nota_service)} nota se-jaringan) — "
-                            f"**{n_di_atas_rata2} dari {len(bund_cabang)} cabang** berada DI ATAS rata-rata "
-                            "ini, jadi prioritas pembinaan sebaiknya difokuskan ke cabang-cabang tersebut dulu."
-                        )
-
-                        for c in catatan_bc:
-                            st.markdown("- " + c)
-
-                with st.expander(f"🔍 Lihat Rincian Nomor Nota — {la.format_int_id(bund_info['jumlah_service_tanpa_aksesoris'])} Nota Tanpa Bundling", expanded=False):
-                    st.caption("Daftar nota Service yang sama sekali tidak ada aksesoris apa pun di dalamnya — bisa difilter per cabang.")
-                    cabang_opsi_bund = ["— Semua Cabang —"] + sorted(bund_detail["Cabang"].dropna().unique().tolist())
-                    cabang_pilihan_bund = st.selectbox("Filter Cabang", cabang_opsi_bund, key="pb_bundling_cabang_filter")
-                    detail_tampil = bund_detail if cabang_pilihan_bund == "— Semua Cabang —" else bund_detail[bund_detail["Cabang"] == cabang_pilihan_bund]
-                    st.caption(f"Menampilkan {la.format_int_id(len(detail_tampil))} dari {la.format_int_id(len(bund_detail))} nota.")
-                    st.dataframe(detail_tampil, use_container_width=True, height=min(80 + 38 * len(detail_tampil), 500))
-                    st.download_button(
-                        "⬇️ Unduh CSV — Rincian Nomor Nota Tanpa Bundling (lengkap)",
-                        bund_detail.to_csv(index=False).encode("utf-8-sig"),
-                        "rincian_nota_tanpa_bundling.csv", "text/csv", key="pb_dl_bundling_detail",
-                    )
-            else:
-                st.info("Tidak ada nota Service pada periode yang dipilih.")
-
-    st.divider()
-
-    # -----------------------------------------------------------------
-    # 4. Perbandingan Penjualan Aksesoris Semua Cabang per Bulan
-    # -----------------------------------------------------------------
-    st.subheader("4️⃣ Perbandingan Penjualan Aksesoris Semua Cabang per Bulan")
-    st.caption(
-        "Kolom \"% Bulan A → Bulan B\" menunjukkan pertumbuhan omzet dari bulan sebelumnya ke bulan "
-        "berikutnya (🟢 naik, 🔴 turun). Bulan TERAKHIR pada data biasanya belum penuh sebulan "
-        "(tergantung tanggal data terakhir diunggah) — wajar kalau terlihat turun drastis, bukan "
-        "berarti performa anjlok."
-    )
-    if df_aks_jual is None:
-        st.info("Belum ada data penjualan aksesoris.")
-    else:
-        bulanan = la.omzet_cabang_per_bulan(df_aks_jual)
-        if bulanan.empty:
-            st.info("Tidak ada data untuk tabel ini.")
         else:
-            kolom_rp = [c for c in bulanan.columns if c not in ("Cabang", "Total") and not c.startswith("%")]
-            kolom_persen = [c for c in bulanan.columns if c.startswith("%")]
+            st.info("Tidak ada nota Service pada periode yang dipilih.")
 
-            st.bar_chart(bulanan.set_index("Cabang")[kolom_rp])
-
-            styled_bulanan = bulanan.style.map(la.warna_indikator_pencapaian_naik_turun, subset=kolom_persen) if kolom_persen else bulanan.style
-            format_dict = {c: la.format_rupiah_id for c in kolom_rp + ["Total"]}
-            format_dict.update({c: la.format_percent_id for c in kolom_persen})
-            styled_bulanan = styled_bulanan.format(format_dict)
-            st.dataframe(styled_bulanan, use_container_width=True, height=min(80 + 38 * len(bulanan), 700))
-            st.download_button(
-                "⬇️ Unduh CSV — Omzet Aksesoris per Cabang per Bulan", bulanan.to_csv(index=False).encode("utf-8-sig"),
-                "omzet_cabang_per_bulan.csv", "text/csv", key="pb_dl_bulanan",
-            )
 
 
 # ---------------------------------------------------------------------------

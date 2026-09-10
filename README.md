@@ -212,6 +212,61 @@ umum (berkas gabungan 18 cabang, SELALU sudah punya kolom CABANG) sama
 sekali TIDAK terpengaruh perubahan ini — hanya relevan untuk kasus edge
 (berkas rincian 1 cabang saja tanpa kolom CABANG).
 
+**🔀 Empat bagian dipindahkan antar dashboard** (permintaan lanjutan
+setelah tab dipisah) — pemindahan kode ANTAR FUNGSI render_*(), bukan
+sekadar reorder dalam fungsi yang sama:
+
+- **Ke Dashboard Penjualan** (dari `render_pembelian_tab()` ke
+  `render_aksesoris_tab()`, ditempatkan setelah "Perbandingan Antar
+  Periode Samurai", sebelum "Katalog Referensi Harga LUNA"):
+  1. **"Grafik Penjualan Perbandingan per Pekan"** → diganti judul jadi
+     "📈 Grafik Penjualan Perbandingan per Pekan (LUNA)". Variabel
+     `df_aks_jual` diganti `df` (variabel setara yang sudah tersedia di
+     `render_aksesoris_tab()`), 8 key widget diganti prefix `pb_`→`ak_`.
+  2. **"Perbandingan Penjualan Aksesoris Semua Cabang per Bulan"** →
+     dipindah dengan cara sama, ditempatkan tepat setelah section di atas.
+  - **🐛 Bug ditemukan & diperbaiki saat pemindahan**: sub-bagian "📋
+    Kepatuhan Bundling Aksesoris pada Transaksi Service" ternyata
+    NESTED 8-spasi di DALAM blok `else:` section "Grafik Penjualan
+    Perbandingan per Pekan" (bukan section independen seperti dugaan
+    awal) — setelah blok induknya dipindah/dihapus, kode itu jadi
+    orphaned dengan indentasi salah. Diperbaiki dengan dedent 1 level;
+    section "Kepatuhan Bundling" TETAP di Dashboard Pembelian (topiknya
+    beda — soal kepatuhan Service, bukan grafik penjualan), hanya
+    indentasinya yang diperbaiki.
+- **Ke Dashboard Persediaan** (dari `render_aksesoris_tab()` ke
+  `render_persediaan_tab()`, ditempatkan sebagai section 5 & 6 baru,
+  sebelum "🗺️ Peta Stok — Cabang × Produk"):
+  1. **"Monitoring Stok Persediaan — Tertarget vs Non Tertarget"** →
+     dependency-nya cuma `df_persediaan`/`dasar` (data STOK, sudah
+     tersedia di `render_persediaan_tab()`), jadi dipindah tanpa
+     penyesuaian berarti — cuma ganti prefix key `dsb_`→`pd_`.
+  2. **"Monitoring Margin Produk Aksesoris (Tertinggi → Terendah)"** →
+     **PALING RUMIT** dari keempat pemindahan, karena section ini
+     SECARA SUBSTANSI butuh data PENJUALAN (`produk_scoreboard`, margin
+     dari produk yang TERJUAL — bukan dari nilai stok), padahal
+     `render_persediaan_tab()` sebelumnya murni soal data STOK, tidak
+     punya akses ke data penjualan sama sekali. Diselesaikan dengan
+     membangun ULANG `produk_scoreboard` secara MANDIRI di dalam
+     `render_persediaan_tab()` — dari `raw_aksesoris` (variabel global
+     yang sudah tersedia), dengan **date picker periode SENDIRI** (Dari
+     tanggal/Sampai tanggal, default = seluruh rentang data), TIDAK
+     terikat ke selector periode Scoreboard yang ada di Dashboard
+     Penjualan (karena itu di fungsi berbeda). Ini artinya Dashboard
+     Persediaan sekarang JUGA bergantung pada data Penjualan diunggah
+     untuk section ini secara spesifik — kalau belum, tampil pesan info
+     yang jelas, bukan error.
+  - **Diuji dengan data asli**: Monitoring Stok Tertarget vs Non
+    (18 baris, Total Nilai Tertarget Rp 305.030.715) dan Monitoring
+    Margin Produk (4.025 produk, margin tertinggi 100% untuk beberapa
+    produk) — keduanya berjalan tanpa error di lokasi baru.
+    Diverifikasi juga `produk_scoreboard` di section "5️⃣ Produk Terlaris
+    Aksesoris" (yang TETAP di `render_aksesoris_tab()`, tidak ikut
+    dipindah) masih berfungsi normal setelah section 6️⃣/7️⃣ lama dihapus.
+  Kode/logikanya SEPENUHNYA dipindah (bukan disembunyikan via flag
+  seperti pola sebelumnya) — untuk mengembalikan ke lokasi asal, perlu
+  edit manual, bukan tinggal ubah nilai flag.
+
 ## 📌 Ringkasan Eksekutif (paling atas halaman)
 
 Bagian ringkas gaya kartu di paling atas halaman, sebelum ketiga dashboard
