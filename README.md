@@ -110,11 +110,14 @@
 > Kode/logikanya tetap ada untuk keduanya, bisa dimunculkan lagi kapan
 > saja dengan mengubah nilai flag jadi `True`.
 
-**Satu halaman panjang** (bukan tab terpisah — digabung sesuai permintaan),
-berisi dashboard berurutan dari atas ke bawah:
+**Navigasi TAB TERPISAH via sidebar** (BARU — sebelumnya satu halaman
+panjang tanpa tab, sekarang diubah atas permintaan) — radio button di
+paling atas sidebar (`st.sidebar.radio()`, key `nav_pilihan_dashboard`)
+memilih SATU dari 3 kategori, dan HANYA dashboard yang dipilih yang
+dirender (bukan semuanya sekaligus seperti versi lama):
 
-1. **📊 Dashboard Persediaan Aksesoris** — versi ringkas, mudah dikontrol,
-   berisi 4 bagian:
+1. **📊 Persediaan** → Dashboard Persediaan Aksesoris (+ Dashboard
+   Persediaan Parfum kalau `TAMPILKAN_PARFUM=True`), berisi 4 bagian:
    1. **Nilai Persediaan Aksesoris — LUNA vs Selain LUNA**: perbandingan
       nilai persediaan per cabang, kartu ringkasan, grafik, dan tabel.
    2. **Produk Paling Diminati per Cabang (Wajib Distok)**: Top-N produk
@@ -128,29 +131,53 @@ berisi dashboard berurutan dari atas ke bawah:
    Ditutup dengan **Peta Stok (heatmap) Cabang × Produk** khusus LUNA —
    memakai indikator warna 🔴🟡🟢 (ambang stok ≤25 Merah, 26–99 Kuning,
    ≥100 Hijau) — dan kotak Analisa & Tindak Lanjut.
-2. **🌸 Dashboard Persediaan Parfum** — struktur serupa Aksesoris tapi
-   disederhanakan sesuai karakter datanya (lihat bagian khusus di bawah).
-   **⏸️ Saat ini disembunyikan** (lihat catatan `TAMPILKAN_PARFUM` di atas).
-3. **🧾 Dashboard Penjualan Aksesoris** — berisi dua bagian:
-   - **Ringkasan Cabang, Produk & Sales**: ranking Seluruh Cabang, Semua
-     Produk Aksesoris (terlaris & profit), dan Seluruh Sales.
-   - **Revenue, HPP & Katalog LUNA**: revenue & tren bulanan, Top 10 produk
-     aksesoris terlaris & profit, omzet + HPP seluruh cabang, katalog
-     referensi harga LUNA & potensi profit, **matrix insentif resmi &
-     kalkulator THP Sales Retail** (dikalibrasi ke target Rp5-8jt/bulan)
-     **⏸️ saat ini disembunyikan**,
-     **target pencapaian penjualan LUNA** (default Rp 2 miliar / 12 bulan
-     mulai 20 Agustus 2026), serta analisa + proyeksi 5–10 tahun.
-     (Target penjualan Parfum UMAIR **⏸️ saat ini disembunyikan**.)
-4. **📦 Dashboard Pembelian & Perbandingan Penjualan Aksesoris** — sudah
-   AKSESORIS-only sejak awal dibuat, tidak terpengaruh flag ini sama sekali.
+2. **🧾 Penjualan** → gabungan TIGA dashboard sekaligus (semuanya seputar
+   penjualan, tapi cakupan beda-beda) — asumsi yang diambil karena
+   permintaan awal cuma sebut 3 kategori besar (Persediaan/Pembelian/
+   Penjualan), bukan 4, jadi Dashboard Omzet LDM dimasukkan ke sini:
+   - **Dashboard Penjualan Aksesoris**: Ringkasan Cabang, Produk & Sales
+     (ranking Seluruh Cabang, Semua Produk Aksesoris, Seluruh Sales) +
+     Revenue, HPP & Katalog LUNA (revenue & tren bulanan, Top 10 produk,
+     omzet+HPP seluruh cabang, katalog referensi harga LUNA, **matrix
+     insentif** ⏸️ saat ini disembunyikan, **target pencapaian penjualan
+     LUNA**, serta analisa + proyeksi 5–10 tahun).
+   - **💻📱🎧 Dashboard Pencapaian Omzet Laptop, Handphone, Aksesoris**
+     (LDM) — rekap per Cabang & Sales, filter Retail Toko, dsb (lihat
+     bagian khusus di bawah).
+3. **📦 Pembelian** → Dashboard Pembelian & Perbandingan Penjualan
+   Aksesoris — sudah AKSESORIS-only sejak awal dibuat.
 
-Seluruh dashboard memakai **satu tempat unggah data** di sidebar ("📁 Upload
-Data" — tiga tombol: Persediaan, Penjualan, Pembelian) yang dipakai bersama
-oleh semuanya, tinggal difilter kategorinya masing-masing per bagian. Karena
-ini SATU HALAMAN (bukan tab), semua bagian langsung ter-render begitu data
-diunggah — tinggal scroll untuk berpindah antar dashboard, tidak perlu klik
-tab.
+Seluruh dashboard TETAP memakai **satu tempat unggah data** di sidebar
+("📁 Upload Data" — tiga tombol: Persediaan, Penjualan, Pembelian) yang
+dipakai bersama oleh ketiga tab, tinggal difilter kategorinya
+masing-masing per bagian — TIDAK perlu unggah ulang saat pindah tab
+(session Streamlit tetap menyimpan data yang sudah dimuat).
+
+**🐛 Dampak tersembunyi dari perubahan struktur tab, ditemukan &
+diperbaiki saat implementasi**: widget "Nama cabang untuk berkas ini"
+(muncul kalau berkas penjualan yang diunggah TIDAK punya kolom CABANG,
+artinya rincian satu cabang saja) SEBELUMNYA ada DI DALAM
+`render_penjualan_tab()` — di versi SATU HALAMAN lama, fungsi itu SELALU
+dipanggil di SETIAP run script (apa pun yang di-scroll user), jadi
+`st.session_state["nama_cabang_bersama"]` yang di-SET di sana SELALU
+tersedia untuk tab/bagian lain yang MEMBACANYA (Ringkasan Eksekutif,
+Produk Paling Diminati, Dashboard Parfum, Dashboard LDM, Dashboard
+Pembelian). Dengan STRUKTUR TAB BARU, kalau user memilih tab
+**"📊 Persediaan"** atau **"📦 Pembelian"** dan TIDAK PERNAH membuka tab
+**"🧾 Penjualan"** sama sekali, `render_penjualan_tab()` TIDAK PERNAH
+dipanggil — sehingga widget itu (dan `session_state` yang di-SET-nya)
+TIDAK PERNAH TERPICU, membuat fitur auto-fill nama cabang di tab lain
+gagal diam-diam. **Diperbaiki** dengan memindahkan widget itu KELUAR dari
+`render_penjualan_tab()`, ke **level module (sidebar)** — dieksekusi
+SEGERA setelah data dimuat, SEBELUM definisi fungsi render_*() manapun,
+sehingga `nama_cabang_bersama` PASTI ter-set (kalau user mengisinya)
+TERLEPAS dari tab mana yang dipilih pertama kali. 6 pesan info/warning
+yang tadinya mengarahkan user ke *"isi nama cabang di tab Dashboard
+Penjualan Aksesoris"* juga diperbarui jadi mengarahkan ke *"panel kiri
+(sidebar)"*, supaya tidak menyesatkan. **Diverifikasi**: kasus paling
+umum (berkas gabungan 18 cabang, SELALU sudah punya kolom CABANG) sama
+sekali TIDAK terpengaruh perubahan ini — hanya relevan untuk kasus edge
+(berkas rincian 1 cabang saja tanpa kolom CABANG).
 
 ## 📌 Ringkasan Eksekutif (paling atas halaman)
 
@@ -588,6 +615,21 @@ otomatis menyesuaikan.
   bulan) untuk konfirmasi ketiga warna (merah/kuning/hijau) tampil benar
   sesuai ambang — 4 cabang merah, 3 kuning, 11 hijau, breakdown sesuai
   ekspektasi.
+- **Baru: kolom "Nilai Persediaan"** — nilai stok LUNA (atau seluruh
+  Aksesoris, mengikuti mode "Target untuk" yang aktif) per cabang SAAT
+  INI, dari data PERSEDIAAN (bukan data penjualan seperti kolom lain di
+  tabel ini) — di-JOIN (LEFT JOIN, bukan INNER) supaya cabang tanpa data
+  stok tetap muncul di tabel dengan nilai 0, bukan hilang. Filter
+  persediaan otomatis menyesuaikan mode aktif: `filter_luna=True` kalau
+  target LUNA, `filter_luna=None` (semua aksesoris) kalau mode "Semua
+  Aksesoris". **Fungsi `tambah_baris_total()` diperbarui** supaya kolom
+  ini JUGA ikut dijumlahkan otomatis di baris "TOTAL JARINGAN" (backward
+  compatible — pemanggilan lain yang tidak punya kolom ini tetap aman,
+  dicek dengan `if c in df.columns`). **Diuji dengan data asli**: baris
+  TOTAL Nilai Persediaan (Rp 305.170.144) diverifikasi cocok persis
+  dengan jumlah manual seluruh cabang DAN dengan hitungan independen
+  langsung dari `df_persediaan` (`apply_filters(filter_luna=True)["Nilai
+  Total"].sum()`) — dua metode berbeda, hasil identik.
 
 **Diuji dengan data asli** (Samurai 39, Target Rp2M): mode **LUNA**
 tercapai Rp104.069.860 (8,4% dari target-sampai-hari-ini); mode **Semua
@@ -1121,6 +1163,24 @@ tinggal disambungkan lagi ke `app.py`.
        diverifikasi cocok persis dengan jumlah manual dari scoreboard
        DAN dengan hitungan independen langsung dari data mentah
        (`df[df["PEMASOK_NORM"]=="LUNA"]["Tanggal"].max()`).
+     - **Baru: expander "📜 History Pembelian — Dari Awal Sampai
+       Terakhir"** — fungsi baru `history_pembelian_cabang()`, BEDA dari
+       `rincian_pembelian_cabang()` yang sudah ada (yang diagregasi per
+       jenis barang) — ini menampilkan RIWAYAT TRANSAKSI MENTAH (per
+       baris pembelian asli, TIDAK dijumlahkan), diurutkan dari tanggal
+       PALING AWAL ke PALING AKHIR. Kolom: Tanggal, Nomor # (nomor
+       faktur), Nama Barang, Kuantitas, @Harga, Total Harga. Selectbox
+       pilih cabang terpisah dari expander rincian (key berbeda, supaya
+       kedua expander independen — pilih cabang berbeda di masing-
+       masing tanpa saling mempengaruhi). Caption otomatis menyebutkan
+       tanggal pembelian PERTAMA & TERAKHIR, jumlah baris transaksi, dan
+       jumlah nomor faktur berbeda. **Diuji dengan data asli** untuk 3
+       cabang: Cibubur (28 Jul–18 Ags 2026, 18 baris, 2 faktur), Dramaga
+       (6 Ags–9 Sep 2026, 20 baris, 3 faktur), Cikampek (6 Jul–3 Sep
+       2026, 25 baris, 5 faktur) — total tiap cabang **cocok persis**
+       dengan Omzet Pembelian di scoreboard, dan urutan tanggal
+       terverifikasi kronologis (`sorted() == list_asli`). Tombol unduh
+       CSV terpisah dari expander rincian.
 2. **Total HPP Aksesoris LUNA (dari Faktur Penjualan)**: BEDA sumber dari
    poin 1 — ini modal (kolom MODAL/HARGA BELI) dari barang LUNA **TERMASUK
    Hydrogel** yang SUDAH TERJUAL, bukan yang dibeli dari pemasok. (Berbeda

@@ -51,6 +51,25 @@ BULAN_NAMA = {
 }
 
 # ---------------------------------------------------------------------------
+# Navigasi Dashboard — sidebar radio untuk memilih SATU dari 3 kategori
+# dashboard, supaya halaman tidak perlu discroll sepanjang semua dashboard
+# sekaligus. Data yang diunggah di bawah TETAP dipakai bersama oleh ketiga
+# tab (tidak perlu unggah ulang saat pindah tab).
+# ---------------------------------------------------------------------------
+st.sidebar.header("📂 Pilih Dashboard")
+pilihan_dashboard = st.sidebar.radio(
+    "Tampilkan dashboard:",
+    ["📊 Persediaan", "📦 Pembelian", "🧾 Penjualan"],
+    key="nav_pilihan_dashboard",
+    label_visibility="collapsed",
+)
+st.sidebar.caption(
+    "\"🧾 Penjualan\" mencakup Dashboard Penjualan Aksesoris (Revenue, HPP, "
+    "Target, dll) DAN Dashboard Pencapaian Omzet Laptop/Handphone/Aksesoris."
+)
+st.sidebar.divider()
+
+# ---------------------------------------------------------------------------
 # Sidebar — SATU TEMPAT untuk unggah data persediaan & penjualan, dipakai
 # bersama oleh SELURUH tab (Persediaan Aksesoris, Persediaan Parfum,
 # Penjualan Aksesoris) supaya tidak perlu unggah ulang saat pindah tab.
@@ -186,6 +205,23 @@ if raw_penjualan is not None:
     else:
         need_cabang_name = True
 
+# Nama cabang untuk berkas 1-cabang (tidak punya kolom CABANG) — DITARUH DI
+# SINI (level module, sebelum semua tab render_*()) supaya widgetnya
+# tersedia SEGERA terlepas dari tab mana yang sedang dipilih di sidebar
+# navigasi. Sebelumnya widget ini ada DI DALAM render_penjualan_tab() saja,
+# sehingga dengan struktur tab terpisah, kalau user tidak pernah membuka
+# tab "Penjualan", fitur auto-fill nama cabang di tab lain (Persediaan,
+# Pembelian) tidak akan pernah terisi.
+if need_cabang_name:
+    st.sidebar.warning("Berkas penjualan tidak punya kolom CABANG — sepertinya rincian satu cabang saja.")
+    nama_cabang_input = st.sidebar.text_input(
+        "Nama cabang untuk berkas ini", placeholder="contoh: MFLASH TELUK JAMBE", key="jl_nama_cabang",
+    )
+    if nama_cabang_input:
+        st.session_state["nama_cabang_bersama"] = nama_cabang_input.strip()
+        df_penjualan = ljl.finalize_data(raw_penjualan, cabang_default=nama_cabang_input.strip())
+    st.sidebar.divider()
+
 # --- Sumber untuk bagian "Revenue, HPP & Katalog LUNA" — berkas yang SAMA ---
 raw_aksesoris, err_aksesoris = None, None
 try:
@@ -220,8 +256,8 @@ def render_ringkasan_eksekutif():
             df_re = la.finalize_data(raw_aksesoris, cabang_default=nama_bersama_re)
         else:
             st.info(
-                "Berkas penjualan rincian satu cabang saja — isi dulu nama cabangnya di bagian "
-                "\"Dashboard Penjualan Aksesoris\" di bawah, ringkasan ini akan otomatis terisi."
+                "Berkas penjualan rincian satu cabang saja — isi dulu nama cabangnya di panel "
+                "kiri (sidebar), ringkasan ini akan otomatis terisi."
             )
             return
 
@@ -383,8 +419,7 @@ def render_persediaan_tab():
         "Diranking dari **jumlah terjual** (bukan indikator warna) — sumbernya data penjualan "
         "aksesoris, disandingkan dengan stok saat ini. Butuh data di panel kiri bagian "
         "\"🧾 Data Penjualan\" — kalau berkasnya rincian satu cabang saja, isi dulu nama "
-        "cabangnya di tab **Dashboard Penjualan Aksesoris** (bagian atas), nama itu otomatis "
-        "dipakai juga di sini."
+        "cabangnya di PANEL KIRI (sidebar), nama itu otomatis dipakai juga di sini."
     )
 
     mode_tampilan = st.radio(
@@ -405,8 +440,8 @@ def render_persediaan_tab():
         else:
             st.info(
                 "Berkas penjualan ini rincian satu cabang saja (tanpa kolom Cabang). Isi dulu "
-                "nama cabangnya di tab **Dashboard Penjualan Aksesoris** (bagian "
-                "\"Ringkasan Cabang, Produk & Sales\"), baru bagian ini akan terisi."
+                "nama cabangnya di PANEL KIRI (sidebar), baru bagian \"Produk Paling Diminati\" "
+                "ini akan terisi."
             )
 
     produk_favorit = pd.DataFrame()
@@ -707,7 +742,7 @@ def render_persediaan_parfum_tab():
         else:
             st.info(
                 "Berkas penjualan ini rincian satu cabang saja (tanpa kolom Cabang). Isi dulu "
-                "nama cabangnya di tab **Dashboard Penjualan Aksesoris**, baru bagian ini akan terisi."
+                "nama cabangnya di PANEL KIRI (sidebar), baru bagian Parfum ini akan terisi."
             )
 
     if df_jual_parfum is not None and df_jual_parfum.empty:
@@ -787,16 +822,9 @@ def render_penjualan_tab():
         return
 
     df = df_penjualan
-    if need_cabang_name:
-        st.warning("Berkas ini tidak punya kolom CABANG — sepertinya rincian satu cabang saja.")
-        nama_cabang = st.text_input(
-            "Nama cabang untuk berkas ini", placeholder="contoh: MFLASH TELUK JAMBE", key="jl_nama_cabang",
-        )
-        if not nama_cabang:
-            st.info("Masukkan nama cabang di atas untuk melanjutkan.")
-            return
-        df = ljl.finalize_data(raw_penjualan, cabang_default=nama_cabang.strip())
-        st.session_state["nama_cabang_bersama"] = nama_cabang.strip()
+    if need_cabang_name and df is None:
+        st.info("Berkas penjualan ini tidak punya kolom CABANG — isi nama cabangnya dulu di panel kiri (sidebar) untuk melanjutkan.")
+        return
 
     if df is None:
         return
@@ -2225,8 +2253,8 @@ def render_omzet_ldm_tab():
         nama_bersama_ldm = st.session_state.get("nama_cabang_bersama")
         if not nama_bersama_ldm:
             st.info(
-                "Berkas penjualan rincian satu cabang saja — isi dulu nama cabangnya di bagian "
-                "\"Dashboard Penjualan Aksesoris\" di bawah, dashboard ini akan otomatis terisi."
+                "Berkas penjualan rincian satu cabang saja — isi dulu nama cabangnya di panel "
+                "kiri (sidebar), dashboard ini akan otomatis terisi."
             )
             return
         df_ldm = ljl.finalize_data(raw_aksesoris, cabang_default=nama_bersama_ldm)
@@ -3008,8 +3036,10 @@ def render_pembelian_tab():
 
 
 # ---------------------------------------------------------------------------
-# Layout — SATU HALAMAN (bukan tab terpisah), ketiga dashboard ditampilkan
-# berurutan dari atas ke bawah dengan pemisah jelas.
+# Layout — TAB TERPISAH via sidebar radio (pilihan_dashboard): hanya
+# dashboard yang sedang dipilih yang dirender, bukan semuanya sekaligus
+# seperti versi satu halaman sebelumnya. Fungsi render_*() itu sendiri
+# TIDAK diubah — cuma cara memanggilnya yang sekarang bersyarat.
 # ---------------------------------------------------------------------------
 if TAMPILKAN_RINGKASAN_EKSEKUTIF:
     render_ringkasan_eksekutif()
@@ -3017,41 +3047,35 @@ if TAMPILKAN_RINGKASAN_EKSEKUTIF:
     st.markdown("---")
     st.markdown("---")
 
-st.markdown("# 📊 Dashboard Persediaan Aksesoris")
-render_persediaan_tab()
+if pilihan_dashboard == "📊 Persediaan":
+    st.markdown("# 📊 Dashboard Persediaan Aksesoris")
+    render_persediaan_tab()
 
-st.markdown("---")
-st.markdown("---")
+    if TAMPILKAN_PARFUM:
+        st.markdown("---")
+        st.markdown("---")
+        st.markdown("# 🌸 Dashboard Persediaan Parfum")
+        render_persediaan_parfum_tab()
 
-if TAMPILKAN_PARFUM:
-    st.markdown("# 🌸 Dashboard Persediaan Parfum")
-    render_persediaan_parfum_tab()
+elif pilihan_dashboard == "🧾 Penjualan":
+    st.markdown("# 🧾 Dashboard Penjualan Aksesoris")
+    render_penjualan_tab()
+
+    st.divider()
+    st.divider()
+    st.markdown("## 💰 Revenue, HPP & Katalog LUNA")
+    st.caption(
+        "Bagian di bawah ini memakai berkas data penjualan aksesoris khusus "
+        "(unggah terpisah di panel kiri) untuk analisa revenue, HPP, katalog LUNA, "
+        "dan proyeksi 5–10 tahun."
+    )
+    render_aksesoris_tab()
 
     st.markdown("---")
     st.markdown("---")
+    st.markdown("# 💻📱🎧 Dashboard Pencapaian Omzet Laptop, Handphone, Aksesoris")
+    render_omzet_ldm_tab()
 
-st.markdown("# 🧾 Dashboard Penjualan Aksesoris")
-render_penjualan_tab()
-
-st.divider()
-st.divider()
-st.markdown("## 💰 Revenue, HPP & Katalog LUNA")
-st.caption(
-    "Bagian di bawah ini memakai berkas data penjualan aksesoris khusus "
-    "(unggah terpisah di panel kiri) untuk analisa revenue, HPP, katalog LUNA, "
-    "dan proyeksi 5–10 tahun."
-)
-
-render_aksesoris_tab()
-
-st.markdown("---")
-st.markdown("---")
-
-st.markdown("# 📦 Dashboard Pembelian & Perbandingan Penjualan Aksesoris")
-render_pembelian_tab()
-
-st.markdown("---")
-st.markdown("---")
-
-st.markdown("# 💻📱🎧 Dashboard Pencapaian Omzet Laptop, Handphone, Aksesoris")
-render_omzet_ldm_tab()
+elif pilihan_dashboard == "📦 Pembelian":
+    st.markdown("# 📦 Dashboard Pembelian & Perbandingan Penjualan Aksesoris")
+    render_pembelian_tab()
