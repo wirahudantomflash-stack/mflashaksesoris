@@ -2505,12 +2505,13 @@ def render_pembelian_tab():
         if score_cabang_luna.empty:
             st.info("Tidak ada data pembelian dari pemasok LUNA.")
         else:
-            tampil_score = score_cabang_luna.copy()
-            tampil_score["Omzet Pembelian"] = score_cabang_luna["Omzet Pembelian"].map(la.format_rupiah_id)
-            tampil_score["Kuantitas"] = score_cabang_luna["Kuantitas"].map(la.format_int_id)
-            st.dataframe(tampil_score, use_container_width=True, height=min(80 + 38 * len(score_cabang_luna), 650))
+            score_cabang_luna_dgn_total = lb.tambah_baris_total_scoreboard(score_cabang_luna)
+            tampil_score = score_cabang_luna_dgn_total.copy()
+            tampil_score["Omzet Pembelian"] = score_cabang_luna_dgn_total["Omzet Pembelian"].map(la.format_rupiah_id)
+            tampil_score["Kuantitas"] = score_cabang_luna_dgn_total["Kuantitas"].map(la.format_int_id)
+            st.dataframe(tampil_score, use_container_width=True, height=min(80 + 38 * len(score_cabang_luna_dgn_total), 650))
             st.download_button(
-                "⬇️ Unduh CSV — Scoreboard Pembelian Cabang ke LUNA", score_cabang_luna.to_csv(index=False).encode("utf-8-sig"),
+                "⬇️ Unduh CSV — Scoreboard Pembelian Cabang ke LUNA", score_cabang_luna_dgn_total.to_csv(index=False).encode("utf-8-sig"),
                 "scoreboard_pembelian_cabang_luna.csv", "text/csv", key="pb_dl_score_cabang_luna",
             )
 

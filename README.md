@@ -1109,6 +1109,18 @@ tinggal disambungkan lagi ke `app.py`.
      semuanya cocok. Tombol unduh CSV terpisah untuk scoreboard dan
      rincian per cabang. Kasus tepi cabang/pemasok tanpa data tertangani
      dengan pesan info yang jelas.
+     - **Baru: baris "TOTAL SELURUH CABANG"** — fungsi baru
+       `tambah_baris_total_scoreboard()`, ditambahkan otomatis di paling
+       bawah tabel scoreboard (bukan di dropdown drill-down — dropdown
+       tetap murni 18 nama cabang asli, supaya tidak bisa salah pilih
+       "cabang" yang sebenarnya baris rekapan). Omzet Pembelian &
+       Kuantitas dijumlahkan dari seluruh cabang; "Tanggal Pembelian
+       Terakhir" diambil tanggal PALING BARU di antara semua cabang
+       (bukan dijumlah, karena bukan angka). **Diuji dengan data asli**:
+       Total Rp 360.671.223, 20.622 pcs, tanggal terbaru 9 Sep 2026 —
+       diverifikasi cocok persis dengan jumlah manual dari scoreboard
+       DAN dengan hitungan independen langsung dari data mentah
+       (`df[df["PEMASOK_NORM"]=="LUNA"]["Tanggal"].max()`).
 2. **Total HPP Aksesoris LUNA (dari Faktur Penjualan)**: BEDA sumber dari
    poin 1 — ini modal (kolom MODAL/HARGA BELI) dari barang LUNA **TERMASUK
    Hydrogel** yang SUDAH TERJUAL, bukan yang dibeli dari pemasok. (Berbeda

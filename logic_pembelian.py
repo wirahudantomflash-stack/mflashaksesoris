@@ -205,6 +205,25 @@ def scoreboard_cabang_pemasok(df: pd.DataFrame, supplier_key: str = "LUNA") -> p
     return g[cols]
 
 
+def tambah_baris_total_scoreboard(df_scoreboard: pd.DataFrame, label: str = "TOTAL SELURUH CABANG") -> pd.DataFrame:
+    """Tambahkan baris rekapan TOTAL di paling bawah scoreboard pembelian
+    per cabang (skema kolom `scoreboard_cabang_pemasok()`) — Omzet
+    Pembelian & Kuantitas dijumlahkan dari seluruh cabang, "Tanggal
+    Pembelian Terakhir" diambil tanggal PALING BARU di antara seluruh
+    cabang (bukan dijumlah, karena itu bukan angka)."""
+    if df_scoreboard.empty:
+        return df_scoreboard
+
+    total = {
+        "Cabang": label,
+        "Omzet Pembelian": df_scoreboard["Omzet Pembelian"].sum(),
+        "Kuantitas": df_scoreboard["Kuantitas"].sum(),
+        "Tanggal Pembelian Terakhir": df_scoreboard["Tanggal Pembelian Terakhir"].max(),
+    }
+    baris_total = pd.DataFrame([total])[df_scoreboard.columns]
+    return pd.concat([df_scoreboard, baris_total], ignore_index=True)
+
+
 def rincian_pembelian_cabang(df: pd.DataFrame, cabang: str, supplier_key: str = "LUNA") -> pd.DataFrame:
     """Rincian PER JENIS BARANG yang dibeli satu cabang dari SATU pemasok
     (default: LUNA) — dipakai untuk drill-down dari `scoreboard_cabang_pemasok()`:
