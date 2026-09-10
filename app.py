@@ -2499,6 +2499,43 @@ def render_pembelian_tab():
                 "porsi_pemasok_aksesoris.csv", "text/csv", key="pb_dl_porsi",
             )
 
+        st.markdown("**📊 Scoreboard Pembelian per Cabang — Pemasok LUNA**")
+        st.caption("Diurutkan dari Omzet Pembelian tertinggi. Pilih cabang di bawah tabel untuk lihat rincian aksesoris yang dibeli.")
+        score_cabang_luna = lb.scoreboard_cabang_pemasok(df_pembelian, supplier_key="LUNA")
+        if score_cabang_luna.empty:
+            st.info("Tidak ada data pembelian dari pemasok LUNA.")
+        else:
+            tampil_score = score_cabang_luna.copy()
+            tampil_score["Omzet Pembelian"] = score_cabang_luna["Omzet Pembelian"].map(la.format_rupiah_id)
+            tampil_score["Kuantitas"] = score_cabang_luna["Kuantitas"].map(la.format_int_id)
+            st.dataframe(tampil_score, use_container_width=True, height=min(80 + 38 * len(score_cabang_luna), 650))
+            st.download_button(
+                "⬇️ Unduh CSV — Scoreboard Pembelian Cabang ke LUNA", score_cabang_luna.to_csv(index=False).encode("utf-8-sig"),
+                "scoreboard_pembelian_cabang_luna.csv", "text/csv", key="pb_dl_score_cabang_luna",
+            )
+
+            with st.expander("🔍 Lihat Rincian Aksesoris yang Dibeli Cabang", expanded=False):
+                cabang_opsi_beli = score_cabang_luna["Cabang"].tolist()
+                cabang_pilihan_beli = st.selectbox("Pilih Cabang", cabang_opsi_beli, key="pb_rincian_beli_cabang")
+                rincian_beli = lb.rincian_pembelian_cabang(df_pembelian, cabang_pilihan_beli, supplier_key="LUNA")
+                if rincian_beli.empty:
+                    st.info(f"Tidak ada rincian pembelian LUNA untuk cabang {cabang_pilihan_beli}.")
+                else:
+                    tampil_rincian_beli = rincian_beli.copy()
+                    tampil_rincian_beli["Kuantitas"] = rincian_beli["Kuantitas"].map(la.format_int_id)
+                    tampil_rincian_beli["Total Harga"] = rincian_beli["Total Harga"].map(la.format_rupiah_id)
+                    st.caption(
+                        f"{la.format_int_id(len(rincian_beli))} jenis barang, total "
+                        f"{la.format_int_id(int(rincian_beli['Kuantitas'].sum()))} pcs, "
+                        f"Rp{la.format_int_id(rincian_beli['Total Harga'].sum())}."
+                    )
+                    st.dataframe(tampil_rincian_beli, use_container_width=True, height=min(80 + 38 * len(rincian_beli), 500))
+                    st.download_button(
+                        f"⬇️ Unduh CSV — Rincian Pembelian {cabang_pilihan_beli} dari LUNA",
+                        rincian_beli.to_csv(index=False).encode("utf-8-sig"),
+                        f"rincian_pembelian_{cabang_pilihan_beli.lower()}_luna.csv", "text/csv", key="pb_dl_rincian_beli",
+                    )
+
     st.divider()
 
     # -----------------------------------------------------------------

@@ -186,6 +186,45 @@ def kandidat_kebocoran(df: pd.DataFrame, supplier_key: str = "LUNA") -> pd.DataF
     return out.reset_index(drop=True)
 
 
+def scoreboard_cabang_pemasok(df: pd.DataFrame, supplier_key: str = "LUNA") -> pd.DataFrame:
+    """Scoreboard pembelian ke SATU pemasok (default: LUNA), per cabang —
+    Omzet Pembelian, Kuantitas, dan Tanggal Pembelian Terakhir. Diurutkan
+    dari Omzet Pembelian TERBESAR ke terkecil."""
+    cols = ["Cabang", "Omzet Pembelian", "Kuantitas", "Tanggal Pembelian Terakhir"]
+    df_supplier = df[df["PEMASOK_NORM"] == supplier_key]
+    if df_supplier.empty:
+        return pd.DataFrame(columns=cols)
+
+    g = df_supplier.groupby("CABANG").agg(
+        **{"Omzet Pembelian": ("Total Harga", "sum")},
+        Kuantitas=("Kuantitas", "sum"),
+        **{"Tanggal Pembelian Terakhir": ("Tanggal", "max")},
+    ).reset_index().rename(columns={"CABANG": "Cabang"})
+    g["Tanggal Pembelian Terakhir"] = g["Tanggal Pembelian Terakhir"].dt.strftime("%Y-%m-%d")
+    g = g.sort_values("Omzet Pembelian", ascending=False).reset_index(drop=True)
+    return g[cols]
+
+
+def rincian_pembelian_cabang(df: pd.DataFrame, cabang: str, supplier_key: str = "LUNA") -> pd.DataFrame:
+    """Rincian PER JENIS BARANG yang dibeli satu cabang dari SATU pemasok
+    (default: LUNA) — dipakai untuk drill-down dari `scoreboard_cabang_pemasok()`:
+    pilih satu cabang, lihat barang apa saja yang dibeli, kuantitas, total
+    nilai, dan tanggal pembelian terakhir per barang."""
+    cols = ["Nama Barang", "Kuantitas", "Total Harga", "Tanggal Pembelian Terakhir"]
+    df_cabang_supplier = df[(df["PEMASOK_NORM"] == supplier_key) & (df["CABANG"] == cabang)]
+    if df_cabang_supplier.empty:
+        return pd.DataFrame(columns=cols)
+
+    g = df_cabang_supplier.groupby("Nama Barang").agg(
+        Kuantitas=("Kuantitas", "sum"),
+        **{"Total Harga": ("Total Harga", "sum")},
+        **{"Tanggal Pembelian Terakhir": ("Tanggal", "max")},
+    ).reset_index()
+    g["Tanggal Pembelian Terakhir"] = g["Tanggal Pembelian Terakhir"].dt.strftime("%Y-%m-%d")
+    g = g.sort_values("Total Harga", ascending=False).reset_index(drop=True)
+    return g[cols]
+
+
 # ---------------------------------------------------------------------------
 # Format angka gaya Indonesia
 # ---------------------------------------------------------------------------

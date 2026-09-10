@@ -1092,6 +1092,23 @@ tinggal disambungkan lagi ke `app.py`.
    (disatukan case-insensitive), dibandingkan dengan total belanja
    aksesoris ke SEMUA pemasok, plus ranking lengkap semua pemasok di
    expander terpisah.
+   - **Baru: Scoreboard Pembelian per Cabang — Pemasok LUNA** — dua
+     fungsi baru di `logic_pembelian.py`: `scoreboard_cabang_pemasok()`
+     (Cabang, Omzet Pembelian, Kuantitas, Tanggal Pembelian Terakhir,
+     diurutkan dari Omzet tertinggi) dan `rincian_pembelian_cabang()`
+     (drill-down per jenis barang untuk satu cabang: Nama Barang,
+     Kuantitas, Total Harga, Tanggal Pembelian Terakhir). Expander
+     "🔍 Lihat Rincian Aksesoris yang Dibeli Cabang" berisi selectbox
+     pilih cabang (pola konsisten dengan drill-down lain di dashboard
+     ini, bukan tombol per baris — Streamlit dataframe tidak mendukung
+     itu secara native). **Diuji dengan data asli**: 18 cabang, tertinggi
+     Cibubur (Rp 37.677.496, 2.088 pcs, terakhir beli 18 Ags 2026);
+     rincian Cibubur menampilkan 16 jenis barang (LUNA USB Cable CB-2EL
+     terbesar, Rp 6.890.100), totalnya **cocok persis** dengan angka
+     Omzet Pembelian di scoreboard — diverifikasi untuk 3 cabang berbeda,
+     semuanya cocok. Tombol unduh CSV terpisah untuk scoreboard dan
+     rincian per cabang. Kasus tepi cabang/pemasok tanpa data tertangani
+     dengan pesan info yang jelas.
 2. **Total HPP Aksesoris LUNA (dari Faktur Penjualan)**: BEDA sumber dari
    poin 1 — ini modal (kolom MODAL/HARGA BELI) dari barang LUNA **TERMASUK
    Hydrogel** yang SUDAH TERJUAL, bukan yang dibeli dari pemasok. (Berbeda
