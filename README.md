@@ -317,6 +317,29 @@ sama lain).
   LAMA-nya sudah dihapus total dari `render_aksesoris_tab()`, bukan
   disalin).
 
+**🔀 "Total HPP Aksesoris LUNA (dari Faktur Penjualan)" dipindah dari
+Dashboard Pembelian ke Dashboard Penjualan** — dari `render_pembelian_tab()`
+ke `render_aksesoris_tab()`, ditempatkan setelah "Perbandingan Penjualan
+Aksesoris Semua Cabang per Bulan", sebelum "Katalog Referensi Harga LUNA"
+(mengelompokkan section-section terkait LUNA per-periode jadi satu grup
+logis, bersama 2 section lain yang sudah dipindah sebelumnya). Variabel
+`df_aks_jual` diganti `df` (variabel setara yang sudah tersedia di
+`render_aksesoris_tab()`); variabel turunannya `df_aks_jual_hpp` otomatis
+ikut berubah jadi `df_hpp` (hasil replace string literal, tetap valid).
+5 key widget diganti prefix `pb_`→`ak_` (`hpp_gunakan_filter`,
+`hpp_mode_periode`, `hpp_periode_samurai`, `hpp_mulai`, `hpp_durasi`),
+diverifikasi tidak bentrok dengan key yang sudah ada. Judul section
+diganti dari subheader "2️⃣ ..." (nomor urut lokal ke Dashboard Pembelian)
+jadi header "💰 ..." (tanpa nomor, karena urutan section di lokasi baru
+berbeda). Section "📋 Kepatuhan Bundling Aksesoris pada Transaksi Service"
+(yang sebelumnya tepat di bawah section ini) **tetap di Dashboard
+Pembelian** — topiknya beda (soal kepatuhan Service, bukan HPP/Omzet
+penjualan LUNA), jadi sengaja tidak ikut dipindah. **Diuji dengan data
+asli**: Total HPP LUNA Rp 144.239.239, Omzet Rp 312.339.760, Margin
+53,8% — dihitung sukses di lokasi baru dengan periode default (seluruh
+data). Compile bersih, tidak ada duplikasi key, section terverifikasi
+cuma ada sekali (di lokasi baru saja).
+
 ## 📌 Ringkasan Eksekutif (paling atas halaman)
 
 Bagian ringkas gaya kartu di paling atas halaman, sebelum ketiga dashboard
