@@ -1018,7 +1018,16 @@ def render_penjualan_tab():
 # ---------------------------------------------------------------------------
 # TAB 3 — Dashboard Revenue Penjualan Aksesoris
 # ---------------------------------------------------------------------------
-def render_aksesoris_tab():
+def render_dashboard_scoreboard_aksesoris():
+    """Dashboard & Scoreboard Penjualan Aksesoris — dipisah jadi fungsi
+    MANDIRI (sebelumnya bagian pertama di dalam render_aksesoris_tab())
+    supaya bisa dipanggil PALING ATAS di tab "Penjualan", SEBELUM
+    "Ringkasan Cabang, Produk & Sales" — permintaan pengguna untuk
+    menonjolkan scoreboard ini di posisi teratas. Setup data (baca
+    raw_aksesoris, finalize_data, filter AKSESORIS) DIDUPLIKASI dari
+    render_aksesoris_tab() karena fungsi ini sekarang independen — TIDAK
+    membagi variabel `df` dengan render_aksesoris_tab() lagi (masing-
+    masing compute df sendiri dari raw_aksesoris yang sama)."""
     if err_aksesoris:
         st.error(f"Gagal membaca berkas penjualan: {err_aksesoris}")
         return
@@ -1039,19 +1048,14 @@ def render_aksesoris_tab():
         else:
             st.info(
                 "Berkas ini tidak punya kolom Cabang (rincian satu cabang saja). "
-                "Masukkan nama cabangnya dulu di bagian **\"🧾 Ringkasan Cabang, Produk & Sales\"** "
-                "di atas — nama itu akan dipakai juga di bagian ini."
+                "Masukkan nama cabangnya dulu di panel kiri (sidebar) — nama itu akan "
+                "dipakai juga di bagian ini."
             )
             return
 
     if df is None:
         return
 
-    # PENTING: berkas penjualan sekarang bisa berisi SEMUA kategori barang
-    # (JASA, SPAREPART, dll — bukan cuma aksesoris). Seluruh bagian di bawah
-    # ini (revenue, HPP, katalog LUNA, target) HARUS difilter ke AKSESORIS
-    # saja, atau angka Omzet akan salah besar (ikut menjumlahkan kategori lain).
-    df_semua_kategori = df  # disimpan untuk lintas-kategori (mis. target UMAIR Parfum)
     df = la.hanya_kategori(df, "AKSESORIS")
     if df.empty:
         st.warning(
@@ -1178,6 +1182,50 @@ def render_aksesoris_tab():
     st.divider()
     st.divider()
 
+
+# ---------------------------------------------------------------------------
+def render_aksesoris_tab():
+    if err_aksesoris:
+        st.error(f"Gagal membaca berkas penjualan: {err_aksesoris}")
+        return
+    if raw_aksesoris is None:
+        st.info(
+            "Belum ada data. Unggah berkas penjualan (Excel/CSV) lewat panel kiri di "
+            "bagian \"🧾 Data Penjualan\" — berkas yang sama dipakai untuk bagian ini juga."
+        )
+        return
+
+    df = None
+    if "CABANG" in raw_aksesoris.columns:
+        df = la.finalize_data(raw_aksesoris)
+    else:
+        nama_bersama = st.session_state.get("nama_cabang_bersama")
+        if nama_bersama:
+            df = la.finalize_data(raw_aksesoris, cabang_default=nama_bersama)
+        else:
+            st.info(
+                "Berkas ini tidak punya kolom Cabang (rincian satu cabang saja). "
+                "Masukkan nama cabangnya dulu di bagian **\"🧾 Ringkasan Cabang, Produk & Sales\"** "
+                "di atas — nama itu akan dipakai juga di bagian ini."
+            )
+            return
+
+    if df is None:
+        return
+
+    # PENTING: berkas penjualan sekarang bisa berisi SEMUA kategori barang
+    # (JASA, SPAREPART, dll — bukan cuma aksesoris). Seluruh bagian di bawah
+    # ini (revenue, HPP, katalog LUNA, target) HARUS difilter ke AKSESORIS
+    # saja, atau angka Omzet akan salah besar (ikut menjumlahkan kategori lain).
+    df_semua_kategori = df  # disimpan untuk lintas-kategori (mis. target UMAIR Parfum)
+    df = la.hanya_kategori(df, "AKSESORIS")
+    if df.empty:
+        st.warning(
+            "Tidak ada baris berkategori AKSESORIS pada berkas ini. Cek lagi berkas yang "
+            "diunggah — mungkin filenya untuk kategori lain."
+        )
+        return
+
     st.subheader("Filter — Data Penjualan Aksesoris")
     tahun_opsi = sorted([int(t) for t in df["TAHUN"].dropna().unique()])
     bulan_opsi = sorted([int(b) for b in df["BULAN"].dropna().unique()])
@@ -1214,13 +1262,21 @@ def render_aksesoris_tab():
     )
     st.divider()
 
+    # PENTING: rs (revenue_summary) & seg (revenue_per_segmen) dihitung DI
+    # LUAR blok if di bawah ini karena dipakai lagi di bagian lain (Katalog
+    # LUNA, Matrix Insentif) yang TIDAK bergantung pada
+    # TAMPILKAN_REVENUE_PENJUALAN_AKSESORIS — kalau computation-nya ditaruh
+    # DI DALAM blok if, keduanya jadi UnboundLocal saat flag itu False
+    # (bug yang pernah terjadi di produksi, sudah diperbaiki).
+    rs = la.revenue_summary(dff)
+    seg = la.revenue_per_segmen(dff)
+
     if TAMPILKAN_REVENUE_PENJUALAN_AKSESORIS:
         # -----------------------------------------------------------------
         # 1. Dashboard Revenue
         # -----------------------------------------------------------------
         st.header("💰 Revenue Penjualan Aksesoris")
 
-        rs = la.revenue_summary(dff)
         c1, c2, c3, c4, c5 = st.columns(5)
         c1.metric("Omzet", la.format_rupiah_id(rs["omzet"]))
         c2.metric("HPP (Harga Beli)", la.format_rupiah_id(rs["modal"]))
@@ -1252,7 +1308,6 @@ def render_aksesoris_tab():
                 "tren_revenue_aksesoris.csv", "text/csv", key="ak_dl_trend",
             )
 
-        seg = la.revenue_per_segmen(dff)
         if not seg.empty:
             st.subheader("Omzet per Segmen Transaksi")
             st.caption("Service = dari transaksi Service HP/Laptop dll · Penjualan Unit = HP/Laptop baru & second.")
@@ -1292,6 +1347,12 @@ def render_aksesoris_tab():
 
     st.divider()
 
+    # PENTING: oc (omzet_cabang) dihitung DI LUAR blok if karena dipakai
+    # lagi di bagian lain (Matrix Insentif) yang TIDAK bergantung pada
+    # TAMPILKAN_OMZET_HPP_SELURUH_CABANG — sama seperti perbaikan rs/seg
+    # di atas.
+    oc = la.omzet_cabang(dff)
+
     if TAMPILKAN_OMZET_HPP_SELURUH_CABANG:
         # -----------------------------------------------------------------
         # 3. Dashboard Omzet All Cabang
@@ -1302,7 +1363,6 @@ def render_aksesoris_tab():
             "terjual di cabang tersebut — dipakai untuk melihat beban modal per cabang, "
             "bukan cuma omzet dan laba."
         )
-        oc = la.omzet_cabang(dff)
         if oc.empty:
             st.info("Tidak ada data cabang pada filter ini.")
         else:
@@ -3115,6 +3175,10 @@ if pilihan_dashboard == "📊 Persediaan":
 
 elif pilihan_dashboard == "🧾 Penjualan":
     st.markdown("# 🧾 Dashboard Penjualan Aksesoris")
+    render_dashboard_scoreboard_aksesoris()
+
+    st.markdown("---")
+    st.markdown("---")
     render_penjualan_tab()
 
     st.divider()

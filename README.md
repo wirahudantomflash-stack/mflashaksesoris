@@ -267,6 +267,56 @@ sekadar reorder dalam fungsi yang sama:
   seperti pola sebelumnya) — untuk mengembalikan ke lokasi asal, perlu
   edit manual, bukan tinggal ubah nilai flag.
 
+**🔀 "Dashboard & Scoreboard Penjualan Aksesoris" dipindah ke PALING
+ATAS** tab "🧾 Penjualan" (di atas "Ringkasan Cabang, Produk & Sales"),
+dipisah jadi **fungsi mandiri baru** `render_dashboard_scoreboard_aksesoris()`
+— sebelumnya section ini adalah bagian PERTAMA di dalam
+`render_aksesoris_tab()` (dipanggil setelah `render_penjualan_tab()`),
+sekarang dipanggil TERPISAH dan LEBIH DULU. Setup data (baca
+`raw_aksesoris`, `finalize_data`, filter AKSESORIS) DIDUPLIKASI dari
+`render_aksesoris_tab()` karena kedua fungsi sekarang independen — TIDAK
+berbagi variabel `df` lagi (masing-masing compute `df` sendiri dari
+`raw_aksesoris` global yang sama, sehingga hasilnya tetap konsisten satu
+sama lain).
+
+- **🐛 BUG KRITIS ditemukan & diperbaiki saat proses ini (UnboundLocalError
+  di produksi)**: dilaporkan pengguna — error `UnboundLocalError` pada
+  `render_aksesoris_tab()` baris `margin_aktual = rs["margin"]`. Audit
+  sistematis dijalankan ke SELURUH blok `if TAMPILKAN_*:` di file untuk
+  mencari variabel yang didefinisikan DI DALAM blok tapi dipakai lagi DI
+  LUAR blok itu (pola yang sama seperti bug `ring_wilayah` yang sudah
+  diperbaiki sebelumnya, tapi kali ini terlewat untuk 2 variabel lain).
+  Ditemukan **2 bug nyata**:
+  1. `rs` (dari `la.revenue_summary(dff)`) — cuma di-set di dalam blok
+     `if TAMPILKAN_REVENUE_PENJUALAN_AKSESORIS:`, tapi dipakai lagi di
+     bagian Katalog LUNA & Matrix Insentif yang independen dari flag itu.
+  2. `seg` (dari `la.revenue_per_segmen(dff)`) — pola sama, dipakai lagi
+     di bagian Matrix Insentif.
+  `oc` (dari `la.omzet_cabang(dff)`, di blok
+  `TAMPILKAN_OMZET_HPP_SELURUH_CABANG`) TERNYATA JUGA punya pola sama
+  (dipakai lagi di Matrix Insentif) — diperbaiki SEKALIAN meski belum
+  sempat memicu error di produksi (kemungkinan besar akan error berikutnya
+  kalau tidak diperbaiki sekarang).
+  **Perbaikan**: ketiga computation (`rs`, `seg`, `oc`) dipindah KE LUAR
+  blok `if TAMPILKAN_*:` masing-masing (dihitung SELALU, terlepas dari
+  status flag) — konsisten dengan pola perbaikan `ring_wilayah`
+  sebelumnya. **4 temuan lain dari audit sistematis ini TERKONFIRMASI
+  AMAN** (bukan bug): `rs` di dalam `TAMPILKAN_ANALISA_MENDALAM_LUNA`
+  adalah variabel lokal di nested function `_render_analisa_brand()`
+  (scope terpisah); `use_container_width` & `ring_wilayah` sudah py ada
+  fallback; `df_parfum_untuk_grafik` sudah ada `else` fallback;
+  `format`/`value`/`keyword` di `TAMPILKAN_MONITORING_BERTAHAP` adalah
+  false positive (keyword argument pemanggilan fungsi, bukan assignment
+  variabel — regex audit awal tidak membedakan keduanya).
+- **Diuji dengan data asli**: `render_dashboard_scoreboard_aksesoris()`
+  dan `render_aksesoris_tab()` masing-masing setup data independen dari
+  `raw_aksesoris` yang sama menghasilkan angka identik (Scoreboard Total
+  Omzet Rp 1.317.667.501 untuk Samurai 39; `rs`/`seg`/`oc` semua
+  ter-compute tanpa error). Tidak ada duplikasi key widget setelah
+  pemisahan fungsi (semua key section ini tetap sama, karena section
+  LAMA-nya sudah dihapus total dari `render_aksesoris_tab()`, bukan
+  disalin).
+
 ## 📌 Ringkasan Eksekutif (paling atas halaman)
 
 Bagian ringkas gaya kartu di paling atas halaman, sebelum ketiga dashboard
