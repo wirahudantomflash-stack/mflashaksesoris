@@ -1370,12 +1370,17 @@ def tambah_baris_total(df_per_cabang: pd.DataFrame, label: str = "TOTAL JARINGAN
     matematis), "Sisa Hari" diambil dari baris pertama (sama untuk semua
     cabang dalam satu periode). Berlaku untuk skema kolom
     `target_brand_per_cabang()` (9 kolom) maupun skema Tahap 1 yang lebih
-    ringkas (Cabang, Target, Result, % Actual, GAP)."""
+    ringkas (Cabang, Target, Result, % Actual, GAP) — kolom "Nilai
+    Persediaan" (kalau ada, ditambahkan terpisah oleh pemanggil) juga ikut
+    dijumlahkan otomatis."""
     if df_per_cabang.empty:
         return df_per_cabang
 
     total = {"Cabang": label}
-    kolom_rp_jumlah = [c for c in ["Target", "Result", "Expected", "GAP", "Target Kejar Per Hari"] if c in df_per_cabang.columns]
+    kolom_rp_jumlah = [
+        c for c in ["Target", "Result", "Expected", "GAP", "Target Kejar Per Hari", "Nilai Persediaan"]
+        if c in df_per_cabang.columns
+    ]
     for c in kolom_rp_jumlah:
         total[c] = df_per_cabang[c].sum()
 

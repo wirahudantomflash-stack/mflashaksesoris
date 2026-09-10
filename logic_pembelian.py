@@ -244,6 +244,24 @@ def rincian_pembelian_cabang(df: pd.DataFrame, cabang: str, supplier_key: str = 
     return g[cols]
 
 
+def history_pembelian_cabang(df: pd.DataFrame, cabang: str, supplier_key: str = "LUNA") -> pd.DataFrame:
+    """History TRANSAKSI (per baris pembelian, BUKAN diagregasi per jenis
+    barang) untuk satu cabang dari SATU pemasok (default: LUNA), diurutkan
+    dari tanggal PALING AWAL ke PALING AKHIR — dipakai untuk melihat
+    riwayat lengkap pembelian dari awal sampai terakhir, transaksi demi
+    transaksi (beda dari `rincian_pembelian_cabang()` yang sudah
+    diringkas/dijumlahkan per jenis barang)."""
+    cols = ["Tanggal", "Nomor #", "Nama Barang", "Kuantitas", "@Harga", "Total Harga"]
+    df_cabang_supplier = df[(df["PEMASOK_NORM"] == supplier_key) & (df["CABANG"] == cabang)]
+    if df_cabang_supplier.empty:
+        return pd.DataFrame(columns=cols)
+
+    out = df_cabang_supplier[["Tanggal", "Nomor #", "Nama Barang", "Kuantitas", "@Harga", "Total Harga"]].copy()
+    out = out.sort_values("Tanggal", ascending=True).reset_index(drop=True)
+    out["Tanggal"] = out["Tanggal"].dt.strftime("%Y-%m-%d")
+    return out[cols]
+
+
 # ---------------------------------------------------------------------------
 # Format angka gaya Indonesia
 # ---------------------------------------------------------------------------

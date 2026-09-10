@@ -1770,6 +1770,20 @@ def render_aksesoris_tab():
     if per_cabang_luna.empty:
         st.info("Tidak ada data cabang untuk periode ini.")
     else:
+        # Gabungkan Nilai Persediaan {label_target} per cabang — dari data
+        # STOK (persediaan), bukan dari data penjualan seperti kolom lain
+        # di tabel ini. Cabang tanpa data persediaan tetap muncul di tabel
+        # (LEFT JOIN, fillna 0), bukan hilang begitu saja.
+        if df_persediaan is not None:
+            persediaan_target = lp.apply_filters(
+                df_persediaan, hanya_aksesoris=True, filter_luna=(True if keyword_target else None),
+            )
+            nilai_persediaan_cbg = lp.nilai_persediaan_cabang(persediaan_target)[["Cabang", "Nilai Persediaan"]]
+        else:
+            nilai_persediaan_cbg = pd.DataFrame(columns=["Cabang", "Nilai Persediaan"])
+        per_cabang_luna = per_cabang_luna.merge(nilai_persediaan_cbg, on="Cabang", how="left")
+        per_cabang_luna["Nilai Persediaan"] = per_cabang_luna["Nilai Persediaan"].fillna(0)
+
         per_cabang_luna = per_cabang_luna.sort_values("% Actual", ascending=True).reset_index(drop=True)
         pcl_dgn_total = la.tambah_baris_total(per_cabang_luna)
         styled_pcl = pcl_dgn_total.style.map(
@@ -1778,6 +1792,7 @@ def render_aksesoris_tab():
             "Target": la.format_rupiah_id, "Result": la.format_rupiah_id, "Expected": la.format_rupiah_id,
             "% Actual": la.format_percent_id, "% Expected": la.format_percent_id, "GAP": la.format_rupiah_id,
             "Target Kejar Per Hari": la.format_rupiah_id, "Sisa Hari": la.format_int_id,
+            "Nilai Persediaan": la.format_rupiah_id,
         })
         st.dataframe(styled_pcl, use_container_width=True, height=530)
         st.caption(
@@ -2535,6 +2550,31 @@ def render_pembelian_tab():
                         f"⬇️ Unduh CSV — Rincian Pembelian {cabang_pilihan_beli} dari LUNA",
                         rincian_beli.to_csv(index=False).encode("utf-8-sig"),
                         f"rincian_pembelian_{cabang_pilihan_beli.lower()}_luna.csv", "text/csv", key="pb_dl_rincian_beli",
+                    )
+
+            with st.expander("📜 Lihat History Pembelian — Dari Awal Sampai Terakhir", expanded=False):
+                st.caption("Riwayat TRANSAKSI lengkap (bukan diagregasi per jenis barang), diurutkan dari pembelian PALING AWAL ke PALING AKHIR.")
+                cabang_pilihan_history = st.selectbox("Pilih Cabang", cabang_opsi_beli, key="pb_history_beli_cabang")
+                history_beli = lb.history_pembelian_cabang(df_pembelian, cabang_pilihan_history, supplier_key="LUNA")
+                if history_beli.empty:
+                    st.info(f"Tidak ada history pembelian LUNA untuk cabang {cabang_pilihan_history}.")
+                else:
+                    tampil_history = history_beli.copy()
+                    tampil_history["Kuantitas"] = history_beli["Kuantitas"].map(la.format_int_id)
+                    tampil_history["@Harga"] = history_beli["@Harga"].map(la.format_rupiah_id)
+                    tampil_history["Total Harga"] = history_beli["Total Harga"].map(la.format_rupiah_id)
+                    st.caption(
+                        f"Pembelian PERTAMA: **{history_beli['Tanggal'].iloc[0]}** · "
+                        f"pembelian TERAKHIR: **{history_beli['Tanggal'].iloc[-1]}** · "
+                        f"{la.format_int_id(len(history_beli))} baris transaksi, "
+                        f"{la.format_int_id(history_beli['Nomor #'].nunique())} nomor faktur berbeda, "
+                        f"total Rp{la.format_int_id(history_beli['Total Harga'].sum())}."
+                    )
+                    st.dataframe(tampil_history, use_container_width=True, height=min(80 + 38 * len(history_beli), 500))
+                    st.download_button(
+                        f"⬇️ Unduh CSV — History Pembelian {cabang_pilihan_history} dari LUNA",
+                        history_beli.to_csv(index=False).encode("utf-8-sig"),
+                        f"history_pembelian_{cabang_pilihan_history.lower()}_luna.csv", "text/csv", key="pb_dl_history_beli",
                     )
 
     st.divider()
