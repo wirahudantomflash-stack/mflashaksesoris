@@ -34,6 +34,11 @@ TAMPILKAN_ANALISA_MENDALAM_LUNA = False # "Analisa Mendalam: LUNA, Selain LUNA"
 TAMPILKAN_KEBUTUHAN_BELUM_TERPENUHI = False  # "3. Kebutuhan Konsumen yang Belum Terpenuhi"
 TAMPILKAN_ANALISA_LOKASI_CABANG = False      # "4. Analisa Lokasi Cabang MFlash"
 
+# Flag sementara tambahan lagi (pola sama):
+TAMPILKAN_REVENUE_PENJUALAN_AKSESORIS = False   # "Revenue Penjualan Aksesoris" (termasuk sub-bagian "Omzet per Segmen Transaksi")
+TAMPILKAN_OMZET_HPP_SELURUH_CABANG = False      # "Omzet & HPP Seluruh Cabang"
+TAMPILKAN_PENJUALAN_LUNA_VS_SELAIN_LUNA = False # "Penjualan Aksesoris LUNA vs Selain LUNA"
+
 st.set_page_config(page_title="MFlash Dashboard Gadget dan Aksesoris", page_icon="flash_logo.png", layout="wide")
 
 st.logo("flash_logo.png")
@@ -879,7 +884,12 @@ def render_penjualan_tab():
 
     st.divider()
     st.header("Semua Produk Aksesoris")
-    st.caption("Difilter khusus kategori barang AKSESORIS (AKSESORIS/ACCESORIES digabung).")
+    st.caption(
+        "Difilter khusus kategori barang AKSESORIS (AKSESORIS/ACCESORIES digabung). "
+        "**Omzet mencakup SELURUH produk aksesoris tanpa pengecualian — termasuk produk "
+        "Hydrogel, baik bermerek LUNA maupun brand lain** — tidak ada exclusion apa pun "
+        "pada angka Omzet di tabel ini."
+    )
     metrik_produk = st.radio("Urutkan berdasarkan", ["Qty Terjual", "Omzet"], key="jl_metrik_produk", horizontal=True)
     tp = ljl.top_produk(dff, metric=metrik_produk, n=None, hanya_aksesoris=True)
     if tp.empty:
@@ -982,7 +992,10 @@ def render_aksesoris_tab():
     st.header("🏆 Dashboard & Scoreboard Penjualan Aksesoris")
     st.caption(
         "**Aksesoris Tertarget** = LUNA KECUALI Hydrogel · **Aksesoris Non Tertarget** = Selain LUNA "
-        "(termasuk LUNA Hydrogel). Parfum tidak disertakan di bagian ini."
+        "(termasuk LUNA Hydrogel). Parfum tidak disertakan di bagian ini. **PENTING: kolom \"Total "
+        "Omzet\" = Omzet Tertarget + Omzet Non Tertarget, jadi SUDAH MENCAKUP SELURUH penjualan "
+        "Hydrogel (baik bermerek LUNA maupun brand lain seperti Vivan) — tidak ada pengecualian "
+        "apa pun pada angka Total Omzet, meski istilah \"Tertarget\" sendiri mengecualikan Hydrogel.**"
     )
 
     periode_dsb_opsi = list(la.PERIODE_SAMURAI.keys())
@@ -1167,55 +1180,56 @@ def render_aksesoris_tab():
     )
     st.divider()
 
-    # -----------------------------------------------------------------
-    # 1. Dashboard Revenue
-    # -----------------------------------------------------------------
-    st.header("💰 Revenue Penjualan Aksesoris")
+    if TAMPILKAN_REVENUE_PENJUALAN_AKSESORIS:
+        # -----------------------------------------------------------------
+        # 1. Dashboard Revenue
+        # -----------------------------------------------------------------
+        st.header("💰 Revenue Penjualan Aksesoris")
 
-    rs = la.revenue_summary(dff)
-    c1, c2, c3, c4, c5 = st.columns(5)
-    c1.metric("Omzet", la.format_rupiah_id(rs["omzet"]))
-    c2.metric("HPP (Harga Beli)", la.format_rupiah_id(rs["modal"]))
-    c3.metric("Laba", la.format_rupiah_id(rs["laba"]))
-    c4.metric("Margin", la.format_percent_id(rs["margin"]))
-    c5.metric("Rata-rata / Nota", la.format_rupiah_id(rs["rata_per_nota"]))
-    st.caption(
-        f"{la.format_int_id(rs['jumlah_nota'])} nota · {la.format_int_id(rs['jumlah_item'])} item terjual · "
-        f"HPP = total HARGA BELI per baris (sudah nilai total, tidak dikalikan QTY lagi)"
-    )
-
-    trend = la.revenue_trend_bulanan(dff)
-    if not trend.empty:
-        st.subheader("Tren Omzet & Laba Bulanan")
+        rs = la.revenue_summary(dff)
+        c1, c2, c3, c4, c5 = st.columns(5)
+        c1.metric("Omzet", la.format_rupiah_id(rs["omzet"]))
+        c2.metric("HPP (Harga Beli)", la.format_rupiah_id(rs["modal"]))
+        c3.metric("Laba", la.format_rupiah_id(rs["laba"]))
+        c4.metric("Margin", la.format_percent_id(rs["margin"]))
+        c5.metric("Rata-rata / Nota", la.format_rupiah_id(rs["rata_per_nota"]))
         st.caption(
-            "Bulan berjalan yang belum lengkap tetap ditampilkan di grafik, tapi tidak "
-            "dipakai sebagai dasar rata-rata pada bagian Proyeksi di bawah."
-        )
-        st.bar_chart(trend.set_index("Periode")[["Omzet", "Laba"]])
-        tampil_trend = trend.copy()
-        for col in ["Omzet", "Modal", "Laba"]:
-            tampil_trend[col] = trend[col].map(la.format_rupiah_id)
-        tampil_trend["Margin (%)"] = trend["Margin (%)"].map(la.format_percent_id)
-        tampil_trend["Qty Terjual"] = trend["Qty Terjual"].map(la.format_int_id)
-        tampil_trend["Jumlah Nota"] = trend["Jumlah Nota"].map(la.format_int_id)
-        st.dataframe(tampil_trend, use_container_width=True)
-        st.download_button(
-            "⬇️ Unduh CSV — Tren Bulanan", trend.to_csv(index=False).encode("utf-8-sig"),
-            "tren_revenue_aksesoris.csv", "text/csv", key="ak_dl_trend",
+            f"{la.format_int_id(rs['jumlah_nota'])} nota · {la.format_int_id(rs['jumlah_item'])} item terjual · "
+            f"HPP = total HARGA BELI per baris (sudah nilai total, tidak dikalikan QTY lagi)"
         )
 
-    seg = la.revenue_per_segmen(dff)
-    if not seg.empty:
-        st.subheader("Omzet per Segmen Transaksi")
-        st.caption("Service = dari transaksi Service HP/Laptop dll · Penjualan Unit = HP/Laptop baru & second.")
-        st.bar_chart(seg.set_index("Segmen")["Omzet"])
-        tampil_seg = seg.copy()
-        tampil_seg["Omzet"] = seg["Omzet"].map(la.format_rupiah_id)
-        tampil_seg["Laba"] = seg["Laba"].map(la.format_rupiah_id)
-        tampil_seg["Margin (%)"] = seg["Margin (%)"].map(la.format_percent_id)
-        tampil_seg["Jumlah Nota"] = seg["Jumlah Nota"].map(la.format_int_id)
-        tampil_seg["Porsi Omzet (%)"] = seg["Porsi Omzet (%)"].map(la.format_percent_id)
-        st.dataframe(tampil_seg, use_container_width=True)
+        trend = la.revenue_trend_bulanan(dff)
+        if not trend.empty:
+            st.subheader("Tren Omzet & Laba Bulanan")
+            st.caption(
+                "Bulan berjalan yang belum lengkap tetap ditampilkan di grafik, tapi tidak "
+                "dipakai sebagai dasar rata-rata pada bagian Proyeksi di bawah."
+            )
+            st.bar_chart(trend.set_index("Periode")[["Omzet", "Laba"]])
+            tampil_trend = trend.copy()
+            for col in ["Omzet", "Modal", "Laba"]:
+                tampil_trend[col] = trend[col].map(la.format_rupiah_id)
+            tampil_trend["Margin (%)"] = trend["Margin (%)"].map(la.format_percent_id)
+            tampil_trend["Qty Terjual"] = trend["Qty Terjual"].map(la.format_int_id)
+            tampil_trend["Jumlah Nota"] = trend["Jumlah Nota"].map(la.format_int_id)
+            st.dataframe(tampil_trend, use_container_width=True)
+            st.download_button(
+                "⬇️ Unduh CSV — Tren Bulanan", trend.to_csv(index=False).encode("utf-8-sig"),
+                "tren_revenue_aksesoris.csv", "text/csv", key="ak_dl_trend",
+            )
+
+        seg = la.revenue_per_segmen(dff)
+        if not seg.empty:
+            st.subheader("Omzet per Segmen Transaksi")
+            st.caption("Service = dari transaksi Service HP/Laptop dll · Penjualan Unit = HP/Laptop baru & second.")
+            st.bar_chart(seg.set_index("Segmen")["Omzet"])
+            tampil_seg = seg.copy()
+            tampil_seg["Omzet"] = seg["Omzet"].map(la.format_rupiah_id)
+            tampil_seg["Laba"] = seg["Laba"].map(la.format_rupiah_id)
+            tampil_seg["Margin (%)"] = seg["Margin (%)"].map(la.format_percent_id)
+            tampil_seg["Jumlah Nota"] = seg["Jumlah Nota"].map(la.format_int_id)
+            tampil_seg["Porsi Omzet (%)"] = seg["Porsi Omzet (%)"].map(la.format_percent_id)
+            st.dataframe(tampil_seg, use_container_width=True)
 
     st.divider()
 
@@ -1244,38 +1258,39 @@ def render_aksesoris_tab():
 
     st.divider()
 
-    # -----------------------------------------------------------------
-    # 3. Dashboard Omzet All Cabang
-    # -----------------------------------------------------------------
-    st.header("🏬 Omzet & HPP Seluruh Cabang")
-    st.caption(
-        "HPP (Harga Pokok Penjualan) = total HARGA BELI dari seluruh item aksesoris yang "
-        "terjual di cabang tersebut — dipakai untuk melihat beban modal per cabang, "
-        "bukan cuma omzet dan laba."
-    )
-    oc = la.omzet_cabang(dff)
-    if oc.empty:
-        st.info("Tidak ada data cabang pada filter ini.")
-    else:
-        tab_chart1, tab_chart2 = st.tabs(["Omzet vs HPP per Cabang", "HPP terhadap Omzet (%)"])
-        with tab_chart1:
-            st.bar_chart(oc.set_index("Cabang")[["Omzet", "HPP"]])
-        with tab_chart2:
-            st.bar_chart(oc.set_index("Cabang")["HPP terhadap Omzet (%)"])
-
-        tampil_oc = oc.copy()
-        tampil_oc["Omzet"] = oc["Omzet"].map(la.format_rupiah_id)
-        tampil_oc["HPP"] = oc["HPP"].map(la.format_rupiah_id)
-        tampil_oc["Laba"] = oc["Laba"].map(la.format_rupiah_id)
-        tampil_oc["Margin (%)"] = oc["Margin (%)"].map(la.format_percent_id)
-        tampil_oc["HPP terhadap Omzet (%)"] = oc["HPP terhadap Omzet (%)"].map(la.format_percent_id)
-        tampil_oc["Jumlah Nota"] = oc["Jumlah Nota"].map(la.format_int_id)
-        tampil_oc["Rata-rata / Nota"] = oc["Rata-rata / Nota"].map(la.format_rupiah_id)
-        st.dataframe(tampil_oc, use_container_width=True, height=460)
-        st.download_button(
-            "⬇️ Unduh CSV — Omzet & HPP per Cabang", oc.to_csv(index=True).encode("utf-8-sig"),
-            "omzet_hpp_cabang.csv", "text/csv", key="ak_dl_cabang",
+    if TAMPILKAN_OMZET_HPP_SELURUH_CABANG:
+        # -----------------------------------------------------------------
+        # 3. Dashboard Omzet All Cabang
+        # -----------------------------------------------------------------
+        st.header("🏬 Omzet & HPP Seluruh Cabang")
+        st.caption(
+            "HPP (Harga Pokok Penjualan) = total HARGA BELI dari seluruh item aksesoris yang "
+            "terjual di cabang tersebut — dipakai untuk melihat beban modal per cabang, "
+            "bukan cuma omzet dan laba."
         )
+        oc = la.omzet_cabang(dff)
+        if oc.empty:
+            st.info("Tidak ada data cabang pada filter ini.")
+        else:
+            tab_chart1, tab_chart2 = st.tabs(["Omzet vs HPP per Cabang", "HPP terhadap Omzet (%)"])
+            with tab_chart1:
+                st.bar_chart(oc.set_index("Cabang")[["Omzet", "HPP"]])
+            with tab_chart2:
+                st.bar_chart(oc.set_index("Cabang")["HPP terhadap Omzet (%)"])
+
+            tampil_oc = oc.copy()
+            tampil_oc["Omzet"] = oc["Omzet"].map(la.format_rupiah_id)
+            tampil_oc["HPP"] = oc["HPP"].map(la.format_rupiah_id)
+            tampil_oc["Laba"] = oc["Laba"].map(la.format_rupiah_id)
+            tampil_oc["Margin (%)"] = oc["Margin (%)"].map(la.format_percent_id)
+            tampil_oc["HPP terhadap Omzet (%)"] = oc["HPP terhadap Omzet (%)"].map(la.format_percent_id)
+            tampil_oc["Jumlah Nota"] = oc["Jumlah Nota"].map(la.format_int_id)
+            tampil_oc["Rata-rata / Nota"] = oc["Rata-rata / Nota"].map(la.format_rupiah_id)
+            st.dataframe(tampil_oc, use_container_width=True, height=460)
+            st.download_button(
+                "⬇️ Unduh CSV — Omzet & HPP per Cabang", oc.to_csv(index=True).encode("utf-8-sig"),
+                "omzet_hpp_cabang.csv", "text/csv", key="ak_dl_cabang",
+            )
 
     st.divider()
 
@@ -1402,77 +1417,78 @@ def render_aksesoris_tab():
 
     st.divider()
 
-    # -----------------------------------------------------------------
-    # 3a2. Grafik Penjualan LUNA vs Selain LUNA vs Parfum & Kontribusi Cabang
-    # -----------------------------------------------------------------
-    st.header("📊 Penjualan Aksesoris LUNA vs Selain LUNA" + (" vs Parfum" if TAMPILKAN_PARFUM else ""))
-    st.caption(
-        "Aksesoris LUNA/Selain LUNA dari data yang sudah difilter kategori AKSESORIS"
-        + (
-            "; Parfum diambil terpisah dari kategori PARFUM pada berkas penjualan yang sama "
-            "(kedua kategori beda, sehingga dibandingkan berdampingan di sini)."
-            if TAMPILKAN_PARFUM else "."
-        )
-    )
-
-    if TAMPILKAN_PARFUM:
-        df_parfum_untuk_grafik = la.hanya_kategori(df_semua_kategori, "PARFUM")
-        if sel_cabang:
-            df_parfum_untuk_grafik = df_parfum_untuk_grafik[df_parfum_untuk_grafik["CABANG"].isin(sel_cabang)]
-        if sel_tahun:
-            df_parfum_untuk_grafik = df_parfum_untuk_grafik[df_parfum_untuk_grafik["TAHUN"].isin(sel_tahun)]
-        if sel_bulan:
-            df_parfum_untuk_grafik = df_parfum_untuk_grafik[df_parfum_untuk_grafik["BULAN"].isin(sel_bulan)]
-    else:
-        df_parfum_untuk_grafik = dff.iloc[0:0]
-
-    opk = la.omzet_per_kelompok(dff, df_parfum_untuk_grafik, keyword_brand="LUNA")
-    if not TAMPILKAN_PARFUM:
-        opk = opk[opk["Kelompok"] != "Parfum"].reset_index(drop=True)
-    if opk.empty or opk["Omzet"].sum() == 0:
-        st.info("Tidak ada data untuk grafik ini pada filter saat ini.")
-    else:
-        st.bar_chart(opk.set_index("Kelompok")["Omzet"])
-        tampil_opk = opk.copy()
-        tampil_opk["Omzet"] = opk["Omzet"].map(la.format_rupiah_id)
-        tampil_opk["Laba"] = opk["Laba"].map(la.format_rupiah_id)
-        tampil_opk["Jumlah Nota"] = opk["Jumlah Nota"].map(la.format_int_id)
-        tampil_opk["Jumlah Item Terjual"] = opk["Jumlah Item Terjual"].map(la.format_int_id)
-        st.dataframe(tampil_opk, use_container_width=True)
-        st.download_button(
-            "⬇️ Unduh CSV — Omzet per Kelompok" + (" (LUNA/Selain LUNA/Parfum)" if TAMPILKAN_PARFUM else " (LUNA/Selain LUNA)"),
-            opk.to_csv(index=False).encode("utf-8-sig"),
-            "omzet_per_kelompok.csv", "text/csv", key="ak_dl_kelompok",
-        )
-
-    if TAMPILKAN_KONTRIBUSI_CABANG:
-        st.subheader("📶 Indikator Kontribusi Cabang (Terendah → Tertinggi)")
+    if TAMPILKAN_PENJUALAN_LUNA_VS_SELAIN_LUNA:
+        # -----------------------------------------------------------------
+        # 3a2. Grafik Penjualan LUNA vs Selain LUNA vs Parfum & Kontribusi Cabang
+        # -----------------------------------------------------------------
+        st.header("📊 Penjualan Aksesoris LUNA vs Selain LUNA" + (" vs Parfum" if TAMPILKAN_PARFUM else ""))
         st.caption(
-            "Total omzet Aksesoris" + (" + Parfum" if TAMPILKAN_PARFUM else "") + " per cabang, diurutkan dari "
-            "kontribusi PALING RENDAH ke PALING BESAR — cabang di paling atas grafik yang paling perlu didorong."
+            "Aksesoris LUNA/Selain LUNA dari data yang sudah difilter kategori AKSESORIS"
+            + (
+                "; Parfum diambil terpisah dari kategori PARFUM pada berkas penjualan yang sama "
+                "(kedua kategori beda, sehingga dibandingkan berdampingan di sini)."
+                if TAMPILKAN_PARFUM else "."
+            )
         )
-        kc = la.kontribusi_cabang_gabungan(dff, df_parfum_untuk_grafik)
-        if kc.empty:
-            st.info("Tidak ada data untuk diagram ini pada filter saat ini.")
+
+        if TAMPILKAN_PARFUM:
+            df_parfum_untuk_grafik = la.hanya_kategori(df_semua_kategori, "PARFUM")
+            if sel_cabang:
+                df_parfum_untuk_grafik = df_parfum_untuk_grafik[df_parfum_untuk_grafik["CABANG"].isin(sel_cabang)]
+            if sel_tahun:
+                df_parfum_untuk_grafik = df_parfum_untuk_grafik[df_parfum_untuk_grafik["TAHUN"].isin(sel_tahun)]
+            if sel_bulan:
+                df_parfum_untuk_grafik = df_parfum_untuk_grafik[df_parfum_untuk_grafik["BULAN"].isin(sel_bulan)]
         else:
-            st.bar_chart(kc.set_index("Cabang")["Total Omzet"])
-            tampil_kc = kc.copy()
-            tampil_kc["Omzet Aksesoris"] = kc["Omzet Aksesoris"].map(la.format_rupiah_id)
-            tampil_kc["Omzet Parfum"] = kc["Omzet Parfum"].map(la.format_rupiah_id)
-            tampil_kc["Total Omzet"] = kc["Total Omzet"].map(la.format_rupiah_id)
-            tampil_kc["Porsi Kontribusi (%)"] = kc["Porsi Kontribusi (%)"].map(la.format_percent_id)
-            if not TAMPILKAN_PARFUM:
-                tampil_kc = tampil_kc.drop(columns=["Omzet Parfum"])
-            st.dataframe(tampil_kc, use_container_width=True, height=460)
-            st.caption(
-                f"Kontribusi terendah: **{kc.iloc[0]['Cabang']}** ({la.format_percent_id(kc.iloc[0]['Porsi Kontribusi (%)'])}) · "
-                f"tertinggi: **{kc.iloc[-1]['Cabang']}** ({la.format_percent_id(kc.iloc[-1]['Porsi Kontribusi (%)'])})."
-            )
+            df_parfum_untuk_grafik = dff.iloc[0:0]
+
+        opk = la.omzet_per_kelompok(dff, df_parfum_untuk_grafik, keyword_brand="LUNA")
+        if not TAMPILKAN_PARFUM:
+            opk = opk[opk["Kelompok"] != "Parfum"].reset_index(drop=True)
+        if opk.empty or opk["Omzet"].sum() == 0:
+            st.info("Tidak ada data untuk grafik ini pada filter saat ini.")
+        else:
+            st.bar_chart(opk.set_index("Kelompok")["Omzet"])
+            tampil_opk = opk.copy()
+            tampil_opk["Omzet"] = opk["Omzet"].map(la.format_rupiah_id)
+            tampil_opk["Laba"] = opk["Laba"].map(la.format_rupiah_id)
+            tampil_opk["Jumlah Nota"] = opk["Jumlah Nota"].map(la.format_int_id)
+            tampil_opk["Jumlah Item Terjual"] = opk["Jumlah Item Terjual"].map(la.format_int_id)
+            st.dataframe(tampil_opk, use_container_width=True)
             st.download_button(
-                "⬇️ Unduh CSV — Kontribusi Cabang" + (" (Aksesoris + Parfum)" if TAMPILKAN_PARFUM else " (Aksesoris)"),
-                kc.to_csv(index=False).encode("utf-8-sig"),
-                "kontribusi_cabang.csv", "text/csv", key="ak_dl_kontribusi_cabang",
+                "⬇️ Unduh CSV — Omzet per Kelompok" + (" (LUNA/Selain LUNA/Parfum)" if TAMPILKAN_PARFUM else " (LUNA/Selain LUNA)"),
+                opk.to_csv(index=False).encode("utf-8-sig"),
+                "omzet_per_kelompok.csv", "text/csv", key="ak_dl_kelompok",
             )
+
+        if TAMPILKAN_KONTRIBUSI_CABANG:
+            st.subheader("📶 Indikator Kontribusi Cabang (Terendah → Tertinggi)")
+            st.caption(
+                "Total omzet Aksesoris" + (" + Parfum" if TAMPILKAN_PARFUM else "") + " per cabang, diurutkan dari "
+                "kontribusi PALING RENDAH ke PALING BESAR — cabang di paling atas grafik yang paling perlu didorong."
+            )
+            kc = la.kontribusi_cabang_gabungan(dff, df_parfum_untuk_grafik)
+            if kc.empty:
+                st.info("Tidak ada data untuk diagram ini pada filter saat ini.")
+            else:
+                st.bar_chart(kc.set_index("Cabang")["Total Omzet"])
+                tampil_kc = kc.copy()
+                tampil_kc["Omzet Aksesoris"] = kc["Omzet Aksesoris"].map(la.format_rupiah_id)
+                tampil_kc["Omzet Parfum"] = kc["Omzet Parfum"].map(la.format_rupiah_id)
+                tampil_kc["Total Omzet"] = kc["Total Omzet"].map(la.format_rupiah_id)
+                tampil_kc["Porsi Kontribusi (%)"] = kc["Porsi Kontribusi (%)"].map(la.format_percent_id)
+                if not TAMPILKAN_PARFUM:
+                    tampil_kc = tampil_kc.drop(columns=["Omzet Parfum"])
+                st.dataframe(tampil_kc, use_container_width=True, height=460)
+                st.caption(
+                    f"Kontribusi terendah: **{kc.iloc[0]['Cabang']}** ({la.format_percent_id(kc.iloc[0]['Porsi Kontribusi (%)'])}) · "
+                    f"tertinggi: **{kc.iloc[-1]['Cabang']}** ({la.format_percent_id(kc.iloc[-1]['Porsi Kontribusi (%)'])})."
+                )
+                st.download_button(
+                    "⬇️ Unduh CSV — Kontribusi Cabang" + (" (Aksesoris + Parfum)" if TAMPILKAN_PARFUM else " (Aksesoris)"),
+                    kc.to_csv(index=False).encode("utf-8-sig"),
+                    "kontribusi_cabang.csv", "text/csv", key="ak_dl_kontribusi_cabang",
+                )
 
     st.divider()
 
@@ -1481,29 +1497,27 @@ def render_aksesoris_tab():
     # -----------------------------------------------------------------
     st.header("📅 Pencapaian Omzet & Gross Profit per Periode Samurai")
     st.caption(
-        "Periode internal: Samurai 37 (Jan–Mar 2026), Samurai 38 (Apr–Jun 2026), "
-        "Samurai 39 (Jul–Sep 2026), Samurai 40 (Okt–Des 2026) — dihitung dari data "
-        "AKSESORIS (LUNA vs Selain LUNA), tidak terpengaruh filter tahun/bulan di atas "
-        "karena periode Samurai sudah menentukan rentang tanggalnya sendiri."
+        "**Khusus LUNA saja** (tidak menampilkan Selain LUNA di bagian ini). Periode internal: "
+        "Samurai 37 (Jan–Mar 2026), Samurai 38 (Apr–Jun 2026), Samurai 39 (Jul–Sep 2026), "
+        "Samurai 40 (Okt–Des 2026) — dihitung dari data AKSESORIS, tidak terpengaruh filter "
+        "tahun/bulan di atas karena periode Samurai sudah menentukan rentang tanggalnya sendiri."
     )
 
     periode_pilihan = st.selectbox(
         "Pilih periode untuk lihat pencapaiannya", list(la.PERIODE_SAMURAI.keys()), key="ak_periode_samurai",
     )
-    hasil_periode = la.pencapaian_kelompok_periode(df, periode_pilihan, keyword_brand="LUNA")
+    hasil_periode_full = la.pencapaian_kelompok_periode(df, periode_pilihan, keyword_brand="LUNA")
+    hasil_periode = hasil_periode_full[hasil_periode_full["Kelompok"] == "LUNA"] if not hasil_periode_full.empty else hasil_periode_full
 
     if hasil_periode.empty:
-        st.info(f"Belum ada data penjualan aksesoris pada periode **{periode_pilihan}**.")
+        st.info(f"Belum ada data penjualan LUNA pada periode **{periode_pilihan}**.")
     else:
-        p1, p2 = st.columns(2)
-        for col, (_, row) in zip([p1, p2], hasil_periode.iterrows()):
-            with col:
-                st.metric(f"{row['Kelompok']} — Omzet", la.format_rupiah_id(row["Omzet"]))
-                st.caption(
-                    f"Gross Profit {la.format_rupiah_id(row['Gross Profit'])} · "
-                    f"Margin {la.format_percent_id(row['Margin (%)'])} · "
-                    f"{la.format_int_id(row['Jumlah Item Terjual'])} pcs"
-                )
+        row = hasil_periode.iloc[0]
+        m1, m2, m3 = st.columns(3)
+        m1.metric("LUNA — Omzet", la.format_rupiah_id(row["Omzet"]))
+        m2.metric("Gross Profit", la.format_rupiah_id(row["Gross Profit"]))
+        m3.metric("Margin", la.format_percent_id(row["Margin (%)"]))
+        st.caption(f"{la.format_int_id(int(row['Jumlah Nota']))} nota · {la.format_int_id(int(row['Jumlah Item Terjual']))} pcs terjual.")
         tampil_hp = hasil_periode.copy()
         tampil_hp["Omzet"] = hasil_periode["Omzet"].map(la.format_rupiah_id)
         tampil_hp["Gross Profit"] = hasil_periode["Gross Profit"].map(la.format_rupiah_id)
@@ -1513,9 +1527,14 @@ def render_aksesoris_tab():
         st.dataframe(tampil_hp, use_container_width=True)
 
     st.subheader("📊 Perbandingan Antar Periode Samurai")
-    perbandingan_samurai = la.perbandingan_antar_periode_samurai(df, keyword_brand="LUNA")
+    st.caption("**Khusus LUNA saja.**")
+    perbandingan_samurai_full = la.perbandingan_antar_periode_samurai(df, keyword_brand="LUNA")
+    perbandingan_samurai = (
+        perbandingan_samurai_full[perbandingan_samurai_full["Kelompok"] == "LUNA"]
+        if not perbandingan_samurai_full.empty else perbandingan_samurai_full
+    )
     if perbandingan_samurai.empty:
-        st.info("Belum ada data untuk perbandingan antar periode.")
+        st.info("Belum ada data LUNA untuk perbandingan antar periode.")
     else:
         pivot_omzet = perbandingan_samurai.pivot(index="Periode", columns="Kelompok", values="Omzet")
         pivot_gp = perbandingan_samurai.pivot(index="Periode", columns="Kelompok", values="Gross Profit")

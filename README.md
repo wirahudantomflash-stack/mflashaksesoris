@@ -110,6 +110,39 @@
 > Kode/logikanya tetap ada untuk keduanya, bisa dimunculkan lagi kapan
 > saja dengan mengubah nilai flag jadi `True`.
 
+> ## ⏸️ Tiga bagian lagi juga SEMENTARA DISEMBUNYIKAN (dalam Dashboard
+> ## Penjualan Aksesoris)
+>
+> Tiga flag serupa lagi, mekanisme & alasan sama:
+> ```python
+> TAMPILKAN_REVENUE_PENJUALAN_AKSESORIS = False   # "Revenue Penjualan Aksesoris" (termasuk sub-bagian "Omzet per Segmen Transaksi")
+> TAMPILKAN_OMZET_HPP_SELURUH_CABANG = False      # "Omzet & HPP Seluruh Cabang"
+> TAMPILKAN_PENJUALAN_LUNA_VS_SELAIN_LUNA = False # "Penjualan Aksesoris LUNA vs Selain LUNA"
+> ```
+> **Revenue Penjualan Aksesoris**: seluruh bagian "💰 Revenue Penjualan
+> Aksesoris" tidak dirender — INI SATU FLAG UNTUK TIGA SUB-BAGIAN
+> SEKALIGUS (semuanya nested di bawah header yang sama, jadi digabung
+> jadi satu flag, bukan dipecah tiga): 5 kartu metrik (Omzet, HPP, Laba,
+> Margin, Rata-rata/Nota), "Tren Omzet & Laba Bulanan" (grafik+tabel
+> bulanan), dan **"Omzet per Segmen Transaksi"** (yang diminta terpisah
+> sebagai item ke-3 di daftar semula — TAPI karena strukturnya memang
+> sub-bagian dari Revenue, otomatis ikut tersembunyi bersama, TIDAK perlu
+> flag sendiri).
+> **Omzet & HPP Seluruh Cabang**: seluruh bagian "🏬 Omzet & HPP Seluruh
+> Cabang" (2 tab grafik: Omzet vs HPP per Cabang & HPP terhadap Omzet %,
+> plus tabel) tidak dirender.
+> **Penjualan Aksesoris LUNA vs Selain LUNA**: seluruh bagian "📊
+> Penjualan Aksesoris LUNA vs Selain LUNA" (grafik garis + tabel omzet
+> per kelompok, Indikator Kontribusi Cabang) tidak dirender — bagian
+> "🔍 Analisa Mendalam: LUNA, Selain LUNA" di ATASNYA (sudah disembunyikan
+> sejak sebelumnya via `TAMPILKAN_ANALISA_MENDALAM_LUNA`) dan bagian
+> "📅 Pencapaian Omzet & Gross Profit per Periode Samurai" di BAWAHNYA
+> **tetap tampil**. Diverifikasi tidak ada variabel yang bocor (`kc`,
+> `opk`, dll didefinisikan di dalam blok ini, tidak dipakai lagi di
+> bagian setelahnya).
+> Kode/logikanya tetap ada untuk ketiganya, bisa dimunculkan lagi kapan
+> saja dengan mengubah nilai flag jadi `True`.
+
 **Navigasi TAB TERPISAH via sidebar** (BARU — sebelumnya satu halaman
 panjang tanpa tab, sekarang diubah atas permintaan) — radio button di
 paling atas sidebar (`st.sidebar.radio()`, key `nav_pilihan_dashboard`)
