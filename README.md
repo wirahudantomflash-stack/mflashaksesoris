@@ -340,6 +340,27 @@ asli**: Total HPP LUNA Rp 144.239.239, Omzet Rp 312.339.760, Margin
 data). Compile bersih, tidak ada duplikasi key, section terverifikasi
 cuma ada sekali (di lokasi baru saja).
 
+**🔀 "Kepatuhan Bundling Aksesoris pada Transaksi Service" dipindah dari
+Dashboard Pembelian ke Dashboard Penjualan** — dari `render_pembelian_tab()`
+ke `render_aksesoris_tab()`, ditempatkan tepat setelah "Total HPP Aksesoris
+LUNA" yang sudah dipindah sebelumnya, sebelum "Katalog Referensi Harga
+LUNA". Dependency LEBIH RUMIT dari pemindahan sebelumnya karena section
+ini butuh DUA dataframe sekaligus: `df_re` (SEMUA kategori barang, untuk
+tahu isi lengkap nota Service) diganti `df_semua_kategori` (variabel
+setara yang sudah tersedia di `render_aksesoris_tab()`, disimpan sebelum
+difilter AKSESORIS), dan `df_aks_jual` (AKSESORIS saja) diganti `df`.
+Variabel turunannya (`df_re_bund`→`df_semua_kategori_bund`,
+`df_aks_jual_bund`→`df_bund`) disesuaikan mengikuti pola yang sama. 7 key
+widget diganti prefix `pb_`→`ak_`, diverifikasi tidak bentrok. Judul
+section diganti dari `st.markdown("###### ...")` (sub-subheader kecil)
+jadi `st.header("📋 ...")` (setara section-section lain di lokasi baru).
+**Diuji dengan data asli** (Samurai 39): Total Nota Service 17.743, Ada
+Bundling LUNA 5.894, Tanpa Bundling 4.202, Porsi Tanpa Bundling per
+Cabang 18 baris (Jatibening tertinggi 52,5%) — semua fungsi
+(`analisa_bundling_brand()`, `analisa_bundling_per_cabang()`) berjalan
+sukses dengan variabel dataframe hasil rename. Compile bersih, tidak ada
+duplikasi key, section terverifikasi cuma ada sekali di file.
+
 ## 📌 Ringkasan Eksekutif (paling atas halaman)
 
 Bagian ringkas gaya kartu di paling atas halaman, sebelum ketiga dashboard
