@@ -3150,6 +3150,85 @@ def render_pembelian_tab():
 
     st.divider()
 
+    st.subheader("💧 Scoreboard Pembelian Hydrogel per Cabang (LUNA & Vivan)")
+    st.caption(
+        "Mencakup SEMUA produk yang nama barangnya mengandung kata \"Hydrogel\" — tidak dibatasi "
+        "ke satu pemasok, karena Hydrogel dibeli dari pemasok LUNA maupun pemasok lain (mis. "
+        "PT. Wook Global Technology untuk Vivan)."
+    )
+    score_hydrogel = lb.scoreboard_cabang_produk_keyword(df_pembelian, keyword="HYDROGEL")
+    if score_hydrogel.empty:
+        st.info("Tidak ada data pembelian Hydrogel.")
+    else:
+        total_pembelian_hydrogel = score_hydrogel["Omzet Pembelian"].sum()
+        total_pembelian_aksesoris = df_pembelian["Total Harga"].sum()
+        persen_hydrogel = (total_pembelian_hydrogel / total_pembelian_aksesoris * 100) if total_pembelian_aksesoris else 0
+
+        hd1, hd2 = st.columns(2)
+        hd1.metric("1️⃣ Total Pembelian Hydrogel — Seluruh Cabang", la.format_rupiah_id(total_pembelian_hydrogel))
+        hd2.metric("3️⃣ % Pembelian Hydrogel dari Total Aksesoris", la.format_percent_id(persen_hydrogel))
+
+        st.markdown("**2️⃣ Total Pembelian Hydrogel per Cabang**")
+        score_hydrogel_dgn_total = lb.tambah_baris_total_scoreboard(score_hydrogel)
+        tampil_hydrogel = score_hydrogel_dgn_total.copy()
+        tampil_hydrogel["Omzet Pembelian"] = score_hydrogel_dgn_total["Omzet Pembelian"].map(la.format_rupiah_id)
+        tampil_hydrogel["Kuantitas"] = score_hydrogel_dgn_total["Kuantitas"].map(la.format_int_id)
+        st.dataframe(tampil_hydrogel, use_container_width=True, height=min(80 + 38 * len(score_hydrogel_dgn_total), 650))
+        st.download_button(
+            "⬇️ Unduh CSV — Scoreboard Pembelian Hydrogel per Cabang", score_hydrogel_dgn_total.to_csv(index=False).encode("utf-8-sig"),
+            "scoreboard_pembelian_hydrogel_cabang.csv", "text/csv", key="pb_dl_score_hydrogel",
+        )
+
+        st.markdown("**4️⃣5️⃣ Total HPP & Gross Profit Hydrogel — Seluruh Cabang (dari Faktur Penjualan)**")
+        st.caption(
+            "Beda sumber dari 3 metrik di atas (yang dari Faktur Pembelian ke pemasok) — ini modal "
+            "& laba dari Hydrogel yang SUDAH TERJUAL ke konsumen."
+        )
+        if df_aks_jual is None:
+            st.info("Unggah data Penjualan di panel kiri untuk melihat HPP & Gross Profit Hydrogel.")
+        else:
+            gunakan_filter_periode_hydrogel = st.checkbox(
+                "Batasi ke periode tertentu (kosongkan untuk SELURUH data)", value=False, key="pb_hydrogel_gunakan_filter",
+            )
+            if not gunakan_filter_periode_hydrogel:
+                tgl_mulai_hydrogel = df_aks_jual["TGL FAKTUR"].min()
+                tgl_selesai_hydrogel = df_aks_jual["TGL FAKTUR"].max()
+                st.caption(f"Periode: SELURUH data — {tgl_mulai_hydrogel.strftime('%d %b %Y')} – {tgl_selesai_hydrogel.strftime('%d %b %Y')}.")
+            else:
+                mode_periode_hydrogel = st.radio(
+                    "Jenis Periode", ["Periode Samurai (Kuartalan)", "Program Custom (1–12 Bulan)"],
+                    horizontal=True, key="pb_hydrogel_mode_periode",
+                )
+                periode_samurai_hydrogel_opsi = [
+                    "Samurai 39 (Jul–Sep 2026)", "Samurai 40 (Okt–Des 2026)", "Samurai 41 (Jan–Mar 2027)",
+                    "Samurai 42 (Apr–Jun 2027)", "Samurai 43 (Jul–Sep 2027)", "Samurai 44 (Okt–Des 2027)",
+                ]
+                if mode_periode_hydrogel == "Periode Samurai (Kuartalan)":
+                    periode_pilihan_hydrogel = st.selectbox("Pilih Periode Samurai", periode_samurai_hydrogel_opsi, key="pb_hydrogel_periode_samurai")
+                    tgl_mulai_hydrogel, tgl_selesai_hydrogel = la.PERIODE_SAMURAI[periode_pilihan_hydrogel]
+                    st.caption(f"Periode: {tgl_mulai_hydrogel.strftime('%d %b %Y')} – {tgl_selesai_hydrogel.strftime('%d %b %Y')} (3 bulan).")
+                else:
+                    hy1, hy2 = st.columns(2)
+                    with hy1:
+                        tgl_mulai_hydrogel = pd.Timestamp(st.date_input("Mulai Program", value=pd.Timestamp("2026-08-20"), key="pb_hydrogel_mulai"))
+                    with hy2:
+                        durasi_hydrogel = st.slider("Durasi Program (bulan)", min_value=1, max_value=12, value=3, key="pb_hydrogel_durasi")
+                    tgl_selesai_hydrogel = tgl_mulai_hydrogel + pd.DateOffset(months=int(durasi_hydrogel)) - pd.Timedelta(days=1)
+                    st.caption(f"Periode: {tgl_mulai_hydrogel.strftime('%d %b %Y')} – {tgl_selesai_hydrogel.strftime('%d %b %Y')} ({durasi_hydrogel} bulan).")
+
+            df_aks_jual_hydrogel = df_aks_jual[
+                (df_aks_jual["TGL FAKTUR"] >= tgl_mulai_hydrogel) & (df_aks_jual["TGL FAKTUR"] <= tgl_selesai_hydrogel)
+            ]
+            hpp_hydrogel = la.total_hpp_brand(df_aks_jual_hydrogel, keyword="HYDROGEL", keyword_kecuali=None)
+            hg1, hg2, hg3, hg4 = st.columns(4)
+            hg1.metric("4️⃣ Total HPP Hydrogel", la.format_rupiah_id(hpp_hydrogel["hpp"]))
+            hg2.metric("Total Omzet Hydrogel", la.format_rupiah_id(hpp_hydrogel["omzet"]))
+            hg3.metric("5️⃣ Total Gross Profit Hydrogel", la.format_rupiah_id(hpp_hydrogel["laba"]))
+            hg4.metric("Margin Hydrogel", la.format_percent_id(hpp_hydrogel["margin_persen"]))
+            st.caption(f"{la.format_int_id(hpp_hydrogel['qty_terjual'])} pcs terjual dari {la.format_int_id(hpp_hydrogel['jumlah_baris'])} baris transaksi.")
+
+    st.divider()
+
 # ---------------------------------------------------------------------------
 # Layout — TAB TERPISAH via sidebar radio (pilihan_dashboard): hanya
 # dashboard yang sedang dipilih yang dirender, bukan semuanya sekaligus

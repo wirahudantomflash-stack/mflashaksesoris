@@ -361,6 +361,49 @@ Cabang 18 baris (Jatibening tertinggi 52,5%) — semua fungsi
 sukses dengan variabel dataframe hasil rename. Compile bersih, tidak ada
 duplikasi key, section terverifikasi cuma ada sekali di file.
 
+**🆕 Scoreboard Pembelian Hydrogel per Cabang (LUNA & Vivan)** — section
+BARU di Dashboard Pembelian, ditempatkan setelah "Scoreboard Pembelian
+per Cabang — Pemasok LUNA" (mengikuti pola section itu sebagai
+template, sesuai permintaan pengguna). Fungsi baru
+`scoreboard_cabang_produk_keyword()` di `logic_pembelian.py` — BEDA dari
+`scoreboard_cabang_pemasok()` yang sudah ada (yang filter berdasar SATU
+nama pemasok), fungsi baru ini filter berdasar KEYWORD DI NAMA BARANG
+("HYDROGEL"), TIDAK dibatasi ke satu pemasok — karena Hydrogel dibeli
+dari pemasok LUNA maupun pemasok lain (mis. PT. Wook Global Technology
+untuk Vivan). **Diverifikasi**: semua produk Hydrogel di data yang ada
+memang hanya dari brand LUNA & Vivan (dicek manual, tidak ada brand
+Hydrogel lain), jadi keyword generik "HYDROGEL" sudah cukup tanpa perlu
+filter brand eksplisit.
+
+5 metrik yang diminta:
+1. **Total Pembelian Hydrogel — Seluruh Cabang** (kartu metrik)
+2. **Total Pembelian Hydrogel per Cabang** (tabel scoreboard + baris
+   TOTAL, pakai `tambah_baris_total_scoreboard()` yang sudah ada)
+3. **% Pembelian Hydrogel dari Total Aksesoris** (Total Hydrogel ÷ Total
+   Pembelian Aksesoris keseluruhan × 100 — `load_pembelian()` sudah
+   memfilter ke kategori AKSESORIS saja, jadi pembaginya sudah tepat)
+4. **Total HPP Hydrogel — Seluruh Cabang**
+5. **Total Gross Profit Hydrogel — Seluruh Cabang**
+
+Poin 4–5 BEDA SUMBER dari poin 1–3 — dihitung dari data PENJUALAN
+(`la.total_hpp_brand(df_aks_jual, keyword="HYDROGEL")`, fungsi yang
+sudah ada), bukan Pembelian, karena HPP/Gross Profit itu konsepnya
+"modal & laba dari barang yang SUDAH TERJUAL", bukan dari yang dibeli
+ke pemasok — pola yang sama seperti "Total HPP Aksesoris LUNA"
+sebelumnya. Dilengkapi filter periode yang sama (checkbox "Batasi ke
+periode tertentu" + radio Samurai/Custom), default SELURUH data. 6 key
+widget baru (`pb_dl_score_hydrogel`, `pb_hydrogel_gunakan_filter`,
+`pb_hydrogel_mode_periode`, `pb_hydrogel_periode_samurai`,
+`pb_hydrogel_mulai`, `pb_hydrogel_durasi`), diverifikasi tidak bentrok.
+
+**Diuji dengan data asli**: Total Pembelian Hydrogel Rp 49.314.532
+(17 dari 18 cabang, tertinggi Radjiman Rp 7.617.532), persentase 4,28%
+dari total pembelian aksesoris; Total HPP Hydrogel Rp 203.714.887, Total
+Gross Profit Rp 694.917.368 (Omzet Rp 898.632.255, margin 77,3%) untuk
+seluruh periode data — diverifikasi independen dengan filter manual
+langsung dari `NAMA BARANG` mengandung "HYDROGEL", hasilnya cocok
+persis di kedua sisi (pembelian & penjualan).
+
 ## 📌 Ringkasan Eksekutif (paling atas halaman)
 
 Bagian ringkas gaya kartu di paling atas halaman, sebelum ketiga dashboard

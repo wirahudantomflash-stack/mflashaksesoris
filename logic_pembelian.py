@@ -205,6 +205,29 @@ def scoreboard_cabang_pemasok(df: pd.DataFrame, supplier_key: str = "LUNA") -> p
     return g[cols]
 
 
+def scoreboard_cabang_produk_keyword(df: pd.DataFrame, keyword: str = "HYDROGEL") -> pd.DataFrame:
+    """Scoreboard pembelian untuk produk yang NAMA BARANG-nya mengandung
+    keyword tertentu (default: HYDROGEL — mencakup SEMUA brand yang punya
+    kata itu di nama produk, mis. LUNA Hydrogel & Vivan Hydrogel sekaligus,
+    TIDAK dibatasi ke satu pemasok seperti `scoreboard_cabang_pemasok()`),
+    per cabang — Omzet Pembelian, Kuantitas, dan Tanggal Pembelian
+    Terakhir. Diurutkan dari Omzet Pembelian TERBESAR ke terkecil."""
+    cols = ["Cabang", "Omzet Pembelian", "Kuantitas", "Tanggal Pembelian Terakhir"]
+    mask = df["NAMA_BARANG_NORM"].str.contains(keyword.upper(), na=False)
+    df_keyword = df[mask]
+    if df_keyword.empty:
+        return pd.DataFrame(columns=cols)
+
+    g = df_keyword.groupby("CABANG").agg(
+        **{"Omzet Pembelian": ("Total Harga", "sum")},
+        Kuantitas=("Kuantitas", "sum"),
+        **{"Tanggal Pembelian Terakhir": ("Tanggal", "max")},
+    ).reset_index().rename(columns={"CABANG": "Cabang"})
+    g["Tanggal Pembelian Terakhir"] = g["Tanggal Pembelian Terakhir"].dt.strftime("%Y-%m-%d")
+    g = g.sort_values("Omzet Pembelian", ascending=False).reset_index(drop=True)
+    return g[cols]
+
+
 def tambah_baris_total_scoreboard(df_scoreboard: pd.DataFrame, label: str = "TOTAL SELURUH CABANG") -> pd.DataFrame:
     """Tambahkan baris rekapan TOTAL di paling bawah scoreboard pembelian
     per cabang (skema kolom `scoreboard_cabang_pemasok()`) — Omzet
