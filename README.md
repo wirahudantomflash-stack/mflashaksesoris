@@ -358,6 +358,56 @@ INSENTIF tetap harus mengecualikan Hydrogel** seperti sebelumnya.
   tidak ada omzet yang hilang/dobel, cuma PROPORSI antara kedua
   kelompok yang berubah.
 
+**🔀 "Scoreboard Penjualan per Cabang" — kolom diganti nama + kolom baru
++ baris Total** — permintaan lanjutan pengguna, 3 perubahan sekaligus
+pada `scoreboard_cabang_aksesoris()`:
+
+1. **Kolom "Total Omzet" diganti nama jadi "Pencapaian Omzet"** — nilai
+   & rumusnya TIDAK berubah (tetap Omzet Tertarget + Omzet Non
+   Tertarget), cuma label kolomnya. SEMUA referensi ke nama kolom lama
+   di `app.py` diperbarui mengikuti (metric ringkasan, formatting
+   tabel, filter "Margin Cabang di Bawah 40%") — diverifikasi dengan
+   grep menyeluruh, tidak ada referensi `"Total Omzet"` tersisa yang
+   terkait dataframe ini (2 referensi LAIN yang masih memakai nama itu
+   — baris kontribusi cabang `kc`/`kc_re` — dataframe BERBEDA, sengaja
+   TIDAK diubah).
+2. **Kolom baru "Target Kejar Per Hari"** untuk setiap baris cabang —
+   formula & pola SAMA dengan yang sudah ada di "Monitoring Pencapaian
+   per Cabang" (`target_brand_per_cabang()`), supaya konsisten:
+   `max(Target - Pencapaian Omzet, 0) / Sisa Hari`. "Sisa Hari" dihitung
+   dari tanggal acuan (TGL FAKTUR paling akhir pada SELURUH data, bukan
+   cuma yang sudah difilter periode) sampai akhir periode — BUKAN dari
+   tanggal hari ini, supaya tetap akurat kalau periode yang dipilih ada
+   di masa lalu/depan relatif terhadap data yang diunggah. Cabang yang
+   sudah melampaui target (mis. Cinere 118,7%) otomatis dapat 0 (clip),
+   bukan angka negatif yang membingungkan.
+3. **Baris "TOTAL JARINGAN"** di paling bawah tabel — fungsi baru
+   `tambah_baris_total_scoreboard_aksesoris()`. Kolom Rp (Omzet
+   Tertarget, Omzet Non Tertarget, Pencapaian Omzet, Laba, Target,
+   Rata-rata Omzet/Hari, Target Kejar Per Hari) DIJUMLAHKAN dari seluruh
+   cabang; kolom % (Margin, % Pencapaian) DIHITUNG ULANG dari RASIO
+   TOTAL (Total Laba/Total Pencapaian Omzet, Total Pencapaian
+   Omzet/Total Target) — BUKAN rata-rata sederhana antar cabang, supaya
+   tetap akurat secara matematis kalau omzet antar cabang timpang.
+   **PENTING — variabel `scoreboard` (tanpa baris total) DIPERTAHANKAN
+   terpisah** dari `scoreboard_dgn_total` (dengan baris total): baris
+   "TOTAL JARINGAN" HANYA muncul di tabel & unduhan CSV, TIDAK ikut
+   bocor ke chart "Rata-rata Penjualan per Hari per Cabang" maupun
+   filter "Monitoring Margin Cabang di Bawah 40%" yang memakai
+   `scoreboard` mentah di bagian SETELAHNYA dalam fungsi yang sama —
+   pola yang sama seperti pemisahan `score_cabang_luna` vs
+   `score_cabang_luna_dgn_total` yang sudah ada sebelumnya di Dashboard
+   Pembelian.
+
+**Diuji dengan data asli** (Samurai 39, Jul–Sep 2026): 18 baris cabang +
+1 baris TOTAL JARINGAN. Target Kejar Per Hari terverifikasi benar
+(Cinere sudah 118,7% pencapaian → Rp0/hari; Pejaten 12% pencapaian →
+Rp12.219.970/hari — proporsional dengan gap masing-masing). Baris TOTAL
+JARINGAN: Omzet Tertarget Rp234.719.732, Pencapaian Omzet
+Rp1.421.066.473, Margin 38,59%, % Pencapaian 40,60% — SEMUA kolom
+diverifikasi cocok persis dengan penjumlahan/rasio manual independen
+dari 18 baris cabang. Kasus tepi data kosong tertangani (tidak error).
+
 **🔀 "Total HPP Aksesoris LUNA (dari Faktur Penjualan)" dipindah dari
 Dashboard Pembelian ke Dashboard Penjualan** — dari `render_pembelian_tab()`
 ke `render_aksesoris_tab()`, ditempatkan setelah "Perbandingan Penjualan

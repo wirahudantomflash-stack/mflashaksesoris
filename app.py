@@ -1110,7 +1110,7 @@ def render_dashboard_scoreboard_aksesoris():
     if scoreboard.empty:
         st.info("Tidak ada data penjualan aksesoris pada periode ini.")
     else:
-        total_omzet_dsb = scoreboard["Total Omzet"].sum()
+        total_omzet_dsb = scoreboard["Pencapaian Omzet"].sum()
         total_target_dsb_aktual = scoreboard["Target"].sum()
         total_laba_dsb = scoreboard["Laba"].sum()
         m1, m2, m3, m4 = st.columns(4)
@@ -1120,18 +1120,19 @@ def render_dashboard_scoreboard_aksesoris():
         m4.metric("Margin Jaringan", la.format_percent_id(total_laba_dsb / total_omzet_dsb * 100 if total_omzet_dsb else 0))
 
         st.markdown("##### 2️⃣ Scoreboard Penjualan per Cabang (Omzet Tertinggi → Terendah)")
-        st.caption("Warna indikator % Pencapaian: 🔴 <85% · 🟡 85–99% · 🟢 ≥100%.")
-        styled_scoreboard = scoreboard.style.map(
+        st.caption("Warna indikator % Pencapaian: 🔴 <85% · 🟡 85–99% · 🟢 ≥100%. Baris \"TOTAL JARINGAN\" di paling bawah — Margin & % Pencapaian dihitung ulang dari rasio total, bukan rata-rata sederhana antar cabang.")
+        scoreboard_dgn_total = la.tambah_baris_total_scoreboard_aksesoris(scoreboard)
+        styled_scoreboard = scoreboard_dgn_total.style.map(
             la.warna_indikator_pencapaian, subset=["% Pencapaian"],
         ).format({
             "Omzet Tertarget": la.format_rupiah_id, "Omzet Non Tertarget": la.format_rupiah_id,
-            "Total Omzet": la.format_rupiah_id, "Laba": la.format_rupiah_id, "Margin (%)": la.format_percent_id,
+            "Pencapaian Omzet": la.format_rupiah_id, "Laba": la.format_rupiah_id, "Margin (%)": la.format_percent_id,
             "Target": la.format_rupiah_id, "% Pencapaian": la.format_percent_id,
-            "Rata-rata Omzet / Hari": la.format_rupiah_id,
+            "Rata-rata Omzet / Hari": la.format_rupiah_id, "Target Kejar Per Hari": la.format_rupiah_id,
         })
         st.dataframe(styled_scoreboard, use_container_width=True, height=650)
         st.download_button(
-            "⬇️ Unduh CSV — Scoreboard Penjualan per Cabang", scoreboard.to_csv(index=False).encode("utf-8-sig"),
+            "⬇️ Unduh CSV — Scoreboard Penjualan per Cabang", scoreboard_dgn_total.to_csv(index=False).encode("utf-8-sig"),
             "scoreboard_penjualan_aksesoris.csv", "text/csv", key="dsb_dl_scoreboard",
         )
 
@@ -1157,8 +1158,8 @@ def render_dashboard_scoreboard_aksesoris():
             st.success("✅ Semua cabang sudah bermargin ≥ 40% pada periode ini.")
         else:
             st.warning(f"⚠️ {len(margin_rendah)} dari {len(scoreboard)} cabang bermargin di bawah 40%.")
-            tampil_margin = margin_rendah[["Cabang", "Total Omzet", "Laba", "Margin (%)"]].copy()
-            tampil_margin["Total Omzet"] = margin_rendah["Total Omzet"].map(la.format_rupiah_id)
+            tampil_margin = margin_rendah[["Cabang", "Pencapaian Omzet", "Laba", "Margin (%)"]].copy()
+            tampil_margin["Pencapaian Omzet"] = margin_rendah["Pencapaian Omzet"].map(la.format_rupiah_id)
             tampil_margin["Laba"] = margin_rendah["Laba"].map(la.format_rupiah_id)
             tampil_margin["Margin (%)"] = margin_rendah["Margin (%)"].map(la.format_percent_id)
             st.dataframe(tampil_margin, use_container_width=True, height=min(80 + 38 * len(margin_rendah), 400))

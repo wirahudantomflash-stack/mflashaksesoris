@@ -1570,9 +1570,10 @@ def scoreboard_cabang_aksesoris(
     target_per_cabang: dict | None = None,
 ) -> pd.DataFrame:
     """Scoreboard penjualan Aksesoris (Tertarget + Non Tertarget digabung)
-    per cabang untuk satu periode — diurutkan dari Total Omzet TERTINGGI ke
-    TERENDAH. Kolom: Cabang, Omzet Tertarget, Omzet Non Tertarget, Total
-    Omzet, Laba, Margin (%), Target, % Pencapaian, Rata-rata Omzet/Hari.
+    per cabang untuk satu periode — diurutkan dari Pencapaian Omzet
+    TERTINGGI ke TERENDAH. Kolom: Cabang, Omzet Tertarget, Omzet Non
+    Tertarget, Pencapaian Omzet, Laba, Margin (%), Target, % Pencapaian,
+    Rata-rata Omzet/Hari, Target Kejar Per Hari.
 
     "Omzet Tertarget" di sini = SELURUH produk LUNA, TERMASUK Hydrogel
     (BEDA dari `split_tertarget_non_tertarget()` yang dipakai di tempat
@@ -1590,15 +1591,30 @@ def scoreboard_cabang_aksesoris(
     jumlah cabang), atau pakai `target_per_cabang` (dict) untuk distribusi
     tidak rata. "Rata-rata Omzet/Hari" dihitung dari jumlah HARI dalam
     periode (tanggal_selesai - tanggal_mulai + 1), bukan cuma hari yang
-    ada transaksinya — supaya representatif sebagai target harian ke depan."""
-    cols = ["Cabang", "Omzet Tertarget", "Omzet Non Tertarget", "Total Omzet", "Laba",
-            "Margin (%)", "Target", "% Pencapaian", "Rata-rata Omzet / Hari"]
+    ada transaksinya — supaya representatif sebagai target harian ke depan.
+
+    "Target Kejar Per Hari" = sisa target yang belum tercapai (Target -
+    Pencapaian Omzet, di-clip minimal 0) dibagi SISA HARI periode —
+    formula & pola yang SAMA dengan `target_brand_per_cabang()` (supaya
+    konsisten dengan bagian "Monitoring Pencapaian per Cabang"). "Sisa
+    hari" dihitung dari tanggal acuan (TGL FAKTUR paling akhir pada
+    `df_aksesoris` KESELURUHAN — bukan cuma yang sudah difilter periode)
+    sampai `tanggal_selesai`, BUKAN dari tanggal hari ini — supaya tetap
+    akurat kalau periode yang dipilih ada di masa lalu/depan relatif
+    terhadap data yang diunggah."""
+    cols = ["Cabang", "Omzet Tertarget", "Omzet Non Tertarget", "Pencapaian Omzet", "Laba",
+            "Margin (%)", "Target", "% Pencapaian", "Rata-rata Omzet / Hari", "Target Kejar Per Hari"]
     if df_aksesoris.empty:
         return pd.DataFrame(columns=cols)
 
     tanggal_mulai = pd.Timestamp(tanggal_mulai)
     tanggal_selesai = pd.Timestamp(tanggal_selesai)
     total_hari = max((tanggal_selesai - tanggal_mulai).days + 1, 1)
+
+    tgl_acuan = df_aksesoris["TGL FAKTUR"].max()
+    tgl_efektif = min(tgl_acuan, tanggal_selesai)
+    hari_berjalan = max((tgl_efektif - tanggal_mulai).days + 1, 0)
+    sisa_hari = max(total_hari - hari_berjalan, 0)
 
     df_periode = df_aksesoris[(df_aksesoris["TGL FAKTUR"] >= tanggal_mulai) & (df_aksesoris["TGL FAKTUR"] <= tanggal_selesai)]
     # Tertarget = SELURUH LUNA (termasuk Hydrogel) — lihat catatan di
@@ -1624,20 +1640,47 @@ def scoreboard_cabang_aksesoris(
 
         omzet_t = float(omzet_tertarget_cb.get(cabang, 0))
         omzet_nt = float(omzet_non_tertarget_cb.get(cabang, 0))
-        total_omzet = omzet_t + omzet_nt
+        pencapaian_omzet = omzet_t + omzet_nt
         laba = float(laba_cb.get(cabang, 0))
-        margin = (laba / total_omzet * 100) if total_omzet else 0
-        pct = (total_omzet / target_cabang * 100) if target_cabang else 0
-        rata2_hari = total_omzet / total_hari
+        margin = (laba / pencapaian_omzet * 100) if pencapaian_omzet else 0
+        pct = (pencapaian_omzet / target_cabang * 100) if target_cabang else 0
+        rata2_hari = pencapaian_omzet / total_hari
+        target_kejar_per_hari = (max(target_cabang - pencapaian_omzet, 0) / sisa_hari) if sisa_hari else 0
 
         rows.append({
             "Cabang": cabang, "Omzet Tertarget": omzet_t, "Omzet Non Tertarget": omzet_nt,
-            "Total Omzet": total_omzet, "Laba": laba, "Margin (%)": margin,
+            "Pencapaian Omzet": pencapaian_omzet, "Laba": laba, "Margin (%)": margin,
             "Target": target_cabang, "% Pencapaian": pct, "Rata-rata Omzet / Hari": rata2_hari,
+            "Target Kejar Per Hari": target_kejar_per_hari,
         })
 
     out = pd.DataFrame(rows, columns=cols)
-    return out.sort_values("Total Omzet", ascending=False).reset_index(drop=True)
+    return out.sort_values("Pencapaian Omzet", ascending=False).reset_index(drop=True)
+
+
+def tambah_baris_total_scoreboard_aksesoris(scoreboard: pd.DataFrame, label: str = "TOTAL JARINGAN") -> pd.DataFrame:
+    """Tambahkan baris rekapan TOTAL di paling bawah `scoreboard_cabang_aksesoris()`
+    — kolom Rp/Qty dijumlahkan dari seluruh cabang, kolom % (Margin,
+    % Pencapaian) DIHITUNG ULANG dari rasio TOTAL (bukan rata-rata
+    sederhana antar cabang, supaya tetap akurat secara matematis — kalau
+    omzet antar cabang timpang, rata-rata sederhana bisa menyesatkan)."""
+    if scoreboard.empty:
+        return scoreboard
+
+    total = {"Cabang": label}
+    kolom_jumlah = [
+        "Omzet Tertarget", "Omzet Non Tertarget", "Pencapaian Omzet", "Laba",
+        "Target", "Rata-rata Omzet / Hari",
+    ]
+    for c in kolom_jumlah:
+        total[c] = scoreboard[c].sum()
+
+    total["Margin (%)"] = (total["Laba"] / total["Pencapaian Omzet"] * 100) if total["Pencapaian Omzet"] else 0
+    total["% Pencapaian"] = (total["Pencapaian Omzet"] / total["Target"] * 100) if total["Target"] else 0
+    total["Target Kejar Per Hari"] = scoreboard["Target Kejar Per Hari"].sum()
+
+    baris_total = pd.DataFrame([total])[scoreboard.columns]
+    return pd.concat([scoreboard, baris_total], ignore_index=True)
 
 
 def produk_terlaris_aksesoris_scoreboard(df_aksesoris: pd.DataFrame, tanggal_mulai, tanggal_selesai) -> pd.DataFrame:
