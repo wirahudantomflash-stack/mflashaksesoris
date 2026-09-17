@@ -1574,6 +1574,18 @@ def scoreboard_cabang_aksesoris(
     TERENDAH. Kolom: Cabang, Omzet Tertarget, Omzet Non Tertarget, Total
     Omzet, Laba, Margin (%), Target, % Pencapaian, Rata-rata Omzet/Hari.
 
+    "Omzet Tertarget" di sini = SELURUH produk LUNA, TERMASUK Hydrogel
+    (BEDA dari `split_tertarget_non_tertarget()` yang dipakai di tempat
+    lain — di situ Hydrogel dikecualikan dari Tertarget karena skema
+    insentifnya beda). Perbedaan ini SENGAJA khusus untuk scoreboard ini
+    atas permintaan pengguna: Omzet Tertarget di scoreboard mencerminkan
+    total penjualan LUNA (untuk pelaporan omzet), sementara perhitungan
+    INSENTIF (Matrix Insentif Per Item/Pekanan/Manager) tetap independen
+    — matrix insentif adalah tabel referensi statis yang sudah punya
+    pengecualian Hydrogel sendiri (`INSENTIF_HYDROGEL_PER_PCS`), TIDAK
+    bergantung pada fungsi split manapun, jadi tidak terpengaruh
+    perubahan ini.
+
     Target dibagi RATA ke seluruh cabang secara default (target_total /
     jumlah cabang), atau pakai `target_per_cabang` (dict) untuk distribusi
     tidak rata. "Rata-rata Omzet/Hari" dihitung dari jumlah HARI dalam
@@ -1589,7 +1601,12 @@ def scoreboard_cabang_aksesoris(
     total_hari = max((tanggal_selesai - tanggal_mulai).days + 1, 1)
 
     df_periode = df_aksesoris[(df_aksesoris["TGL FAKTUR"] >= tanggal_mulai) & (df_aksesoris["TGL FAKTUR"] <= tanggal_selesai)]
-    df_tertarget, df_non_tertarget = split_tertarget_non_tertarget(df_periode)
+    # Tertarget = SELURUH LUNA (termasuk Hydrogel) — lihat catatan di
+    # docstring soal perbedaan dari split_tertarget_non_tertarget().
+    nama_upper = df_periode["NAMA BARANG"].astype(str).str.upper()
+    mask_tertarget = nama_upper.str.contains("LUNA", na=False)
+    df_tertarget = df_periode[mask_tertarget]
+    df_non_tertarget = df_periode[~mask_tertarget]
 
     semua_cabang = sorted(df_aksesoris["CABANG"].dropna().unique().tolist())
     n_cabang = len(semua_cabang) or 1

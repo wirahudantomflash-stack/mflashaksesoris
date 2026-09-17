@@ -1070,11 +1070,14 @@ def render_dashboard_scoreboard_aksesoris():
     # -----------------------------------------------------------------
     st.header("🏆 Dashboard & Scoreboard Penjualan Aksesoris")
     st.caption(
-        "**Aksesoris Tertarget** = LUNA KECUALI Hydrogel · **Aksesoris Non Tertarget** = Selain LUNA "
-        "(termasuk LUNA Hydrogel). Parfum tidak disertakan di bagian ini. **PENTING: kolom \"Total "
-        "Omzet\" = Omzet Tertarget + Omzet Non Tertarget, jadi SUDAH MENCAKUP SELURUH penjualan "
-        "Hydrogel (baik bermerek LUNA maupun brand lain seperti Vivan) — tidak ada pengecualian "
-        "apa pun pada angka Total Omzet, meski istilah \"Tertarget\" sendiri mengecualikan Hydrogel.**"
+        "**Aksesoris Tertarget** = SELURUH produk LUNA, **TERMASUK Hydrogel** · **Aksesoris Non "
+        "Tertarget** = Selain LUNA (brand lain, termasuk Hydrogel brand lain seperti Vivan). Parfum "
+        "tidak disertakan di bagian ini. Definisi ini KHUSUS untuk bagian ini — beda dari istilah "
+        "\"Tertarget\" di bagian lain dashboard (mis. Target Pencapaian, Matrix Insentif) yang "
+        "MENGECUALIKAN Hydrogel dari LUNA, karena Hydrogel punya skema insentif tersendiri "
+        "(Rp10.000/pcs flat). **Perhitungan Insentif TIDAK terpengaruh** oleh definisi Omzet "
+        "Tertarget di sini — Matrix Insentif adalah tabel referensi independen yang sudah punya "
+        "pengecualian Hydrogel sendiri."
     )
 
     periode_dsb_opsi = list(la.PERIODE_SAMURAI.keys())

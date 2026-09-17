@@ -317,6 +317,47 @@ sama lain).
   LAMA-nya sudah dihapus total dari `render_aksesoris_tab()`, bukan
   disalin).
 
+**🔀 "Omzet Tertarget" di Dashboard & Scoreboard SEKARANG MENCAKUP
+Hydrogel** — permintaan lanjutan pengguna: sebelumnya kolom "Omzet
+Tertarget" di scoreboard ini memakai definisi yang SAMA dengan bagian
+lain dashboard (LUNA KECUALI Hydrogel, via `split_tertarget_non_tertarget()`).
+Pengguna klarifikasi: Omzet Tertarget di scoreboard ini INGIN mencakup
+Hydrogel (untuk pelaporan omzet penjualan), **NAMUN perhitungan
+INSENTIF tetap harus mengecualikan Hydrogel** seperti sebelumnya.
+
+- **Diselidiki dulu**: dicek apakah "Omzet Tertarget" dari scoreboard
+  ini dipakai sebagai INPUT ke perhitungan insentif manapun —
+  ditemukan TIDAK: Matrix Insentif (Per Item, Pekanan, Manager) adalah
+  TABEL REFERENSI STATIS (`_MATRIX_PER_ITEM_RAW`, dll — hardcoded, bukan
+  dihitung dari data transaksi), dan sudah punya pengecualian Hydrogel
+  SENDIRI (`INSENTIF_HYDROGEL_PER_PCS`, insentif flat Rp10.000/pcs
+  berapa pun harga jualnya) — TIDAK bergantung pada
+  `split_tertarget_non_tertarget()` atau kolom "Omzet Tertarget" scoreboard
+  sama sekali. `simulasi_insentif()` juga menerima input generik
+  (`penjualan_harian_list`), bukan otomatis dari data Tertarget. Jadi
+  perubahan definisi di scoreboard ini AMAN dilakukan tanpa
+  mempengaruhi insentif — keduanya memang sudah independen secara
+  struktural sejak awal.
+- **Perubahan**: `scoreboard_cabang_aksesoris()` di `logic_aksesoris.py`
+  diubah — TIDAK lagi memanggil `split_tertarget_non_tertarget()`
+  (fungsi global yang TETAP dipakai apa adanya di tempat lain, TIDAK
+  diubah, supaya bagian lain dashboard yang masih mengandalkan definisi
+  lama tidak terpengaruh), diganti LOGIC INLINE khusus fungsi ini:
+  "Tertarget" = SELURUH produk yang namanya mengandung "LUNA" (TERMASUK
+  Hydrogel), "Non Tertarget" = sisanya (Selain LUNA, termasuk Hydrogel
+  brand lain seperti Vivan). Caption di UI diperbarui untuk menjelaskan
+  definisi baru INI KHUSUS untuk section ini, beda dari istilah
+  "Tertarget" di bagian lain dashboard.
+- **Diuji dengan data asli**: Omzet Tertarget naik dari Rp 308.068.232
+  (versi lama, exclude Hydrogel) jadi **Rp 362.487.232** (versi baru,
+  include Hydrogel) — selisih Rp 54.419.000 persis sebesar kontribusi
+  LUNA Hydrogel. Diverifikasi 2 cara: (1) cocok persis dengan hitungan
+  manual independen filter `NAMA BARANG` mengandung "LUNA" tanpa
+  pengecualian apa pun, (2) Total Omzet (Tertarget + Non Tertarget)
+  TETAP SAMA PERSIS dengan total data mentah tanpa split — membuktikan
+  tidak ada omzet yang hilang/dobel, cuma PROPORSI antara kedua
+  kelompok yang berubah.
+
 **🔀 "Total HPP Aksesoris LUNA (dari Faktur Penjualan)" dipindah dari
 Dashboard Pembelian ke Dashboard Penjualan** — dari `render_pembelian_tab()`
 ke `render_aksesoris_tab()`, ditempatkan setelah "Perbandingan Penjualan
