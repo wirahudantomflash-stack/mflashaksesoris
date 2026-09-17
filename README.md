@@ -1493,32 +1493,38 @@ tinggal disambungkan lagi ke `app.py`.
      sama dengan urutan kronologis untuk pekan 1–99 (lebih dari cukup
      untuk kebutuhan ini). Diverifikasi: `sorted(daftar_label) ==
      daftar_label_asli` bernilai `True` untuk seluruh 10 pekan data uji.
-   - **🔀 Diperbarui: grafik diganti jadi KUMULATIF (total berjalan)** —
-     permintaan lanjutan pengguna: grafik SEBELUMNYA menampilkan nilai
-     PER PEKAN (bisa naik-turun antar pekan, cocok untuk bandingkan
-     performa tiap pekan), TAPI yang dimaksud pengguna adalah grafik
-     TOTAL AKUMULASI dari pekan ke pekan (garis yang terus naik/rata,
-     mencerminkan total Omzet LUNA sejak pekan pertama sampai pekan
-     tsb) — BUKAN untuk membandingkan naik/turun antar pekan individual.
-     Kolom baru "Omzet LUNA Kumulatif" = `cumsum()` dari kolom "Omzet
-     LUNA" (yang sudah terurut kronologis oleh
-     `omzet_luna_mingguan_blok7()`), dipakai sebagai sumbu Y grafik
-     garis (judul diganti jadi "Omzet LUNA per Pekan — Kumulatif").
-     **Tabel di bawah grafik TETAP menampilkan kedua kolom** — "Omzet
-     LUNA" (nilai per pekan, untuk yang masih butuh lihat naik/turun
-     tiap pekan) DAN "Omzet LUNA Kumulatif" (kolom baru, konsisten
-     dengan apa yang ditampilkan grafik di atasnya). File CSV yang
-     diunduh TIDAK berubah (tetap kolom asli tanpa kumulatif — kolom
-     kumulatif itu murah dihitung ulang dari kolom "Omzet LUNA" kapan
-     saja, jadi tidak perlu disimpan permanen di file unduhan). **Diuji
-     dengan data asli**: 34 pekan (1 Jan–16 Sep 2026), kumulatif naik
-     monoton dari Rp210.000 (Pekan 01) sampai Rp362.487.232 (Pekan 37,
-     nomor pekan melompati beberapa yang kosong data) — diverifikasi
-     nilai kumulatif di pekan TERAKHIR PERSIS SAMA dengan
-     `sum()` seluruh kolom "Omzet LUNA" (pembuktian matematis bahwa
-     cumsum benar), dan seluruh 34 titik kumulatif TIDAK PERNAH turun
-     dari titik sebelumnya (monoton non-decreasing, sesuai sifat data
-     Omzet yang tidak pernah negatif).
+   - **🔀 Diperbarui — koreksi interpretasi: grafik jadi Perbandingan
+     Naik/Turun antar Pekan (WoW), BUKAN kumulatif** — permintaan
+     pengguna sempat DISALAHARTIKAN di iterasi sebelumnya sebagai
+     "grafik kumulatif/total berjalan" (`cumsum()`), lalu pengguna
+     mengoreksi dengan contoh konkret: *"misal Pekan 35 penjualan 10
+     juta dan Pekan 36 hanya 5 juta"* — maksudnya adalah perbandingan
+     EKSPLISIT naik/turun ANTAR PEKAN (week-over-week), bukan akumulasi.
+     Versi kumulatif DIBATALKAN, diganti dengan:
+     - Grafik kembali ke nilai Omzet PER PEKAN (bukan kumulatif) —
+       tapi sekarang titik pada garis diberi **warna kondisional**:
+       🟢 hijau kalau naik dari pekan sebelumnya, 🔴 merah kalau turun,
+       ⚪ abu-abu untuk pekan pertama (belum ada pembanding). Tooltip
+       saat hover menampilkan selisih Rupiah DAN persentase perubahan
+       vs pekan sebelumnya.
+     - **Kolom baru di tabel**: "Selisih vs Pekan Sebelumnya" (Rp,
+       dengan tanda +/-) dan "% Perubahan" (dengan tanda +/-) — dihitung
+       dari `.diff()` dan `.pct_change()` pada kolom "Omzet LUNA" yang
+       sudah terurut kronologis.
+     - **Kotak insight otomatis** di atas tabel: kartu hijau menyoroti
+       pekan dengan KENAIKAN terbesar, kartu merah menyoroti pekan
+       dengan PENURUNAN terbesar (keduanya dengan angka Rp & % persis),
+       supaya pengguna langsung tahu pekan mana yang paling perlu
+       diperhatikan tanpa scroll tabel manual.
+     File CSV unduhan TIDAK berubah (kolom asli saja — Selisih/%
+     Perubahan gampang dihitung ulang dari "Omzet LUNA", tidak perlu
+     disimpan permanen). **Diuji dengan data asli**: 34 pekan, 21 pekan
+     naik & 12 pekan turun (campuran, jadi warna hijau/merah benar-benar
+     terpakai di grafik) — kenaikan terbesar Pekan 35 (27 Ags–2 Sep,
+     +Rp12.969.500, +51,8%), penurunan terbesar Pekan 27 (2–8 Jul,
+     -Rp6.182.000, -37,9%). Selisih pekan terakhir (Pekan 37 vs 36)
+     diverifikasi cocok persis dengan hitungan manual independen
+     (`mingguan["Omzet LUNA"].iloc[-1] - mingguan["Omzet LUNA"].iloc[-2]`).
    - **Baru: Kontribusi Cabang per Pekan** — tabel pivot Cabang × Pekan
      (fungsi baru `omzet_luna_cabang_per_pekan_blok7()`) langsung di bawah
      grafik total, supaya terlihat CABANG MANA yang paling mendorong omzet

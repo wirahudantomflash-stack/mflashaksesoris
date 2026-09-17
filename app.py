@@ -1723,35 +1723,83 @@ def render_aksesoris_tab():
                         "omzet_luna_harian.csv", "text/csv", key="ak_dl_harian",
                     )
 
-            st.markdown("**Omzet LUNA per Pekan — Kumulatif (termasuk Hydrogel)**")
+            st.markdown("**Omzet LUNA per Pekan (termasuk Hydrogel) — Perbandingan Naik/Turun**")
             st.caption(
-                "Grafik menunjukkan TOTAL BERJALAN (kumulatif) dari pekan ke pekan — bukan nilai "
-                "per pekan yang bisa naik-turun, tapi akumulasi Omzet LUNA sejak pekan pertama "
-                "sampai pekan tsb. Untuk lihat naik/turun tiap pekan secara individual, cek kolom "
-                "\"Omzet LUNA\" (per pekan) di tabel di bawah grafik."
+                "Grafik menampilkan Omzet LUNA per pekan (nilai individual, bukan akumulasi), "
+                "supaya langsung terlihat pekan mana yang naik atau turun dibanding pekan "
+                "sebelumnya — mis. Pekan 35 Rp10jt lalu Pekan 36 cuma Rp5jt akan langsung terlihat "
+                "sebagai penurunan tajam. Titik hijau = naik dari pekan sebelumnya, titik merah = "
+                "turun, titik abu-abu = pekan pertama (tidak ada pembanding)."
             )
             chart_mgg = mingguan.copy()
-            chart_mgg["Omzet LUNA Kumulatif"] = chart_mgg["Omzet LUNA"].cumsum()
+            chart_mgg["Selisih"] = chart_mgg["Omzet LUNA"].diff()
+            chart_mgg["% Perubahan"] = chart_mgg["Omzet LUNA"].pct_change() * 100
+            chart_mgg["_arah"] = np.where(
+                chart_mgg["Selisih"].isna(), "⚪ Pekan Pertama",
+                np.where(chart_mgg["Selisih"] >= 0, "🟢 Naik", "🔴 Turun"),
+            )
             # Label di titik grafik dibuat ringkas (format jutaan) supaya tidak
             # berdempetan antar titik — tabel & unduhan CSV di bawah tetap
             # pakai format Rupiah lengkap seperti biasa.
-            chart_mgg["_label_chart"] = (chart_mgg["Omzet LUNA Kumulatif"] / 1_000_000).apply(lambda x: la.format_decimal_id(x, 1) + " jt")
-            chart_mgg["_label_rp"] = chart_mgg["Omzet LUNA Kumulatif"].apply(la.format_rupiah_id)
+            chart_mgg["_label_chart"] = (chart_mgg["Omzet LUNA"] / 1_000_000).apply(lambda x: la.format_decimal_id(x, 1) + " jt")
+            chart_mgg["_label_rp"] = chart_mgg["Omzet LUNA"].apply(la.format_rupiah_id)
+            chart_mgg["_label_selisih"] = chart_mgg.apply(
+                lambda r: "Pekan pertama (belum ada pembanding)" if pd.isna(r["Selisih"])
+                else f"{'+' if r['Selisih'] >= 0 else ''}{la.format_rupiah_id(r['Selisih'])} ({'+' if r['% Perubahan'] >= 0 else ''}{la.format_percent_id(r['% Perubahan'])})",
+                axis=1,
+            )
 
-            garis = alt.Chart(chart_mgg).mark_line(point=True, color="#378ADD").encode(
+            garis = alt.Chart(chart_mgg).mark_line(color="#378ADD").encode(
                 x=alt.X("Pekan:N", sort=chart_mgg["Pekan"].tolist(), title=None),
-                y=alt.Y("Omzet LUNA Kumulatif:Q", title="Omzet LUNA Kumulatif (Rp)"),
-                tooltip=[alt.Tooltip("Pekan:N"), alt.Tooltip("_label_rp:N", title="Omzet LUNA Kumulatif")],
+                y=alt.Y("Omzet LUNA:Q", title="Omzet LUNA (Rp)"),
+            )
+            titik = alt.Chart(chart_mgg).mark_point(size=90, filled=True).encode(
+                x=alt.X("Pekan:N", sort=chart_mgg["Pekan"].tolist()),
+                y=alt.Y("Omzet LUNA:Q"),
+                color=alt.Color(
+                    "_arah:N", title="Arah vs Pekan Sebelumnya",
+                    scale=alt.Scale(domain=["🟢 Naik", "🔴 Turun", "⚪ Pekan Pertama"], range=["#59A14F", "#E15759", "#B0B0B0"]),
+                ),
+                tooltip=[
+                    alt.Tooltip("Pekan:N"), alt.Tooltip("_label_rp:N", title="Omzet LUNA"),
+                    alt.Tooltip("_label_selisih:N", title="vs Pekan Sebelumnya"),
+                ],
             )
             label = alt.Chart(chart_mgg).mark_text(dy=-12, fontSize=11, color="#1F3864").encode(
                 x=alt.X("Pekan:N", sort=chart_mgg["Pekan"].tolist()),
-                y=alt.Y("Omzet LUNA Kumulatif:Q"),
+                y=alt.Y("Omzet LUNA:Q"),
                 text=alt.Text("_label_chart:N"),
             )
-            st.altair_chart((garis + label).properties(height=350), use_container_width=True)
+            st.altair_chart((garis + titik + label).properties(height=350), use_container_width=True)
+
+            # Kotak insight ringkas: pekan dengan kenaikan & penurunan TERBESAR
+            valid_perubahan = chart_mgg.dropna(subset=["Selisih"])
+            if not valid_perubahan.empty:
+                pekan_naik_max = valid_perubahan.loc[valid_perubahan["Selisih"].idxmax()]
+                pekan_turun_max = valid_perubahan.loc[valid_perubahan["Selisih"].idxmin()]
+                ins1, ins2 = st.columns(2)
+                with ins1:
+                    if pekan_naik_max["Selisih"] > 0:
+                        st.success(
+                            f"📈 Kenaikan terbesar: **{pekan_naik_max['Pekan']}** "
+                            f"(+{la.format_rupiah_id(pekan_naik_max['Selisih'])}, "
+                            f"+{la.format_percent_id(pekan_naik_max['% Perubahan'])})"
+                        )
+                with ins2:
+                    if pekan_turun_max["Selisih"] < 0:
+                        st.error(
+                            f"📉 Penurunan terbesar: **{pekan_turun_max['Pekan']}** "
+                            f"({la.format_rupiah_id(pekan_turun_max['Selisih'])}, "
+                            f"{la.format_percent_id(pekan_turun_max['% Perubahan'])})"
+                        )
 
             tampil_mgg = mingguan.copy()
-            tampil_mgg["Omzet LUNA Kumulatif"] = mingguan["Omzet LUNA"].cumsum().map(la.format_rupiah_id)
+            tampil_mgg["Selisih vs Pekan Sebelumnya"] = chart_mgg["Selisih"].apply(
+                lambda x: "—" if pd.isna(x) else ("+" if x >= 0 else "") + la.format_rupiah_id(x)
+            )
+            tampil_mgg["% Perubahan"] = chart_mgg["% Perubahan"].apply(
+                lambda x: "—" if pd.isna(x) else ("+" if x >= 0 else "") + la.format_percent_id(x)
+            )
             tampil_mgg["Omzet LUNA"] = mingguan["Omzet LUNA"].map(la.format_rupiah_id)
             tampil_mgg["Qty Terjual"] = mingguan["Qty Terjual"].map(la.format_int_id)
             st.dataframe(tampil_mgg, use_container_width=True, height=min(80 + 38 * len(mingguan), 400))
