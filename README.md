@@ -495,6 +495,119 @@ seluruh periode data — diverifikasi independen dengan filter manual
 langsung dari `NAMA BARANG` mengandung "HYDROGEL", hasilnya cocok
 persis di kedua sisi (pembelian & penjualan).
 
+## 🆕 "Simulasi Gaji & THP Sales Retail" (modul baru: `logic_insentif.py`)
+
+Section baru di Dashboard Penjualan (`render_aksesoris_tab()`), ditempatkan
+setelah "Matrix Insentif Aksesoris" (yang saat ini disembunyikan via
+`TAMPILKAN_MATRIX_INSENTIF`), sebelum "Target Pencapaian Penjualan
+Aksesoris". Mengacu ke berkas resmi yang diunggah pengguna,
+**"Rules_Insentif_Sales_Retail.xlsx"** (sheet "Gaji 2jt PAKAI"), berisi 3
+tabel: **SALES RETAIL** (dengan Gaji Pokok Rp2.600.000), **RETAIL — Teknisi/
+Magang/Affiliate/Sales Non Gaji** (tanpa gaji, % bonus lebih tinggi sebagai
+kompensasi), dan **CORP** (datanya terlihat belum lengkap/placeholder —
+**sengaja TIDAK dipakai**, dikonfirmasi pengguna).
+
+### Aturan resmi dari berkas
+Bonus Tier dihitung dari OMSET **Laptop + Aksesoris + Smartboard** digabung
+(satu angka), dicocokkan ke tabel bracket (8 tier: Rp25jt s/d Rp300jt),
+dikalikan % bonus tier tsb. Catatan di berkas: *"Insentif : LAPTOP,
+AKSESORIS, SMARTBOARD (BONUS HP 40rb, Laptop Gaming Diatur terpisah Rp
+350rb)"* — artinya Handphone dan "Laptop Gaming" punya skema bonus
+TERPISAH, DIKECUALIKAN dari OMSET tier di atas.
+
+### 2 aturan tambahan (DIKONFIRMASI pengguna via chat, BELUM ada di berkas)
+1. **Laptop dengan harga satuan (@HARGA) > Rp15.000.000/unit** — bonus flat
+   **Rp350.000/unit** (interpretasi "Laptop Gaming" di berkas jadi berbasis
+   HARGA, bukan nama produk — dikonfirmasi pengguna).
+2. **Handphone**: Rp40.000/unit (sesuai berkas). Kalau total unit Handphone
+   terjual SATU sales DALAM SATU PERIODE > 5 unit, maka SELURUH unit
+   (bukan cuma kelebihannya) dapat Rp40.000+Rp50.000 = **Rp90.000/unit** —
+   **asumsi retroaktif ke seluruh volume** yang dikonfirmasi eksplisit oleh
+   pengguna (bukan cuma unit ke-6 dst yang dapat tambahan).
+
+### ⚠️ Asumsi tambahan (belum eksplisit di berkas/chat, PERLU DIKOREKSI
+   kalau keliru — sudah ditampilkan sebagai expander peringatan di UI)
+- **Lookup tier pakai FLOOR** (bracket TERTINGGI yang SUDAH TERCAPAI) — mis.
+  OMSET Rp180 juta pakai bracket Rp150 juta (8,5%), BUKAN interpolasi
+  maupun bracket Rp200 juta yang lebih tinggi.
+- OMSET di bawah bracket terendah (Rp25 juta) → Bonus Tier = **Rp0**.
+- Kategori barang "HANDPHONE" dan "HP" DIGABUNG — dicek manual, keduanya
+  sama-sama produk handphone (iPhone, Itel, Realme, dll), cuma variasi
+  penulisan kategori di data sumber (22 baris "HP" vs 1.791 baris
+  "HANDPHONE").
+- Kategori barang "SMARTBOARD" TIDAK ADA sebagai `KATEGORI BARANG`
+  tersendiri di data sumber saat ini — dicari via `NAMA BARANG` mengandung
+  kata "SMARTBOARD" sebagai fallback (ditemukan 4 baris).
+- Kolom "THP" pada tabel "RETAIL Non Gaji" di berkas asli punya nilai
+  janggal (mis. "43500000.145") — kemungkinan besar artefak formula Excel
+  (salah menempelkan kolom % ke digit belakang koma), BUKAN angka
+  sungguhan. THP di modul ini DIHITUNG ULANG dari definisi yang benar
+  (Bonus saja, karena kategori ini tanpa gaji), TIDAK disalin mentah dari
+  berkas.
+- Baris transaksi tanpa nama sales (`YANG MENYERAHKAN/MENJUAL` kosong)
+  DIKECUALIKAN dari simulasi — bukan orang yang bisa disimulasikan gajinya.
+
+### Fungsi utama (`logic_insentif.py`)
+- `TIER_SALES_RETAIL` / `TIER_RETAIL_NON_GAJI` — tabel bracket (OMSET
+  minimum, % Bonus), ditranskrip PERSIS dari berkas Excel.
+- `cari_pct_bonus_tier(omset, tabel_tier)` — floor-lookup.
+- `simulasi_gaji_sales(df, tanggal_mulai, tanggal_selesai, dengan_gaji)` —
+  fungsi utama, group by (Cabang, Nama Sales), return DataFrame 17 kolom:
+  Cabang, Nama Sales, Omzet Laptop, Qty Laptop, Omzet Handphone, Qty
+  Handphone, Omzet Aksesoris, Qty Aksesoris, Omzet Lainnya, Total Omzet,
+  Rata-rata GP (%), Gaji Pokok, Bonus Tier, Bonus Laptop Mahal, Bonus
+  Handphone, Total Bonus, THP. "Rata-rata GP (%)" dihitung dari SELURUH
+  transaksi sales itu di periode tsb (semua kategori — Jasa, Sparepart,
+  dll ikut masuk "Omzet Lainnya" & mempengaruhi GP, TAPI TIDAK masuk
+  perhitungan Bonus Tier, karena Bonus Tier cuma dari 3 kategori spesifik
+  di berkas).
+
+### UI (`app.py`, di dalam `render_aksesoris_tab()`)
+- Radio pilih kategori: "Sales Retail (dengan Gaji Pokok)" vs "Retail Non
+  Gaji". Expander "⚠️ Asumsi perhitungan yang perlu diketahui" menampilkan
+  SEMUA asumsi di atas secara eksplisit ke pengguna.
+- **Default periode = SATU BULAN TERAKHIR yang ada datanya** (BUKAN
+  seluruh data) — pilihan desain PENTING: skema tier ini jelas dirancang
+  untuk simulasi BULANAN (bracket OMSET 25jt–300jt masuk akal untuk 1
+  bulan kerja, TIDAK masuk akal kalau digabung berbulan-bulan — awalnya
+  diuji dengan seluruh data ~9 bulan dan menghasilkan THP hingga Rp117
+  juta yang jelas tidak realistis, makanya default diubah). Date picker
+  memilih tanggal apa pun di bulan yang diinginkan, otomatis dinormalisasi
+  ke awal-akhir bulan itu.
+- Filter Cabang opsional (multiselect, kosong = semua cabang).
+- 4 kartu metrik: Jumlah Sales, Total THP, Rata-rata THP/Sales, Rata-rata
+  GP Jaringan (direkonstruksi dari `Σ(GP% × Omzet) / Σ(Omzet)` per baris,
+  BUKAN rata-rata sederhana dari kolom GP% — supaya akurat kalau omzet
+  antar sales timpang; diverifikasi cocok persis dengan hitungan LABA
+  langsung dari data mentah).
+- Tabel lengkap 17 kolom + unduhan CSV (nama file menyertakan bulan-tahun
+  periode, mis. `simulasi_gaji_2026_09.csv`).
+
+### Diuji dengan data asli
+- Periode 1 bulan (Agustus 2026): 122 sales, THP realistis (Rp5–16 juta).
+  Verifikasi manual untuk 1 sales spesifik (Total Omzet, Bonus Laptop
+  Mahal, Bonus Handphone) — SEMUA cocok persis.
+- Kasus HP >5 unit: Muhammad Mirza (Sawangan) 272 unit HP → Bonus
+  Rp24.480.000 (272 × Rp90.000) — cocok persis.
+- Kasus Laptop Mahal: 20 sales punya minimal 1 transaksi laptop >Rp15jt
+  dalam periode data lengkap.
+- Mode "Retail Non Gaji": diverifikasi Gaji Pokok = Rp0 untuk SEMUA baris.
+- Kasus tepi data kosong: `simulasi_gaji_sales()` return DataFrame kosong
+  dengan struktur kolom yang benar, tidak error.
+- Rata-rata GP Jaringan (periode default September 2026, 104 sales):
+  44,74% — diverifikasi cocok persis dengan hitungan `Σ LABA / Σ TOTAL
+  HARGA` langsung dari data mentah (bukan rekonstruksi keliru).
+
+### 🔎 Temuan data quality (dilaporkan, TIDAK diperbaiki otomatis)
+Ditemukan nama sales yang SAMA tapi beda kapitalisasi tercatat sebagai 2
+ORANG TERPISAH di hasil simulasi — mis. "FAUZAN RISMAHYUDI" dan "Fauzan
+Rismahyudi" (Sawangan) muncul sebagai 2 baris berbeda. Ini masalah
+KONSISTENSI PENULISAN di data sumber (`YANG MENYERAHKAN/MENJUAL`), BUKAN
+bug di logic — sengaja TIDAK "diperbaiki" otomatis (mis. uppercase semua
+nama) karena berisiko MENYEMBUNYIKAN kasus di mana 2 nama mirip itu
+MEMANG 2 orang berbeda. Perlu ditindaklanjuti di sumber data kalau memang
+orang yang sama.
+
 ## 📌 Ringkasan Eksekutif (paling atas halaman)
 
 Bagian ringkas gaya kartu di paling atas halaman, sebelum ketiga dashboard

@@ -9,6 +9,7 @@ import logic_persediaan as lp
 import logic_penjualan as ljl
 import logic_aksesoris as la
 import logic_pembelian as lb
+import logic_insentif as li
 
 # Flag sementara: bagian-bagian yang berkaitan dengan Parfum disembunyikan
 # dari dashboard atas permintaan. Kode/logikanya TIDAK dihapus, cuma
@@ -2278,6 +2279,102 @@ def render_aksesoris_tab():
             )
 
         st.divider()
+
+    # -----------------------------------------------------------------
+    # 3b2. Simulasi Gaji & THP Sales Retail
+    # -----------------------------------------------------------------
+    st.header("💰 Simulasi Gaji & THP Sales Retail")
+    st.caption(
+        "Mengacu ke berkas resmi \"Rules_Insentif_Sales_Retail.xlsx\" (kategori \"SALES RETAIL\" "
+        "dengan Gaji Pokok, dan \"RETAIL — Teknisi/Magang/Affiliate/Sales Non Gaji\"; kategori "
+        "\"CORP\" tidak dipakai). OMSET untuk tabel tier Bonus = **Laptop (harga ≤ Rp15jt) + "
+        "Aksesoris + Smartboard**. **Laptop >Rp15jt/unit** dapat bonus flat **Rp350.000/unit** "
+        "(dikecualikan dari OMSET tier). **Handphone**: Rp40.000/unit, kalau total >5 unit dalam "
+        "periode maka SELURUH unit dapat Rp90.000/unit (Rp40rb+Rp50rb) — 2 aturan Laptop & "
+        "Handphone terakhir ini adalah aturan TAMBAHAN yang dikonfirmasi terpisah, belum ada di "
+        "berkas resminya."
+    )
+    with st.expander("⚠️ Asumsi perhitungan yang perlu diketahui", expanded=False):
+        st.markdown(
+            "- **Lookup tier pakai FLOOR** (bracket TERTINGGI yang SUDAH TERCAPAI) — mis. OMSET "
+            "Rp180 juta pakai bracket Rp150 juta (8,5%), BUKAN interpolasi maupun bracket Rp200 juta.\n"
+            "- OMSET di bawah bracket terendah (Rp25 juta) mendapat **Bonus Tier = Rp0** (belum ada "
+            "bracket \"di bawah Rp25 juta\" di berkas).\n"
+            "- Kategori barang \"HANDPHONE\" dan \"HP\" digabung (keduanya produk handphone, cuma "
+            "variasi penulisan di data sumber).\n"
+            "- Kolom \"THP\" pada tabel \"RETAIL Non Gaji\" di berkas asli punya nilai janggal (mis. "
+            "\"43500000.145\") — kemungkinan artefak formula Excel, BUKAN angka sungguhan. THP di "
+            "simulasi ini dihitung ulang dari definisi yang benar (Bonus saja, tanpa gaji), bukan "
+            "disalin mentah dari berkas.\n"
+            "- Baris transaksi tanpa nama sales (kolom \"Yang Menyerahkan/Menjual\" kosong) "
+            "dikecualikan dari simulasi ini."
+        )
+
+    if df_semua_kategori is None or df_semua_kategori.empty:
+        st.info("Unggah data Penjualan di panel kiri untuk menjalankan simulasi ini.")
+    else:
+        gi1, gi2 = st.columns(2)
+        with gi1:
+            mode_gaji = st.radio(
+                "Kategori", ["Sales Retail (dengan Gaji Pokok)", "Retail Non Gaji (Teknisi/Magang/Affiliate)"],
+                key="gaji_mode",
+            )
+        dengan_gaji_sim = mode_gaji.startswith("Sales Retail")
+
+        # Default periode = SATU BULAN TERAKHIR yang ada datanya (BUKAN
+        # seluruh data) — skema tier insentif ini jelas dirancang untuk
+        # simulasi BULANAN (bracket OMSET 25jt–300jt masuk akal untuk 1
+        # bulan kerja seorang sales, tidak masuk akal kalau digabung
+        # berbulan-bulan sekaligus — akan menghasilkan THP yang jauh
+        # dari realistis).
+        tgl_data_max_gaji = df_semua_kategori["TGL FAKTUR"].max()
+        default_awal_bulan = tgl_data_max_gaji.replace(day=1)
+        with gi2:
+            bulan_pilihan_gaji = st.date_input(
+                "Pilih bulan (tanggal berapa pun di bulan itu)", value=default_awal_bulan,
+                min_value=df_semua_kategori["TGL FAKTUR"].min(), max_value=tgl_data_max_gaji, key="gaji_bulan",
+            )
+        tgl_mulai_gaji = pd.Timestamp(bulan_pilihan_gaji).replace(day=1)
+        tgl_selesai_gaji = tgl_mulai_gaji + pd.offsets.MonthEnd(0)
+        st.caption(f"Periode simulasi: {tgl_mulai_gaji.strftime('%d %b %Y')} – {tgl_selesai_gaji.strftime('%d %b %Y')}.")
+
+        cabang_opsi_gaji = sorted(df_semua_kategori["CABANG"].dropna().unique().tolist())
+        cabang_pilihan_gaji = st.multiselect(
+            "Filter Cabang (kosongkan untuk semua cabang)", cabang_opsi_gaji, default=[], key="gaji_cabang_filter",
+        )
+
+        hasil_gaji = li.simulasi_gaji_sales(df_semua_kategori, tgl_mulai_gaji, tgl_selesai_gaji, dengan_gaji=dengan_gaji_sim)
+        if cabang_pilihan_gaji:
+            hasil_gaji = hasil_gaji[hasil_gaji["Cabang"].isin(cabang_pilihan_gaji)].reset_index(drop=True)
+
+        if hasil_gaji.empty:
+            st.info("Tidak ada transaksi dengan nama sales tercatat pada periode/filter ini.")
+        else:
+            g1, g2, g3, g4 = st.columns(4)
+            g1.metric("Jumlah Sales", li.format_int_id(len(hasil_gaji)))
+            g2.metric("Total THP", li.format_rupiah_id(hasil_gaji["THP"].sum()))
+            g3.metric("Rata-rata THP / Sales", li.format_rupiah_id(hasil_gaji["THP"].mean()))
+            total_omzet_gaji = hasil_gaji["Total Omzet"].sum()
+            total_laba_gaji_num = (hasil_gaji["Rata-rata GP (%)"] / 100 * hasil_gaji["Total Omzet"]).sum()
+            g4.metric("Rata-rata GP Jaringan", li.format_percent_id(total_laba_gaji_num / total_omzet_gaji * 100 if total_omzet_gaji else 0))
+
+            tampil_gaji = hasil_gaji.copy()
+            kolom_rp_gaji = [
+                "Omzet Laptop", "Omzet Handphone", "Omzet Aksesoris", "Omzet Lainnya", "Total Omzet",
+                "Gaji Pokok", "Bonus Tier", "Bonus Laptop Mahal", "Bonus Handphone", "Total Bonus", "THP",
+            ]
+            for c in kolom_rp_gaji:
+                tampil_gaji[c] = hasil_gaji[c].map(li.format_rupiah_id)
+            for c in ["Qty Laptop", "Qty Handphone", "Qty Aksesoris"]:
+                tampil_gaji[c] = hasil_gaji[c].map(lambda x: li.format_int_id(x))
+            tampil_gaji["Rata-rata GP (%)"] = hasil_gaji["Rata-rata GP (%)"].map(li.format_percent_id)
+            st.dataframe(tampil_gaji, use_container_width=True, height=min(80 + 38 * len(hasil_gaji), 650))
+            st.download_button(
+                "⬇️ Unduh CSV — Simulasi Gaji & THP Sales Retail", hasil_gaji.to_csv(index=False).encode("utf-8-sig"),
+                f"simulasi_gaji_{tgl_mulai_gaji.strftime('%Y_%m')}.csv", "text/csv", key="gaji_dl",
+            )
+
+    st.divider()
 
     # -----------------------------------------------------------------
     # 3c. Target Pencapaian Penjualan LUNA
